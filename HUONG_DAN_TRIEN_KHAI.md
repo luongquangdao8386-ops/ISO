@@ -1,7 +1,7 @@
 # Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d1.1 (Đợt 1, phiên 1a)
 
-App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, **tài khoản Google riêng**, bảng tính
-riêng), người dùng và PIN riêng. Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
+App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
+riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
 trên GitHub Pages.
 
 Phiên 1a có: đăng nhập PIN, người dùng (bộ phận, Thư ký ISO, Đánh giá viên), bộ phận, danh mục biểu mẫu & tài liệu (lọc, tìm Việt/Trung,
@@ -21,13 +21,15 @@ App THỬ có nhãn vàng **THỬ** trên đầu màn hình; tên trên iPhone l
 
 ---
 
-## Phần A — Tài khoản Google cho máy chủ ISO (làm một lần)
+## Phần A — Tài khoản Google cho máy chủ ISO
 
-Đã chốt: máy chủ ISO dùng **tài khoản Google mới, riêng** (như M&E, Checksheet).
+Đã chốt: máy chủ ISO dùng **chung tài khoản Google** với M&E và Checksheet. Không tạo tài khoản mới.
 
-1. Tạo tài khoản Gmail mới cho máy chủ ISO (Claude không cần biết tài khoản, mật khẩu hay mã SMS).
-2. Trên Chrome máy tính: bấm ảnh đại diện góc phải → **Thêm** (hồ sơ Chrome mới) → đăng nhập tài khoản mới. Mọi bước ở Phần C làm trong
-   hồ sơ Chrome này để không nhầm với tài khoản của M&E/Checksheet.
+1. Dùng tài khoản anh đang dùng cho M&E và Checksheet. Claude không cần biết tài khoản, mật khẩu hay mã SMS.
+2. Mở Chrome trên máy tính bằng hồ sơ của tài khoản đó (ảnh đại diện góc phải để kiểm tra đúng tài khoản). Mọi bước ở Phần C làm
+   trong hồ sơ này.
+3. Lưu ý khi dùng chung: hạn mức Gmail, dịch máy và gọi dịch vụ ngoài của Google tính theo tài khoản, nên ba app chia nhau. Từ Đợt 2
+   ISO gửi email nhắc hạn, cần theo dõi hạn mức này. Nếu tài khoản bị khóa hoặc phải xác minh lại, cả ba app cùng ngừng.
 
 ## Phần B — Bật trang thử /ISO-thu/ (GitHub Pages, làm một lần)
 
@@ -41,7 +43,7 @@ Repo `ISO` (trang THẬT) để trống tới phiên 1d — chỉ đẩy khi anh
 
 ## Phần C — Dựng máy chủ THỬ (`ISO_MayChu_THU`)
 
-Làm trong hồ sơ Chrome của **tài khoản Google máy chủ ISO** (Phần A).
+Làm trong hồ sơ Chrome của tài khoản Google anh đang dùng cho M&E/Checksheet (Phần A).
 
 1. <https://script.google.com> → **Dự án mới** → đổi tên thành `ISO_MayChu_THU`.
 2. **Cài đặt dự án** (bánh răng bên trái):
@@ -53,7 +55,7 @@ Làm trong hồ sơ Chrome của **tài khoản Google máy chủ ISO** (Phần 
      `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO-thu/main/apps-script/appsscript.json` → Ctrl+A → Ctrl+C → dán vào;
    - tệp `Code.gs` → Ctrl+A → xóa → mở link
      `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO-thu/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu** (Ctrl+S).
-4. Ô chọn hàm → **`setup`** → **Chạy** → Google hỏi quyền: **Xem lại quyền** → chọn tài khoản máy chủ ISO → **Nâng cao** →
+4. Ô chọn hàm → **`setup`** → **Chạy** → Google hỏi quyền: **Xem lại quyền** → chọn tài khoản đang dùng → **Nâng cao** →
    **Đi tới ISO_MayChu_THU (không an toàn)** → **Cho phép**.
    Nhật ký thực thi: `Xong setup. ENV=THU. Đã tạo 16 sheet…` và `Đã cài trigger: runBackgroundJobs, backupData`.
 5. **Cài đặt dự án → Thuộc tính tập lệnh** → thêm 3 thuộc tính:
@@ -139,7 +141,7 @@ Thứ tự luôn là: dán `Code.gs` (+ `migrateSchema`) **trước**, rồi Cla
 
 ## Phần THẬT — làm ở phiên 1d
 
-Khi anh nói "phát hành ISO": dựng `ISO_MayChu_THAT` (như Phần C, `ENV = THAT`, tài khoản Google máy chủ ISO), Claude cố định link
+Khi anh nói "phát hành ISO": dựng `ISO_MayChu_THAT` (như Phần C, `ENV = THAT`, cùng tài khoản Google), Claude cố định link
 `/exec` THẬT trong `config.js` (`/ISO/` → THẬT, `/ISO-thu/` → THỬ) và đẩy `main` của repo `ISO`, anh bật Pages cho repo `ISO`.
 
 ## Hàm chạy tay trong trình soạn Apps Script
