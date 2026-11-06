@@ -238,3 +238,27 @@ test('iPhone: Tài khoản → Quản trị: thêm người dùng có bộ phậ
     assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
 });
+
+test('web: Quản trị → Sao lưu → Tài khoản sao lưu thứ hai: lưu email (PIN) → máy chủ chia sẻ thư mục Sao lưu + Dữ liệu, trạng thái "Đang chia sẻ"', async () => {
+  const env = seeded();
+  const app = await openApp({ env, now: NOW, ...WEB });
+  try {
+    const { page } = app;
+    await login(page);
+    await go(page, '#/admin/backup');
+    await page.waitForSelector('#bk-mirror');
+    assert.ok((await page.textContent('#bk-mirror')).includes('Chưa đặt'));
+    await page.fill('#mi-email', 'b-account@example.test');
+    await page.click('#mi-save');
+    await page.waitForSelector('.modal .pin-input');
+    await page.fill('.modal .pin-input', OWNER_PIN);
+    await page.locator('.modal:has(.pin-input) .btn.primary').click();
+    await page.waitForFunction(() => (document.querySelector('#bk-mirror') || {}).textContent && document.querySelector('#bk-mirror').textContent.includes('Đang chia sẻ'));
+    assert.ok((await page.textContent('#bk-mirror')).includes('ISO_Backups_THU, ISO_Data_THU'));
+    const shared = [...env.drive._folders.values()].filter((f) => f.viewers.has('b-account@example.test')).map((f) => f.name).sort();
+    assert.deepEqual(shared, ['ISO_Backups_THU', 'ISO_Data_THU']);
+    assert.deepEqual(await noRawKeys(page), []);
+    await page.screenshot({ path: path.join(SHOTS, 'backup-mirror-web.png'), fullPage: true });
+    assert.deepEqual(app.consoleErrors, []);
+  } finally { await app.close(); }
+});

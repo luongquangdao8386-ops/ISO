@@ -286,14 +286,33 @@ function makeSpreadsheetApp(drive) {
   return app;
 }
 
-/* ---------------- DriveApp ---------------- */
+/* ---------------- DriveApp ----------------
+ * Có chủ sở hữu và người xem (chia sẻ) để test sao lưu sang tài khoản thứ hai: drive._user là tài khoản đang chạy mã
+ * (máy chủ: me-owner@example.test; script ở tài khoản thứ hai đổi drive._user). Người không phải chủ, không được chia sẻ
+ * (trực tiếp hoặc qua thư mục cha) thì không mở được. */
 function makeDrive() {
   const files = new Map(), folders = new Map();
   const Access = { ANYONE: 'ANYONE', ANYONE_WITH_LINK: 'ANYONE_WITH_LINK', DOMAIN: 'DOMAIN', DOMAIN_WITH_LINK: 'DOMAIN_WITH_LINK', PRIVATE: 'PRIVATE' };
   const Permission = { VIEW: 'VIEW', EDIT: 'EDIT', COMMENT: 'COMMENT', OWNER: 'OWNER', ORGANIZER: 'ORGANIZER', NONE: 'NONE' };
+  const user = (e) => ({ getEmail: () => e });
+  /** Người đang chạy mở được mục này: là chủ, hoặc mục/thư mục cha được chia sẻ cho người đó */
+  const canRead = (rec) => {
+    for (let r = rec; r; r = r.parent ? folders.get(r.parent) : null) {
+      if (r.owner === drive._user || (r.viewers && r.viewers.has(drive._user))) return true;
+    }
+    return false;
+  };
+  const guard = (rec) => { if (!canRead(rec)) throw new Error('Access denied: ' + rec.id); return rec; };
+  const sharing = (rec) => ({
+    addViewer: (e) => { if (drive._failSharing) throw new Error('sharing failed'); if (rec.owner !== drive._user) throw new Error('Only owner can share'); rec.viewers.add(String(e).toLowerCase()); return null; },
+    removeViewer: (e) => { rec.viewers.delete(String(e).toLowerCase()); return null; },
+    getViewers: () => [...rec.viewers].map(user),
+    getEditors: () => [],
+    getOwner: () => user(rec.owner)
+  });
   const mkFile = (rec) => ({
     getId: () => rec.id, getName: () => rec.name, getSize: () => rec.bytes.length, getMimeType: () => rec.mime,
-    getBlob: () => new MockBlob(rec.bytes, rec.mime, rec.name),
+    getBlob: () => { guard(rec); return new MockBlob(rec.bytes, rec.mime, rec.name); },
     getAs: (mime) => {
       const d = drive._docs.get(rec.id);
       if (!d) throw new Error('getAs: not a document');
@@ -305,39 +324,58 @@ function makeDrive() {
     getSharingAccess: () => rec.access, getSharingPermission: () => rec.permission,
     setTrashed: (t) => { rec.trashed = !!t; }, isTrashed: () => rec.trashed,
     makeCopy: (name, folder) => {
+      guard(rec);
       const id = 'f_' + crypto.randomBytes(8).toString('hex');
-      const c = { ...rec, id, name, access: 'PRIVATE', permission: 'EDIT', trashed: false, parent: folder ? folder.getId() : rec.parent };
+      const c = { ...rec, id, name, access: 'PRIVATE', permission: 'EDIT', trashed: false, parent: folder ? folder.getId() : rec.parent, owner: drive._user, viewers: new Set() };
       files.set(id, c);
       if (drive._copyBook) drive._copyBook(rec.id, id, name);
       if (drive._afterCopy) drive._afterCopy(rec.id, id);
       return mkFile(c);
     },
-    moveTo: (folder) => { rec.parent = folder.getId(); return mkFile(rec); }
+    moveTo: (folder) => { rec.parent = folder.getId(); return mkFile(rec); },
+    setContent: (text) => { if (rec.owner !== drive._user) throw new Error('Access denied (write): ' + rec.id); rec.bytes = Buffer.from(String(text), 'utf8'); return mkFile(rec); },
+    ...sharing(rec)
   });
   const mkFolder = (rec) => ({
-    getId: () => rec.id, getName: () => rec.name,
+    getId: () => rec.id, getName: () => rec.name, setName: (n) => { rec.name = String(n); return mkFolder(rec); },
     createFolder: (name) => newFolder(name, rec.id),
     createFile: (blob) => {
       const id = 'f_' + crypto.randomBytes(8).toString('hex');
-      const r = { id, name: blob.getName(), bytes: Buffer.from(blob._bytes), mime: blob.getContentType(), access: 'PRIVATE', permission: 'EDIT', trashed: false, parent: rec.id };
+      const r = { id, name: blob.getName(), bytes: Buffer.from(blob._bytes), mime: blob.getContentType(), access: 'PRIVATE', permission: 'EDIT', trashed: false, parent: rec.id, owner: drive._user, viewers: new Set() };
       files.set(id, r); return mkFile(r);
     },
-    getFiles: () => { const list = [...files.values()].filter((f) => f.parent === rec.id && !f.trashed); let i = 0; return { hasNext: () => i < list.length, next: () => mkFile(list[i++]) }; },
-    getFolders: () => { const list = [...folders.values()].filter((f) => f.parent === rec.id && !f.trashed); let i = 0; return { hasNext: () => i < list.length, next: () => mkFolder(list[i++]) }; },
-    getFilesByName: (n) => { const list = [...files.values()].filter((f) => f.parent === rec.id && !f.trashed && f.name === n); let i = 0; return { hasNext: () => i < list.length, next: () => mkFile(list[i++]) }; },
-    setTrashed: (t) => { rec.trashed = !!t; }, isTrashed: () => !!rec.trashed
+    getFiles: () => { guard(rec); const list = [...files.values()].filter((f) => f.parent === rec.id && !f.trashed); let i = 0; return { hasNext: () => i < list.length, next: () => mkFile(list[i++]) }; },
+    getFolders: () => { guard(rec); const list = [...folders.values()].filter((f) => f.parent === rec.id && !f.trashed); let i = 0; return { hasNext: () => i < list.length, next: () => mkFolder(list[i++]) }; },
+    getFilesByName: (n) => { guard(rec); const list = [...files.values()].filter((f) => f.parent === rec.id && !f.trashed && f.name === n); let i = 0; return { hasNext: () => i < list.length, next: () => mkFile(list[i++]) }; },
+    getFoldersByName: (n) => { guard(rec); const list = [...folders.values()].filter((f) => f.parent === rec.id && !f.trashed && f.name === n); let i = 0; return { hasNext: () => i < list.length, next: () => mkFolder(list[i++]) }; },
+    setTrashed: (t) => { rec.trashed = !!t; }, isTrashed: () => !!rec.trashed,
+    ...sharing(rec)
   });
   const newFolder = (name, parent) => {
     const id = 'd_' + crypto.randomBytes(8).toString('hex');
-    const r = { id, name, parent }; folders.set(id, r); return mkFolder(r);
+    const r = { id, name, parent, owner: drive._user, viewers: new Set() }; folders.set(id, r); return mkFolder(r);
   };
+  const iter = (list) => { let i = 0; return { hasNext: () => i < list.length, next: () => mkFolder(list[i++]) }; };
   const drive = {
     Access, Permission,
     createFolder: (name) => newFolder(name, null),
-    getFolderById: (id) => { const r = folders.get(id); if (!r) throw new Error('No folder ' + id); return mkFolder(r); },
-    getFileById: (id) => { const r = files.get(id); if (!r) throw new Error('No file ' + id); return mkFile(r); },
-    _registerExternal: (id, name, mime) => files.set(id, { id, name, bytes: Buffer.alloc(0), mime, access: 'PRIVATE', permission: 'EDIT', trashed: false, parent: null }),
-    _files: files, _folders: folders, _failSharing: false, _docs: new Map()
+    getFolderById: (id) => { const r = folders.get(id); if (!r) throw new Error('No folder ' + id); return mkFolder(guard(r)); },
+    getFileById: (id) => { const r = files.get(id); if (!r) throw new Error('No file ' + id); return mkFile(guard(r)); },
+    getRootFolder: () => { if (!drive._roots[drive._user]) drive._roots[drive._user] = newFolder('My Drive', null).getId(); return mkFolder(folders.get(drive._roots[drive._user])); },
+    /** Chỉ hiểu hai điều kiện dùng trong mã: "sharedWithMe = true" và "title contains '…'" (nối bằng and/or) */
+    searchFolders: (q) => {
+      const t = /title contains '([^']*)'/g;
+      const titles = [...String(q).matchAll(t)].map((m) => m[1]);
+      const shared = /sharedWithMe\s*=\s*true/.test(q);
+      if (!shared && !titles.length) throw new Error('searchFolders: query không hỗ trợ ' + q);
+      const list = [...folders.values()].filter((f) => !f.trashed
+        && (!shared || (f.viewers.has(drive._user) && f.owner !== drive._user))
+        && (!titles.length || titles.some((x) => f.name.includes(x)))
+        && canRead(f));
+      return iter(list);
+    },
+    _registerExternal: (id, name, mime) => files.set(id, { id, name, bytes: Buffer.alloc(0), mime, access: 'PRIVATE', permission: 'EDIT', trashed: false, parent: null, owner: drive._user, viewers: new Set() }),
+    _files: files, _folders: folders, _failSharing: false, _docs: new Map(), _user: 'me-owner@example.test', _roots: {}
   };
   return drive;
 }
@@ -614,7 +652,7 @@ export function loadServer(opts = {}) {
         return { getContentText: () => text, getResponseCode: () => (r && r.code) || 200 };
       }
     },
-    Session: { getEffectiveUser: () => ({ getEmail: () => 'me-owner@example.test' }), getScriptTimeZone: () => 'Asia/Ho_Chi_Minh' },
+    Session: { getEffectiveUser: () => ({ getEmail: () => drive._user }), getScriptTimeZone: () => 'Asia/Ho_Chi_Minh' },
     Logger: { log: (m) => logs.push(String(m)) },
     console: { log: (m) => logs.push(String(m)), error: (m) => logs.push('ERR ' + String(m)), warn: (m) => logs.push('WARN ' + String(m)) }
   };
@@ -633,4 +671,30 @@ export function loadServer(opts = {}) {
     rows(name) { g.dbReset_(); return JSON.parse(JSON.stringify(g.readRows_(name))); }
   };
   return env;
+}
+
+/**
+ * Chạy một tệp .gs khác (vd apps-script/SaoLuuPhu.gs ở tài khoản thứ hai) trong ngữ cảnh riêng, dùng chung Drive và đồng hồ với
+ * máy chủ `env`: Thuộc tính tập lệnh, trigger, nhật ký riêng. Gọi hàm khi drive._user = tài khoản của script đó (asUser).
+ */
+export function loadScript(env, relPath, { user }) {
+  const props = makeProperties();
+  const logs = [];
+  const g = {
+    Date: env.clock.Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Error, TypeError, isNaN, parseInt, parseFloat,
+    Utilities: makeUtilities(env.clock), PropertiesService: props, ScriptApp: makeScriptApp(), DriveApp: env.drive,
+    Session: { getEffectiveUser: () => ({ getEmail: () => env.drive._user }) },
+    Logger: { log: (m) => logs.push(String(m)) }, console: { log: (m) => logs.push(String(m)), error: (m) => logs.push('ERR ' + m) }
+  };
+  vm.createContext(g);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, relPath), 'utf8'), g, { filename: relPath });
+  return {
+    g, logs, props: props._store,
+    /** Gọi hàm với drive._user = tài khoản của script, trả về drive._user cũ sau đó */
+    run(fn, ...args) {
+      const prev = env.drive._user;
+      env.drive._user = user;
+      try { return JSON.parse(JSON.stringify(g[fn](...args) ?? null)); } finally { env.drive._user = prev; }
+    }
+  };
 }

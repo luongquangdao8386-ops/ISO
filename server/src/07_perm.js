@@ -71,6 +71,7 @@ var ACTION_TABLE_ = [
   'audit.view|3|net|R',
   'backup.view|4|net|R',
   'backup.run|4|pin|W',
+  'backup.mirror.set|4|pin|W',
   'settings.edit|4|pin|W',
   'system.status|4|net|R',
   'sample.seed|O|pin|W'

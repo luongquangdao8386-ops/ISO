@@ -38,6 +38,7 @@ var HANDLERS_ = {
   'audit.view': function (ctx) { return auditView_(ctx); },
   'backup.view': function (ctx) { return backupView_(ctx); },
   'backup.run': function (ctx) { return backupRun_(ctx); },
+  'backup.mirror.set': function (ctx) { return backupMirrorSet_(ctx); },
   'settings.edit': function (ctx) { return settingsEdit_(ctx); },
   'system.status': function (ctx) { return systemStatus_(ctx); },
   'sample.seed': function (ctx) { return sampleSeedAction_(ctx); }

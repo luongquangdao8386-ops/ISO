@@ -56,7 +56,7 @@ function auditView_(ctx) {
 /* ---------------- Cấu hình ---------------- */
 
 /** Khóa không sửa trong màn Cấu hình (logo sửa ở màn riêng) */
-var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1 };
+var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, backup_mirror_email: 1 };
 var SETTINGS_BOUNDS_ = {
   session_days: [1, 90], session_warn_days: [0, 30], change_pin_session_minutes: [5, 60], reauth_window_minutes: [1, 30], temp_pin_hours: [1, 168],
   max_sessions_per_user: [1, 50], login_fail_limit: [3, 20], login_fail_window_minutes: [1, 120], login_lock_minutes: [1, 1440],
@@ -207,6 +207,11 @@ function healthRows_() {
   var lb = stateGet_(st, 'last_backup_at', ''), lbs = stateGet_(st, 'last_backup_status', '');
   var lbt = parseTime_(lb);
   add('last_backup', lbs === 'VERIFIED' && lbt && now_().getTime() - lbt.getTime() < 8 * 86400000, (lb ? lb.slice(0, 16).replace('T', ' ') : '') + (lbs ? ' · ' + lbs : ''), stateGet_(st, 'last_backup_ref', ''));
+  // Bản sao ở tài khoản Google thứ hai: đã đặt email và lần chia sẻ gần nhất thành công
+  var mEmail = String(setting_('backup_mirror_email') || '');
+  var mStatus = stateGet_(st, 'backup_mirror_status', '');
+  add('backup_mirror', !!mEmail && mStatus === 'OK', mEmail ? maskEmail_(mEmail) + (mStatus ? ' · ' + mStatus : '') : 'OFF',
+    !mEmail ? 'Quản trị → Sao lưu → Tài khoản sao lưu thứ hai' : (mStatus === 'OK' ? '' : String(stateGet_(st, 'backup_mirror_error', '') || 'Chưa chia sẻ')));
   var mtp = parseTime_(stateGet_(st, 'mt_paused_until', ''));
   add('mt_paused_until', !(mtp && mtp.getTime() > now_().getTime()), stateGet_(st, 'mt_paused_until', ''));
   var lpu = parseTime_(stateGet_(st, 'login_paused_until', ''));

@@ -68,7 +68,8 @@ var SUB_MSG = {
   KIND_INVALID: ['Loại tài liệu không hợp lệ', '文件类型无效'],
   LEVEL_INVALID: ['Cấp tài liệu không hợp lệ', '文件级别无效'],
   CLAUSE_INVALID: ['Điều khoản ISO 9001 dạng 4.1, 8.5.2 …', 'ISO 9001条款格式为 4.1、8.5.2 …'],
-  OUT_OF_SCOPE: ['Ngoài phạm vi bộ phận của bạn', '超出您的部门范围']
+  OUT_OF_SCOPE: ['Ngoài phạm vi bộ phận của bạn', '超出您的部门范围'],
+  MIRROR_SAME_ACCOUNT: ['Tài khoản thứ hai phải khác tài khoản đang chạy máy chủ', '第二个账户须与运行服务器的账户不同']
 };
 
 function fmtMsg_(pair, vars) {

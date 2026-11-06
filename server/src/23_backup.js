@@ -132,7 +132,10 @@ function backupDataRun_() {
     scheduleBackupOnce_(15 * 60000);
   }
   var trashed = pruneBackups_();
-  log_('backupData: ' + stamp + ' → ' + manifest.status + (trashed ? '; đã chuyển ' + trashed + ' bản cũ vào thùng rác' : '') + '.');
+  var mir = null;
+  try { mir = backupMirrorEnsure_(); } catch (e) { mir = { status: 'FAILED', error: String(e && e.message || e).slice(0, 120) }; }
+  log_('backupData: ' + stamp + ' → ' + manifest.status + (trashed ? '; đã chuyển ' + trashed + ' bản cũ vào thùng rác' : '') +
+    (mir ? '; tài khoản thứ hai: ' + mir.status : '') + '.');
   return manifest;
 }
 
@@ -188,7 +191,9 @@ function backupView_(ctx) {
     items: items, queued: oneShotIds_().length > 0, running: running,
     last_backup_at: stateGet_(st, 'last_backup_at', ''), last_backup_ref: stateGet_(st, 'last_backup_ref', ''), last_backup_status: stateGet_(st, 'last_backup_status', ''),
     last_restore_at: stateGet_(st, 'last_restore_at', ''), restored_from_ref: stateGet_(st, 'restored_from_ref', ''),
-    backup_weekday: setting_('backup_weekday'), backup_hour: setting_('backup_hour'), keep_count: setting_('backup_keep_count')
+    backup_weekday: setting_('backup_weekday'), backup_hour: setting_('backup_hour'), keep_count: setting_('backup_keep_count'),
+    mirror: { email: String(setting_('backup_mirror_email') || ''), status: stateGet_(st, 'backup_mirror_status', ''), at: stateGet_(st, 'backup_mirror_at', ''),
+      error: stateGet_(st, 'backup_mirror_error', ''), folders: mirrorFolders_().map(function (f) { return f.getName(); }) }
   };
 }
 
@@ -205,3 +210,82 @@ function backupRun_(ctx) {
   return { status: 'QUEUED', already: false };
 }
 
+
+/* ---------------- Bản sao ở tài khoản Google thứ hai ----------------
+ * Ba app (ISO, M&E, Checksheet) dùng chung một tài khoản Google: tài khoản bị khóa thì mất cả dữ liệu lẫn bản sao lưu.
+ * Máy chủ chia sẻ (chỉ xem) thư mục Sao lưu và thư mục Dữ liệu cho tài khoản thứ hai; script SaoLuuPhu.gs chạy trong tài khoản đó
+ * chép bản sao lưu VERIFIED và tệp dữ liệu về Drive của chính nó (bản chép thuộc tài khoản thứ hai, còn nguyên khi tài khoản chính
+ * bị khóa). Email chỉ lưu trong Settings của máy chủ, không ghi vào mã (repo public). */
+
+/** "abcdef@example.com" → "ab***@example.com" (nhật ký, trạng thái hệ thống) */
+function maskEmail_(e) {
+  var m = /^([^@]{0,2})[^@]*(@.*)$/.exec(String(e || ''));
+  return m ? m[1] + '***' + m[2] : '';
+}
+
+/** Thư mục chia sẻ cho tài khoản thứ hai: Sao lưu (bản sao bảng tính) và Dữ liệu (tệp PDF, ảnh, logo) */
+function mirrorFolders_() {
+  var out = [backupRoot_()];
+  try { out.push(appFolder_()); } catch (e) { /* chưa có thư mục dữ liệu */ }
+  return out;
+}
+
+function hasViewer_(folder, email) {
+  var e = String(email).toLowerCase();
+  var list = folder.getViewers().concat(folder.getEditors());
+  for (var i = 0; i < list.length; i++) if (String(list[i].getEmail()).toLowerCase() === e) return true;
+  return false;
+}
+
+/**
+ * Chia sẻ (chỉ xem) các thư mục cho email; bỏ chia sẻ email cũ nếu đổi. Trả {status: 'OK'|'FAILED', error}.
+ * Không gọi trong khóa ghi (Drive chậm). Google gửi thư báo chia sẻ một lần cho tài khoản thứ hai.
+ */
+function backupMirrorShare_(email, oldEmail) {
+  var err = '';
+  mirrorFolders_().forEach(function (f) {
+    try {
+      if (oldEmail && String(oldEmail).toLowerCase() !== String(email || '').toLowerCase()) { try { f.removeViewer(oldEmail); } catch (e0) { /* chưa từng chia sẻ */ } }
+      if (email && !hasViewer_(f, email)) f.addViewer(email);
+    } catch (e) {
+      err = (f.getName() + ': ' + String(e && e.message || e)).slice(0, 180);
+    }
+  });
+  return { status: email ? (err ? 'FAILED' : 'OK') : 'OFF', error: err };
+}
+
+function noteMirror_(r, by) {
+  withWriteLock_(function () {
+    var st = readState_();
+    stateWrite_(st, { backup_mirror_status: ['STRING', r.status], backup_mirror_at: ['DATETIME', isoVN_(now_())], backup_mirror_error: ['STRING', r.error || ''] }, by || SYSTEM_USER);
+  });
+  cache_().remove('sys:state');
+}
+
+/** Sau mỗi lần sao lưu: kiểm lại chia sẻ (thư mục mới nằm trong thư mục đã chia sẻ nên tự được xem) */
+function backupMirrorEnsure_() {
+  var email = String(setting_('backup_mirror_email') || '');
+  if (!email) return null;
+  var r = backupMirrorShare_(email, '');
+  noteMirror_(r, SYSTEM_USER);
+  return r;
+}
+
+/** backup.mirror.set {email} (cấp 4, PIN): đặt / đổi / bỏ ('' ) tài khoản thứ hai, chia sẻ ngay và báo kết quả */
+function backupMirrorSet_(ctx) {
+  var p = ctx.req.payload || {};
+  var email = trimStr_(p.email).toLowerCase();
+  if (email && (!EMAIL_RE_.test(email) || email.length > 120)) throw validationError_([fieldError_('email', 'INVALID_VALUE')]);
+  var old = String(setting_('backup_mirror_email') || '');
+  var owner = '';
+  try { owner = String(Session.getEffectiveUser().getEmail() || '').toLowerCase(); } catch (e) { owner = ''; }
+  if (email && owner && email === owner) throw validationError_([fieldError_('email', 'MIRROR_SAME_ACCOUNT')]);
+  var r = backupMirrorShare_(email, old);
+  withWriteLock_(function () {
+    writeSetting_('backup_mirror_email', email, ctx.user.user_id);
+    writeAudit_({ user_id: ctx.user.user_id, device_id: ctx.req.device_id, action: 'backup.mirror.set', entity_type: 'BACKUP', entity_id: 'mirror',
+      before_json: { email: maskEmail_(old) }, after_json: { email: maskEmail_(email), status: r.status, error: r.error }, operation_id: ctx.req.operation_id || '', auth_basis: authBasis_(ctx) });
+  });
+  noteMirror_(r, ctx.user.user_id);
+  return { email: email, status: r.status, error: r.error, folders: mirrorFolders_().map(function (f) { return f.getName(); }) };
+}

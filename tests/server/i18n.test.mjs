@@ -43,6 +43,7 @@ test('họ khóa ghép động đủ thành viên', () => {
     'backup_status.': ['VERIFIED', 'INCONSISTENT', 'FAILED', 'RUNNING'],
     'audit_grp.': ['item', 'import', 'dept', 'user', 'settings', 'report', 'backup'],
     'action.': ['record.submit', 'doc.upload'],
+    'mirror_status.': ['OK', 'FAILED', 'OFF'],
     'imp.act.': ['ADD', 'UPDATE', 'SAME', 'ERROR'],
     'imp.status.': ['STAGING', 'PREVIEWED', 'COMMITTING', 'COMPLETED', 'CANCELLED'],
     'soon.what.': ['records', 'coverage', 'reports', 'capa', 'audits', 'links'],

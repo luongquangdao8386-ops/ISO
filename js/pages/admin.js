@@ -269,7 +269,8 @@ export async function renderBackup(view, { shell }) {
       <p>${d.last_backup_at ? `${esc(fmtDateTime(d.last_backup_at))} ${badge('backup_status.' + (d.last_backup_status || 'FAILED'))}` : bi('adm.backup.none')}</p>
       <p class="muted small">${bi('adm.backup.note', { D: biText('weekday.' + (WEEKDAY[d.backup_weekday] || 7)), H: String(d.backup_hour).padStart(2, '0'), N: d.keep_count })}</p>
       ${d.queued || d.running ? `<p class="banner info" id="bk-queued">${bi(d.queued ? 'adm.backup.queued' : 'adm.backup.running')}</p>` : `<button type="button" class="btn primary" id="bk-run">${bi('btn.backup_now')}</button>`}
-    </section>${list}</div>`;
+    </section>${mirrorHtml(d.mirror || {})}${list}</div>`;
+  wireMirror(view, () => renderBackup(view, { shell }));
   const run = $('#bk-run', view);
   if (run) run.addEventListener('click', async (ev) => {
     busy(ev.target, true);
@@ -278,6 +279,47 @@ export async function renderBackup(view, { shell }) {
     if (res.ok) renderBackup(view, { shell }); else writeFail(res);
   });
   if (d.queued || d.running) setTimeout(() => { if (view.isConnected && $('#bk-queued', view)) renderBackup(view, { shell }); }, 5000);
+}
+
+/** Tài khoản Google thứ hai giữ bản sao (chống mất khi tài khoản chính bị khóa) */
+function mirrorHtml(m) {
+  const st = m.email ? (m.status || 'FAILED') : 'OFF';
+  return `<section class="card" id="bk-mirror"><h2>${bi('adm.mirror.title')}</h2>
+    <p class="muted small">${bi('adm.mirror.what')}</p>
+    <div class="kv"><span>${bi('col.status')}</span><strong>${badge('mirror_status.' + st)}</strong></div>
+    ${m.email ? `<div class="kv"><span>${bi('adm.mirror.email')}</span><strong>${esc(m.email)}</strong></div>
+      <div class="kv"><span>${bi('adm.mirror.folders')}</span><strong>${esc((m.folders || []).join(', '))}</strong></div>
+      ${m.at ? `<div class="kv"><span>${bi('adm.mirror.checked')}</span><strong>${esc(fmtDateTime(m.at))}</strong></div>` : ''}
+      ${m.error ? `<p class="banner warn small">${esc(m.error)}</p>` : ''}` : ''}
+    <label class="lbl" for="mi-email">${bi('adm.mirror.email')}</label>
+    <input class="inp" id="mi-email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="120" value="${esc(m.email || '')}">
+    <div class="row"><button type="button" class="btn primary" id="mi-save">${ICON.sync}<span>${bi('adm.mirror.save')}</span></button>
+      ${m.email ? `<button type="button" class="btn danger" id="mi-off">${bi('adm.mirror.off')}</button>` : ''}</div>
+    <p class="muted small">${bi('adm.mirror.next')}</p></section>`;
+}
+
+function wireMirror(view, again) {
+  const save = $('#mi-save', view);
+  if (!save) return;
+  const send = async (btn, email) => {
+    busy(btn, true);
+    const res = await writeWithPin('backup.mirror.set', { email });
+    busy(btn, false);
+    if (!res.ok) { writeFail(res); return; }
+    toast(bi(res.data.status === 'FAILED' ? 'adm.mirror.failed' : (email ? 'adm.mirror.saved' : 'adm.mirror.stopped')), res.data.status === 'FAILED' ? 'err' : 'ok');
+    again();
+  };
+  save.addEventListener('click', (ev) => {
+    const email = $('#mi-email', view).value.trim();
+    if (!/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(email)) { toast(bi('adm.mirror.bad_email'), 'err'); return; }
+    send(ev.currentTarget, email);
+  });
+  const off = $('#mi-off', view);
+  if (off) off.addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    if (!await confirmBox('adm.mirror.off', 'adm.mirror.off_confirm', 'adm.mirror.off', 'danger')) return;
+    send(btn, '');
+  });
 }
 
 /* ====================== Nhật ký thao tác ====================== */

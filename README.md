@@ -20,6 +20,9 @@ phát hành ở phiên 1d.
   Quản trị), xuất → sửa → nhập lại báo "Không đổi".
 - **Quản trị**: người dùng, bộ phận, cài đặt (chu kỳ rà soát 12 tháng, cho phép trễ 3 ngày…), logo trên báo cáo, sao lưu hằng tuần,
   nhật ký thao tác, trạng thái hệ thống, dữ liệu mẫu (THỬ).
+- **Bản sao ở tài khoản Google thứ hai** (ba app dùng chung một tài khoản): máy chủ chia sẻ chỉ xem thư mục Sao lưu + Dữ liệu;
+  `apps-script/SaoLuuPhu.gs` chạy trong tài khoản thứ hai, chép hằng ngày bản sao lưu đã kiểm chứng của ISO, M&E, Checksheet
+  (Hướng dẫn triển khai, Phần I).
 - Nav iPhone 5 nút: Trang chủ · Danh mục · Quét · Hồ sơ · Tài khoản; web menu trái. Màn của phiên/đợt sau hiện mờ
   "Sắp có · 即将推出", máy chủ trả `FEATURE_NOT_ENABLED`.
 
@@ -36,7 +39,7 @@ phát hành THẬT. Đợt 2 kết nối M&E/Checksheet, Gmail, báo cáo PDF, i
 | `assets/` | Biểu tượng app (tờ tài liệu + dấu tick, navy trên vàng — SVG và PNG 180/192/512), ảnh nền |
 | `vendor/` | jsQR 1.4.0 (quét QR), SheetJS 0.20.3 (Excel) |
 | `server/src/` | Mã máy chủ theo mô-đun (`11_catalog.js` danh mục, `14_import.js` nhập Excel tổng) |
-| `apps-script/` | `Code.gs` (tạo bằng `npm run build`) và `appsscript.json` để dán vào Apps Script |
+| `apps-script/` | `Code.gs` (tạo bằng `npm run build`) và `appsscript.json` để dán vào Apps Script; `SaoLuuPhu.gs` cho tài khoản thứ hai |
 | `i18n/labels.json` | Từ điển nhãn duy nhất [Việt, 中文] → `js/dict.js` và `LABELS` trong `Code.gs` |
 | `tests/` | Giả lập Apps Script cho Node, test máy chủ, test giao diện Playwright |
 | `tools/` | Ghép `Code.gs`, quét bí mật trước khi push |

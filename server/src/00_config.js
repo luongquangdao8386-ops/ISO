@@ -59,6 +59,7 @@ var SETTINGS_DEFAULTS = [
   ['backup_weekday', 'ENUM', 'SUNDAY', false, 1, 'Ngày sao lưu trong tuần', '每周备份日'],
   ['backup_hour', 'INT', 1, false, 1, 'Giờ sao lưu', '备份时间'],
   ['backup_keep_count', 'INT', 8, false, 1, 'Số bản sao lưu giữ lại', '保留备份份数'],
+  ['backup_mirror_email', 'STRING', '', false, 1, 'Tài khoản Google thứ hai nhận bản sao lưu (chia sẻ chỉ xem thư mục Sao lưu và Dữ liệu)', '接收备份的第二个Google账户（备份及数据文件夹仅查看共享）'],
   // ISO (mục 10 đặc tả, chốt 06/11/2026)
   ['doc_review_months', 'INT', 12, true, 1, 'Chu kỳ rà soát tài liệu (tháng)', '文件评审周期（月）'],
   ['record_grace_days', 'INT', 3, true, 1, 'Số ngày cho phép trễ khi xét hồ sơ', '记录允许延迟天数'],
@@ -82,7 +83,10 @@ var SYSTEM_STATE_INITIAL = [
   ['restored_from_ref', 'STRING', ''],
   ['restored_backup_at', 'DATETIME', ''],
   ['restored_by', 'STRING', ''],
-  ['last_import_at', 'DATETIME', '']
+  ['last_import_at', 'DATETIME', ''],
+  ['backup_mirror_status', 'STRING', ''],
+  ['backup_mirror_at', 'DATETIME', ''],
+  ['backup_mirror_error', 'STRING', '']
 ];
 
 /** Mẫu mã hiển thị. yymm: true khi có phần năm-tháng (mục 3 đặc tả: HS, DN, KP, BC; DG theo năm ở Đợt 4). */
