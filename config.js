@@ -3,9 +3,10 @@
 //   /ISO/     THẬT — repo ISO      → ISO_MayChu_THAT (cố định link khi "phát hành ISO", phiên 1d)
 //   /ISO-thu/ THỬ  — repo ISO-thu  → ISO_MayChu_THU
 // Link /exec để trống: màn đăng nhập cho dán link tạm (lưu trên máy) tới khi điền vào đây.
+// 07/11/2026: cố định link THỬ (/ISO-thu/ → ISO_MayChu_THU); /ISO/ để trống tới khi phát hành THẬT (phiên 1d).
 (function () {
   var THAT = ''; // ISO_MayChu_THAT
-  var THU = ''; // ISO_MayChu_THU
+  var THU = 'https://script.google.com/macros/s/AKfycbxi7LBFINUrezOuvJoh8DMqV70c9cSo3v2NhkOSxwGzKbCLT7P6s5Aa8Kg0H4w_yvYcyA/exec'; // ISO_MayChu_THU
   var SITES = {
     '/ISO/': { base: 'https://luongquangdao8386-ops.github.io/ISO/', exec: THAT },
     '/ISO-thu/': { base: 'https://luongquangdao8386-ops.github.io/ISO-thu/', exec: THU }
