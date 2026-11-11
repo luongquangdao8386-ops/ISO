@@ -15,12 +15,22 @@ const EXT_MIME = {
   xls: 'application/vnd.ms-excel',
   doc: 'application/msword'
 };
-/** Loại tệp được tải lên theo việc */
-export const KIND_EXT = { PDF: ['pdf'], SOURCE: ['xlsx', 'docx', 'xls', 'doc'] };
+/** Loại tệp được tải lên theo việc: PDF / tệp gốc của phiên bản; ảnh trang sổ / tệp của hồ sơ (phiên 1c) */
+export const KIND_EXT = { PDF: ['pdf'], SOURCE: ['xlsx', 'docx', 'xls', 'doc'], FILE: ['pdf', 'xlsx', 'docx', 'xls', 'doc'] };
 export const KIND_ACCEPT = {
   PDF: '.pdf,application/pdf',
-  SOURCE: '.xlsx,.docx,.xls,.doc,' + [EXT_MIME.xlsx, EXT_MIME.docx, EXT_MIME.xls, EXT_MIME.doc].join(',')
+  SOURCE: '.xlsx,.docx,.xls,.doc,' + [EXT_MIME.xlsx, EXT_MIME.docx, EXT_MIME.xls, EXT_MIME.doc].join(','),
+  RECORD: 'image/*,.pdf,.xlsx,.docx,.xls,.doc,application/pdf,' + [EXT_MIME.xlsx, EXT_MIME.docx, EXT_MIME.xls, EXT_MIME.doc].join(',')
 };
+const PHOTO_EXT = ['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp', 'gif'];
+
+/** Tệp chọn cho hồ sơ là ảnh (thu nhỏ rồi gửi dạng JPEG) hay tệp (PDF, Excel, Word gửi nguyên) */
+export function recordFileKind(file) {
+  const ext = String(file.name || '').split('.').pop().toLowerCase();
+  if (/^image\//.test(file.type || '') || PHOTO_EXT.includes(ext)) return 'PHOTO';
+  if (KIND_EXT.FILE.includes(ext)) return 'FILE';
+  return '';
+}
 
 export function fmtSize(n) {
   const b = Number(n) || 0;
@@ -37,7 +47,7 @@ export function mimeOf(file) {
 /** Kiểm loại và dung lượng trước khi gửi; trả khóa lỗi hoặc '' */
 export function checkFile(file, kind) {
   const ext = String(file.name || '').split('.').pop().toLowerCase();
-  if (!KIND_EXT[kind].includes(ext)) return kind === 'PDF' ? 'file.need_pdf' : 'file.need_source';
+  if (!KIND_EXT[kind].includes(ext)) return kind === 'PDF' ? 'file.need_pdf' : kind === 'FILE' ? 'file.need_record' : 'file.need_source';
   const st = session.settings || {};
   const max = isTouchMobile() ? Number(st.doc_mobile_upload_max_bytes || 5242880) : Number(st.doc_max_bytes || 10485760);
   if (file.size > max) return isTouchMobile() ? 'file.too_big_mobile' : 'file.too_big';
@@ -79,25 +89,43 @@ export function openFile(file) {
   return shareFileNow(file);
 }
 
-/** Nút tệp: <button data-doc="id" data-kind="PDF|SOURCE"> */
-export function docButton(documentId, kind, name, size) {
+/** Nút tệp: <button data-doc="id" data-kind="PDF|SOURCE|PHOTO|FILE"> */
+export function docButton(documentId, kind, name, size, labelKey = '') {
   if (!documentId) return '';
-  const label = kind === 'PDF' ? 'file.view_pdf' : 'file.get_source';
+  const label = labelKey || (kind === 'PDF' ? 'file.view_pdf' : kind === 'PHOTO' ? 'file.view_photo' : kind === 'FILE' ? 'file.get_file' : 'file.get_source');
   return `<button type="button" class="btn small doc-btn" data-doc="${esc(documentId)}" data-kind="${esc(kind)}">
     <span class="doc-label">${bi(cache.has(documentId) ? 'file.open_save' : label)}</span>
     <span class="muted small doc-meta">${esc(name || '')}${size ? ' · ' + esc(fmtSize(size)) : ''}</span></button>`;
 }
 
-/** Gắn hành vi cho các nút tệp: lần đầu tải về, lần sau Mở / Lưu */
+/** Xem ảnh trong app (hồ sơ chụp trang sổ); nút Mở / Lưu gọi bảng Chia sẻ ngay trong lần chạm */
+export function viewImage(file, title = '') {
+  const url = URL.createObjectURL(file);
+  const wrap = document.createElement('div');
+  wrap.className = 'modal img-view';
+  wrap.setAttribute('role', 'dialog');
+  wrap.innerHTML = `<div class="modal-card wide"><h2>${title || esc(file.name)}</h2><div class="img-box"><img alt="${esc(file.name)}"></div>
+    <div class="modal-actions"><button type="button" class="btn" data-close>${bi('btn.close')}</button><button type="button" class="btn primary" data-save>${bi('file.open_save')}</button></div></div>`;
+  wrap.querySelector('img').src = url;
+  const close = () => { wrap.remove(); URL.revokeObjectURL(url); };
+  wrap.querySelector('[data-close]').addEventListener('click', close);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+  wrap.querySelector('[data-save]').addEventListener('click', () => { shareFileNow(file).catch(() => {}); });
+  document.body.appendChild(wrap);
+}
+
+/** Gắn hành vi cho các nút tệp: lần đầu tải về, lần sau Mở / Lưu (ảnh: xem trong app) */
 export function wireDocButtons(root) {
   root.querySelectorAll('button[data-doc]').forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.doc;
-    if (cache.has(id)) { openFile(cache.get(id)).catch(() => {}); return; }
+    const isImg = (f) => /^image\//.test(f.type || '');
+    if (cache.has(id)) { const f = cache.get(id); if (isImg(f)) viewImage(f); else openFile(f).catch(() => {}); return; }
     if (!navigator.onLine) { toast(bi('sync.need_network'), 'err'); return; }
     b.disabled = true; b.classList.add('busy');
     const r = await fetchDoc(id);
     b.disabled = false; b.classList.remove('busy');
     if (!r.ok) { toast(esc(resMsg(r)), 'err'); return; }
+    if (isImg(r.file)) { viewImage(r.file); return; }
     const lab = b.querySelector('.doc-label');
     if (lab) lab.innerHTML = bi('file.open_save');
     // Máy tính: mở luôn (vẫn trong lượt bấm với trình duyệt cho phép); iPhone phải chạm lần nữa

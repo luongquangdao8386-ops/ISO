@@ -1,10 +1,11 @@
 // Trang chủ (cùng khuôn trang chủ M&E, Checksheet): biểu tượng app trên nền nhà máy, ô Chờ bạn xử lý, 4 ô số, lưới ô module.
 // Tổng biểu, % ban hành, điều khoản bắt buộc thiếu biểu tính từ danh mục trên máy; Chờ bạn xử lý phần phiên bản (1b); hồ sơ quá hạn
-// (phiên 1c) và lịch tuần (phiên 1d) hiện "Sắp có". Ô module của phiên/đợt sau mờ "Sắp có · 即将推出".
+// = số biểu có kỳ đến hạn xét gần nhất bị Quá hạn, hồ sơ bị trả lại (1c); lịch tuần (phiên 1d) hiện "Sắp có".
+// Ô module của phiên/đợt sau mờ "Sắp có · 即将推出".
 import { bi, biText, esc, fmtDate, fmtNumber, session } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary } from '../data.js';
+import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { stIcon } from './catalog.js';
@@ -26,6 +27,7 @@ async function pendingHtml() {
     [p.review.length, 'home.pend_review', '/versions?f=review', 't-red-text'],
     [p.issue.length, 'home.pend_issue', '/versions?f=issue', 't-red-text'],
     [p.returned.length, 'home.pend_returned', '/versions?f=returned', 't-red-text'],
+    [p.rec_returned.length, 'home.pend_rec_returned', p.rec_returned.length === 1 ? '/record/' + encodeURIComponent(p.rec_returned[0].record_id) : '/records?f=returned', 't-red-text'],
     [p.drafts.length, 'home.pend_drafts', '/versions?f=drafts', ''],
     [p.nofile.length, 'home.no_file_n', '/catalog?f=nofile', ''],
     [p.review_due.length, 'home.pend_review_due', '/catalog?f=review', '']
@@ -39,11 +41,15 @@ async function pendingHtml() {
 async function statsHtml(list) {
   const s = catalogSummary(list);
   const miss = missingMandatory(list, await recs('CLAUSE'));
+  let overdue = 0;
+  const recOn = canSeeRecords() && await recordsOn();
+  if (recOn) for (const s of (await recordStatusMap(list)).values()) if (s.overdue) overdue++;
   const tile = (val, key, href, cls = '', sub = '') => `<a class="stat${cls ? ' ' + cls : ''}" href="#${href}"><span class="stat-val">${val}</span><span class="stat-label">${bi(key)}</span>${sub ? `<span class="stat-sub">${sub}</span>` : ''}</a>`;
   return `<section class="stats" aria-label="${esc(biText('home.stats'))}">
     ${tile(esc(fmtNumber(s.total)), 'home.stat_total', '/catalog', '', `${stIcon('ISSUED')} ${s.issued} · ${stIcon('DRAFTING')} ${s.drafting} · ${stIcon('NONE')} ${s.none} · ${stIcon('NA')} ${s.na}`)}
     ${tile(esc(String(s.pct).replace('.', ',')) + '%', 'home.stat_pct', '/catalog?f=issued', s.pct >= 80 ? 't-green-text' : '')}
-    ${tile('—', 'home.stat_overdue', '/records', 'soon', bi('soon.tag'))}
+    ${recOn ? tile(esc(String(overdue)), 'home.stat_overdue', '/records?f=late', overdue ? 't-red-text' : '', bi('home.stat_overdue_sub'))
+      : tile('—', 'home.stat_overdue', '/records', 'soon', bi('rec.no_access_short'))}
     ${tile(esc(String(miss)), 'home.stat_missing', '/coverage', miss ? 't-red-text' : '', bi('home.stat_missing_sub'))}
   </section>`;
 }
@@ -56,7 +62,7 @@ async function gridHtml(list) {
   const q = (await queueItems().catch(() => [])).filter((o) => o.user_id === uid && o.dataset_epoch === session.epoch).length;
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
-    { key: 'records', icon: 'file', href: '/records', soon: 1 },
+    { key: 'records', icon: 'file', href: '/records', lvl: 2, show: canSeeRecords() },
     { key: 'coverage', icon: 'checklist', href: '/coverage', soon: 1, lvl: 2 },
     { key: 'excel', icon: 'excel', href: '/excel', show: lvl >= 3 || sec },
     { key: 'reports', icon: 'reports', href: '/reports', soon: 1 },

@@ -46,10 +46,10 @@ var ACTION_TABLE_ = [
   'item.review|X|pin|W',
   'doc.upload|2|offline|W',
   'doc.get|1|net|R',
-  // Hồ sơ (phiên 1c)
+  // Hồ sơ (phiên 1c): nộp được khi mất mạng; trả lại — trưởng bộ phận trong bộ phận, Thư ký ISO, cấp 4 (kiểm ở PRECHECK_ trước PIN)
   'record.submit|2|offline|W',
-  'record.return|3|pin|W',
-  'record.status|1|net|R',
+  'record.return|2|pin|W',
+  'record.status|2|net|R',
   // Đợt 2–4: báo cáo PDF, kết nối M&E/Checksheet, khắc phục, đánh giá nội bộ
   'report.pdf|1|net|R',
   'link.set|4|pin|W',

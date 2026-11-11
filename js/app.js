@@ -74,6 +74,7 @@ export async function updateSyncStatus() {
     if (!app.shell) return;
     app.shell.setBadge('home', p.total);
     app.shell.setBadge('versions', p.review.length + p.issue.length + p.returned.length);
+    app.shell.setBadge('records', p.rec_returned.length);
   } catch (e) { /* không chặn */ }
 }
 
@@ -164,10 +165,13 @@ function registerRoutes() {
   route('/versions', lazy('./pages/version.js', 'renderVersions'), { nav: 'versions' });
   route('/version/new/:item', lazy('./pages/version.js', 'renderVersionNew'), { nav: 'catalog' });
   route('/version/:id', lazy('./pages/version.js', 'renderVersion'), { nav: 'catalog' });
+  route('/records', lazy('./pages/records.js', 'renderRecords'), { nav: 'records' });
+  route('/record/new', lazy('./pages/records.js', 'renderRecordNew'), { nav: 'records' });
+  route('/record/:id', lazy('./pages/records.js', 'renderRecord'), { nav: 'records' });
   route('/excel', lazy('./pages/excel.js', 'renderExcel'), { nav: 'excel' });
   route('/excel/batch/:id', lazy('./pages/excel.js', 'renderBatch'), { nav: 'excel' });
   // Màn của phiên/đợt sau: hiện "Sắp có · 即将推出"
-  ['records', 'coverage', 'reports', 'capa', 'audits', 'links'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
+  ['coverage', 'reports', 'capa', 'audits', 'links'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
   route('/account', lazy('./pages/account.js', 'renderAccount'), { nav: 'account' });
   route('/account/drafts', lazy('./pages/drafts.js', 'renderDrafts'), { nav: 'account' });
   route('/account/conflict/:op', lazy('./pages/drafts.js', 'renderConflict'), { nav: 'account' });
@@ -227,9 +231,9 @@ window.addEventListener('resize', () => {
   refresh();
 });
 
-// Màn xem (trang chủ, danh mục, chi tiết biểu, tài khoản) vẽ lại sau khi tự gửi nháp xong.
+// Màn xem (trang chủ, danh mục, chi tiết biểu, hồ sơ, tài khoản) vẽ lại sau khi tự gửi nháp xong.
 // Không vẽ lại màn nhập (sửa biểu, Excel), khi đang mở hộp thoại hoặc đang gõ.
-const VIEW_PAGE = /^\/(catalog|item\/[^/]+|versions|account(\/drafts)?)?$/;
+const VIEW_PAGE = /^\/(catalog|item\/[^/]+|versions|records|record\/(?!new)[^/]+|account(\/drafts)?)?$/;
 export function refreshAfterSend(r) {
   if (!app.shell) return;
   const path = currentPath();

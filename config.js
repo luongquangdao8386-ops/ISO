@@ -18,6 +18,6 @@
     APP_BASE_URL: site.base,
     EXEC_URL: site.exec,
     API_CONTRACT_VERSION: '1.0',
-    BUILD_VERSION: '1.0.0-d1.2'
+    BUILD_VERSION: '1.0.0-d1.3'
   };
 })();

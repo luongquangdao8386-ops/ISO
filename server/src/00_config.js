@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d1.2';
+var SERVER_VERSION = '1.0.0-d1.3';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.1';
+var SCHEMA_VERSION = '1.0.2';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -66,6 +66,7 @@ var SETTINGS_DEFAULTS = [
   ['admin_self_approval', 'BOOL', true, true, 1, 'Quản trị (cấp 4) được duyệt phiên bản do chính mình soạn', '管理员（4级）可审批自己编写的版本'],
   ['record_grace_days', 'INT', 3, true, 1, 'Số ngày cho phép trễ khi xét hồ sơ', '记录允许延迟天数'],
   ['records_start_date', 'STRING', '', true, 1, 'Ngày bắt đầu tính hồ sơ cho biểu ● nhập từ Excel (trống = ngày nhập danh mục đầu tiên)', 'Excel导入的●表单开始计算记录的日期（空=首次导入目录日期）'],
+  ['record_status_cache_seconds', 'INT', 300, false, 1, 'Bộ đệm tình trạng hồ sơ trên máy chủ (giây)', '服务器记录状态缓存（秒）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本']
 ];
@@ -93,16 +94,24 @@ var SYSTEM_STATE_INITIAL = [
 
 /** Mẫu mã hiển thị. yymm: true khi có phần năm-tháng (mục 3 đặc tả: HS, DN, KP, BC; DG theo năm ở Đợt 4). */
 var CODE_PATTERNS = {
-  RECORD: { prefix: 'HS', digits: 4, yymm: true, sheet: null, col: null },
+  RECORD: { prefix: 'HS', digits: 4, yymm: true, sheet: 'Records', col: 'code' },
   DOC_REQUEST: { prefix: 'DN', digits: 3, yymm: true, sheet: null, col: null },
   CAPA: { prefix: 'KP', digits: 3, yymm: true, sheet: null, col: null },
   REPORT: { prefix: 'BC', digits: 3, yymm: true, sheet: null, col: null }
 };
 
-/** Loại hồ sơ của tệp (Documents.entity_type) — phiên 1b (phiên bản), 1c (hồ sơ) */
+/** Loại hồ sơ của tệp (Documents.entity_type) và loại tệp được gắn — phiên 1b (phiên bản: PDF, tệp gốc), 1c (hồ sơ: ảnh, tệp) */
 var DOC_ENTITY_SHEETS_ = {
-  VERSION: { sheet: 'Versions', key: 'version_id' }
+  VERSION: { sheet: 'Versions', key: 'version_id', kinds: ['PDF', 'SOURCE'] },
+  RECORD: { sheet: 'Records', key: 'record_id', kinds: ['PHOTO', 'FILE'] }
 };
+
+/** Hồ sơ (phiên 1c): trạng thái; số tệp tối đa mỗi hồ sơ; khoảng ngày tối đa một lần nộp */
+var RECORD_STATUS_ = ['SUBMITTED', 'RETURNED', 'VOID'];
+var RECORD_MAX_FILES_ = 30;
+var RECORD_MAX_RANGE_DAYS_ = 400;
+/** Ô tình trạng hồ sơ theo kỳ: Đúng hạn ✓ · Quá hạn ! · Chưa tới hạn – · Không tính (để trống) */
+var CELL_CODES_ = { OK: 'O', LATE: 'L', DUE: 'D', NA: 'N' };
 
 /** Trạng thái phiên bản (mục 6 đặc tả) */
 var VERSION_STATES_ = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'ISSUED', 'SUPERSEDED', 'CANCELLED'];

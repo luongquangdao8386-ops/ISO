@@ -74,6 +74,14 @@ var SUB_MSG = {
   PDF_REQUIRED: ['Cần tải PDF của phiên bản trước', '请先上传该版本的PDF'],
   ITEM_NA: ['Biểu đang Không áp dụng (✕) — dùng lại trước', '该表单为不适用（✕），请先恢复使用'],
   FILE_MISSING: ['Tệp không còn trên Drive của máy chủ', '服务器云端硬盘上的文件已不存在'],
+  // Hồ sơ (phiên 1c)
+  PAGES_INVALID: ['Cần ít nhất 1 ảnh hoặc tệp, tối đa 30', '至少需要1张照片或1个文件，最多30个'],
+  RANGE_INVALID: ['Ngày cuối phải từ ngày đầu trở đi', '结束日期须不早于开始日期'],
+  RANGE_TOO_LONG: ['Mỗi lần nộp tối đa 400 ngày', '每次提交最多400天'],
+  DATE_OUT_OF_RANGE: ['Ngày ngoài khoảng cho phép (không quá 31 ngày sau hôm nay)', '日期超出允许范围（不得晚于今天后31天）'],
+  ITEM_NO_RECORD: ['Biểu chưa có (○) hoặc không áp dụng (✕): không nộp hồ sơ', '表单尚未建立（○）或不适用（✕）：不能提交记录'],
+  RECORD_FROM_APP: ['Biểu in từ app M&E / Checksheet: ngày có hồ sơ lấy từ app đó, không nộp ở đây', '由机电/点检表App打印的表单：记录日期取自该App，无需在此提交'],
+  TOO_MANY_FILES: ['Hồ sơ đã đủ 30 tệp', '该记录已有30个文件'],
   MIRROR_SAME_ACCOUNT: ['Tài khoản thứ hai phải khác tài khoản đang chạy máy chủ', '第二个账户须与运行服务器的账户不同']
 };
 

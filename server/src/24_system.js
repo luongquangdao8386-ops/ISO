@@ -211,6 +211,17 @@ function healthRows_() {
   } else {
     add('versions', false, 'Thiếu sheet Versions', 'Chạy migrateSchema');
   }
+  if (sheetExists_('Records')) {
+    var rs = readRows_('Records').filter(function (r) { return !r.archived_at; });
+    var rcnt = function (x) { return rs.filter(function (r) { return r.status === x; }).length; };
+    var all = recordStatusAll_();
+    var od = Object.keys(all.items).filter(function (k) { return all.items[k][6] === 'L'; }).length;
+    var missingFiles = rs.filter(function (r) { return r.status === 'SUBMITTED' && (r.files_json || []).length < Number(r.pages || 0); }).length;
+    add('records', true, 'Đã nộp ' + rcnt('SUBMITTED') + ' · Bị trả lại ' + rcnt('RETURNED') + ' · Biểu quá hạn ' + od + ' · Chưa đủ tệp ' + missingFiles,
+      'Ngày bắt đầu tính (biểu nhập từ Excel): ' + (all.start_setting || '—') + ' · cho phép trễ ' + all.grace + ' ngày');
+  } else {
+    add('records', false, 'Thiếu sheet Records', 'Chạy migrateSchema');
+  }
   var nofile = items.filter(function (it) { return it.status === 'ISSUED' && it.file_missing; }).length;
   add('file_missing', true, nofile, nofile ? 'Biểu ● chưa có tệp: Danh mục → lọc Chưa có tệp → Gắn tệp' : '');
   var today = todayVN_();

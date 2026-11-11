@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d1.2 (Đợt 1, phiên 1b)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d1.3 (Đợt 1, phiên 1c)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -7,10 +7,48 @@ trên GitHub Pages.
 Phiên 1a có: đăng nhập PIN, người dùng (bộ phận, Thư ký ISO, Đánh giá viên), bộ phận, danh mục biểu mẫu & tài liệu (lọc, tìm Việt/Trung,
 chi tiết biểu), nhập/xuất file Excel tổng, quản trị. Phiên 1b thêm: **phiên bản & ban hành** (soạn → gửi duyệt → duyệt / trả lại →
 ban hành, bản cũ tự lỗi thời, PDF + tệp gốc lưu riêng tư trên Drive của máy chủ), **gắn tệp** cho biểu ● nhập từ Excel, đặt **Không áp
-dụng ✕**, **Đã rà soát** (gia hạn rà soát), ô **Chờ bạn xử lý** và số đỏ trên nút. Hồ sơ (1c), phủ điều khoản + trang chủ đầy đủ (1d)
-hiện mờ "Sắp có · 即将推出".
+dụng ✕**, **Đã rà soát** (gia hạn rà soát), ô **Chờ bạn xử lý** và số đỏ trên nút. Phiên 1c thêm: **hồ sơ** — nộp hồ sơ bằng ảnh / tệp
+(cả khi mất mạng), bảng kỳ ✓ ! –, trả lại hồ sơ nộp sai, tem QR báo bản in lỗi thời. Phủ điều khoản + lịch tuần trên trang chủ (1d) hiện
+mờ "Sắp có · 即将推出".
 
-## CẬP NHẬT LÊN BẢN 1b (1.0.0-d1.2) — làm một lần, trên máy tính
+## CẬP NHẬT LÊN BẢN 1c (1.0.0-d1.3) — làm một lần, trên máy tính
+
+Bản 1c **thêm sheet `Records` và cột `records_from` ở `Items`** nên chạy `migrateSchema`. Không xóa hay sửa dữ liệu đã có.
+Nếu chưa làm bước "CẬP NHẬT LÊN BẢN 1b" bên dưới thì không sao: `migrateSchema` của 1c thêm luôn những gì 1b cần.
+
+1. <https://script.google.com> → dự án máy chủ ISO (`ISO_MayChu_THAT`) → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Ô chọn hàm → **`migrateSchema`** → **Chạy**. Nhật ký: `migrateSchema xong. Thêm: Items(records_from); Records … schema_version=1.0.2`
+   (nếu chưa lên 1b thì có thêm `Versions`, `Items(na_prev_status,reviewed_at,reviewed_by,…)`). Quên bước này: lần nộp hồ sơ đầu tiên
+   máy chủ tự thêm sheet, chỉ chậm hơn vài giây.
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d1.3 hồ sơ` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` trên máy tính và iPhone → app tự tải bản mới (**Tài khoản → Thông tin** ghi `1.0.0-d1.3`; màn báo lỗi thì bấm
+   **Tải lại bản mới**). **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = `1.0.2`, có dòng **Hồ sơ**
+   ("Đã nộp … · Bị trả lại … · Biểu quá hạn …") và ngày bắt đầu tính hồ sơ của biểu nhập từ Excel (`records_start_date`).
+
+### Dùng hồ sơ (app chỉ có owner + Thư ký ISO)
+
+Hai tài khoản cấp 4 nộp hồ sơ thay mọi bộ phận và trả lại được hồ sơ nộp sai.
+
+- **Nộp hồ sơ**: nút **Hồ sơ** (iPhone) → **+**, hoặc mở biểu → **Nộp hồ sơ**, hoặc **Quét** tem QR trên sổ biểu. Chọn kỳ (app gợi ý kỳ
+  còn thiếu gần nhất) hoặc **Khoảng ngày** để nộp cả quyển sổ (vd sổ tháng 10 của biểu hằng ngày: 01/10 → 31/10 — mọi ngày trong
+  khoảng có ✓). **Chụp ảnh** từng trang hoặc **Chọn ảnh / tệp** (PDF, Excel, Word), tối đa 30 → **Lưu hồ sơ**.
+- **Mất mạng vẫn nộp được**: hồ sơ và ảnh lưu trên iPhone (ô hiện "chờ gửi" màu vàng), có mạng app tự gửi. Xem / xóa ở **Tài khoản →
+  Nháp chờ đồng bộ**. Đừng xóa app hay dữ liệu Safari khi còn hồ sơ chờ gửi.
+- **Biểu nào nộp được**: biểu ● đang hiệu lực và ◐ đang soạn (sổ giấy đang dùng). Biểu ○ chưa có, ✕ ngừng dùng, biểu in từ M&E /
+  Checksheet thì không (Đợt 2 lấy ngày có hồ sơ từ app kia).
+- **Bảng kỳ** (màn Hồ sơ): mỗi biểu một dòng, 12 kỳ gần nhất. ✓ đúng hạn · ! quá hạn (kỳ đã kết thúc quá 3 ngày mà chưa có hồ sơ) ·
+  – chưa tới hạn · ô gạch = không tính. **Chỉ tính biểu ● đã ban hành** — danh mục hiện tại toàn ○ ◐ nên bảng sẽ trống cho tới khi ban
+  hành biểu (màn Phiên bản) hoặc nhập Excel có cột T = ●. Biểu ◐ đã có hồ sơ vẫn hiện để xem ✓. Biểu "khi phát sinh" không bao giờ quá hạn.
+- **Ngày bắt đầu tính**: biểu ban hành trong app — từ ngày ban hành lần đầu (ban hành lại không lùi ngày); biểu ● nhập từ Excel — từ
+  `records_start_date` (Trạng thái hệ thống, mặc định ngày nhập danh mục đầu tiên). Kỳ trước ngày đó không tính.
+- **Trả lại hồ sơ nộp sai**: mở hồ sơ (bấm ô của bảng kỳ → hồ sơ) → **Trả lại** → lý do → PIN. Kỳ đó về như chưa có; người nộp thấy
+  "N hồ sơ bị trả lại" ở trang chủ → **Nộp lại**.
+- **Tem QR** (in tem ở Đợt 2): link `…/ISO/#/f/<mã>?r=<lần>` mở biểu; tem của bản cũ báo đỏ "bản in đã lỗi thời". Quét bằng nút
+  **Quét** trong app (camera iPhone mở Safari ngoài app).
+
+## CẬP NHẬT LÊN BẢN 1b (1.0.0-d1.2) — đã gộp vào bước cập nhật 1c ở trên
 
 Bản 1b **thêm sheet `Versions` và 3 cột ở `Items`** (`na_prev_status`, `reviewed_at`, `reviewed_by`) nên phải chạy `migrateSchema`.
 Không xóa hay sửa dữ liệu đã có.
@@ -205,7 +243,7 @@ vàng ô nhập, danh sách chọn ○ ◐ ● ✕, tô màu theo tình trạng,
    → đăng nhập.
 6. **Bản sao ở tài khoản thứ hai**: làm Phần I.
 
-## Phần G — Thử trên THỬ (nghiệm thu Đợt 1 mục 1, 2, 3, 8)
+## Phần G — Thử nghiệm thu Đợt 1 (mục 1–6, 8; mục 7 ở phiên 1d)
 
 1. **Đăng nhập PIN** trên iPhone (app ở Màn hình chính) và máy tính. Tắt Wi-Fi + 4G → mở lại app → **Mở bằng PIN** → vẫn xem
    được danh mục, chi tiết biểu (dải đỏ "Ngoại tuyến").
@@ -217,7 +255,12 @@ vàng ô nhập, danh sách chọn ○ ◐ ● ✕, tô màu theo tình trạng,
    có Excel, không có nút sửa. Người không có quyền làm thao tác cần PIN → báo **Không có quyền** ngay, không hỏi PIN.
 5. **Phiên bản (mục 4)**: soạn phiên bản cho một biểu → gửi duyệt → người soạn (cấp 1–3) **không thấy nút Duyệt**; trưởng bộ phận
    (hoặc Quản trị) duyệt → Thư ký ISO ban hành → bản cũ thành **Lỗi thời**; trang chủ cập nhật **% ban hành**.
-6. Gửi Claude **ảnh màn hình** chỗ lỗi (không cần dán log dài).
+6. **Hồ sơ khi mất mạng (mục 5)**: trên iPhone tắt Wi-Fi + 4G → mở một biểu ● hằng ngày → **Nộp hồ sơ** → **Khoảng ngày** (vd
+   01/11 → 07/11) → chụp 2 trang → **Lưu hồ sơ** → màn hồ sơ ghi "Chờ gửi", bảng kỳ hiện ô vàng. Bật mạng lại → vài giây sau ô thành
+   ✓ xanh, hồ sơ có mã `HS-…`. Bấm một ô ✓ → hồ sơ → **Trả lại** (lý do, PIN) → các ô đó về **!** hoặc **–**.
+7. **Bảng kỳ (mục 6)**: với biểu ngày / tuần / tháng / năm, kỳ đã kết thúc quá 3 ngày mà chưa có hồ sơ là **!**, kỳ hiện tại là **–**;
+   biểu "khi phát sinh" không bao giờ có **!**. (Cần vài biểu ● — ban hành thử ở màn Phiên bản hoặc nhập Excel có T = ●.)
+8. Gửi Claude **ảnh màn hình** chỗ lỗi (không cần dán log dài).
 
 ## Phần H — Cập nhật máy chủ khi có bản mới (phiên 1b, 1c, 1d…)
 

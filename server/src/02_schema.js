@@ -28,7 +28,7 @@ var SHEETS = {
     cols: 'item_id code kind level dept_code group_key name_vi name_zh purpose_vi purpose_zh iso9001 iso14001 iso45001 iso50001 ' +
       'brc_topics law cls freq_vi freq_zh flow keep priority where where_note status current_version_id current_rev issued_at ' +
       'review_due owner_user_id qr_key note period_days period_type issued_source file_missing na_reason sort_order ' +
-      'na_prev_status reviewed_at reviewed_by' },
+      'na_prev_status reviewed_at reviewed_by records_from' },
   // Phiên bản của biểu/tài liệu (phiên 1b): DRAFT → IN_REVIEW → APPROVED → ISSUED → SUPERSEDED; trả lại về DRAFT; hủy CANCELLED.
   // vtype: REVISION (lần ban hành mới, qua duyệt) | ATTACH (gắn tệp cho bản đang hiệu lực nhập từ Excel ●, Thư ký ISO ban hành thẳng)
   Versions: { book: 'B', dot: 1, key: 'version_id', c: true, i18n: true,
@@ -36,6 +36,12 @@ var SHEETS = {
       'pdf_doc_id pdf_file_name pdf_size source_doc_id source_file_name source_size source_mime ' +
       'submitted_at submitted_by approved_at approved_by approve_note issued_at issued_by superseded_at superseded_by_id ' +
       'returned_at returned_by return_reason cancelled_at cancelled_by cancel_reason item_status_before' },
+  // Hồ sơ đã nộp (phiên 1c): một lần nộp phủ một kỳ hoặc một khoảng ngày [period_from, period_to] (kỳ nào giao với khoảng đó là có hồ sơ).
+  // Ghi nhận ngay (SUBMITTED), trưởng bộ phận / Thư ký ISO trả lại (RETURNED) thì kỳ đó tính lại như chưa có.
+  // files_json: [{document_id, kind PHOTO|FILE, mime_type, file_name, size_bytes, page_no}] — tệp tải lên sau (doc.upload, làm được khi mất mạng)
+  Records: { book: 'B', dot: 1, key: 'record_id', c: true,
+    cols: 'record_id code item_id dept_code period_type period_from period_to record_date pages files_json note status ' +
+      'submitted_at submitted_by client_created_at returned_at returned_by return_reason void_at void_by void_reason' },
   // Điều khoản ISO 9001 và chủ đề BRCGS Packaging (std|key)
   Clauses: { book: 'B', dot: 1, key: 'clause_id', c: true, i18n: true,
     cols: 'clause_id std key group_vi group_zh name_vi name_zh mandatory_record sort_order active' },
@@ -87,7 +93,8 @@ var TYPE_OVERRIDES_ = {
   active: 'BOOL', owned_by_app: 'BOOL', must_change_pin: 'BOOL', is_system_owner: 'BOOL', iso_secretary: 'BOOL', auditor: 'BOOL',
   file_missing: 'BOOL', mandatory_record: 'BOOL',
   i18n_meta: 'JSON', schema_version: 'STRING', email: 'STRING', note: 'STRING', where: 'STRING',
-  issued_at: 'DATE', review_due: 'DATE', due_date: 'DATE', run_date: 'DATE'
+  issued_at: 'DATE', review_due: 'DATE', due_date: 'DATE', run_date: 'DATE', records_from: 'DATE', period_from: 'DATE', period_to: 'DATE',
+  pages: 'INT', client_created_at: 'STRING', void_by: 'STRING', period_type: 'STRING'
 };
 
 /** Kiểu cột suy theo tên. */

@@ -352,6 +352,8 @@ function versionIssue_(ctx) {
         superseded.push(r.rev);
       });
       var months = Number(setting_('doc_review_months') || 12);
+      // Ngày bắt đầu tính hồ sơ (1c): giữ ngày của lần ban hành đầu, không lùi về sau khi ban hành lại
+      var startBefore = item.status === 'ISSUED' ? recordsStart_(item, String(setting_('records_start_date') || '')) : '';
       if (row.vtype === 'ATTACH') {
         row.issued_at = item.issued_at || today;
         if (!item.issued_at) item.issued_at = row.issued_at;
@@ -364,6 +366,7 @@ function versionIssue_(ctx) {
         item.current_rev = row.rev;
         item.review_due = addMonthsIso_(today, months);
         item.issued_source = 'APP';
+        if (!item.records_from) item.records_from = startBefore || (row.effective_date && row.effective_date > today ? row.effective_date : today);
       }
       if (!row.effective_date) row.effective_date = row.issued_at;
       row.state = 'ISSUED';

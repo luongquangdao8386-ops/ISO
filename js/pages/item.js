@@ -1,6 +1,7 @@
 // Chi tiết biểu / tài liệu: mục đích, tần suất, Lập → Duyệt, thời gian lưu, điều khoản ISO, chủ đề BRCGS, lần ban hành, hạn rà soát,
 // nơi làm, biểu liên quan (1a); phiên bản hiện hành (xem PDF, tải tệp gốc), bản đang soạn, lịch sử phiên bản, Soạn phiên bản mới,
-// gắn tệp cho biểu ● nhập từ Excel, đặt Không áp dụng ✕ / dùng lại, Đã rà soát (1b). Hồ sơ 12 kỳ (1c), tem QR (Đợt 2) hiện "Sắp có".
+// gắn tệp cho biểu ● nhập từ Excel, đặt Không áp dụng ✕ / dùng lại, Đã rà soát (1b); hồ sơ 12 kỳ gần nhất, Nộp hồ sơ, mở từ tem QR
+// (…/#/f/<mã>?r=<lần>): tem của bản đã lỗi thời báo đỏ (1c). In tem QR (Đợt 2) hiện "Sắp có".
 // Sửa thông tin (Thư ký ISO, cấp 4): /item/:id/edit, thêm mới /item/new.
 import { bi, biText, esc, fmtDate, nameText, uuid, badge } from '../core.js';
 import { ICON, toast, dialog, $ } from '../ui.js';
@@ -11,6 +12,8 @@ import { textInput, textArea, selectInput, numberInput, bilingualInputs, wireFor
 import { docButton, wireDocButtons } from '../files.js';
 import { statusDot } from './catalog.js';
 import { versionRow, vBadge } from './version.js';
+import { itemRecordsCard, wireItemRecords } from './records.js';
+import { canSubmitRecord, recordCheck } from '../data.js';
 
 const PERIOD_OF = (d) => {
   if (d === null || d === undefined || d === '') return 'EVENT';
@@ -34,9 +37,13 @@ export async function renderItem(view, { shell, params, query }) {
   const grp = (await recs('GROUP')).find((g) => g.group_key === it.group_key);
   const um = await users();
   const rel = (await items()).filter((x) => x.group_key === it.group_key && x.item_id !== it.item_id);
-  // Tem quét có lần ban hành khác bản hiện hành → bản in đã lỗi thời (tem QR đầy đủ ở phiên 1c, in tem ở Đợt 2)
+  // Tem quét (…/#/f/<mã>?r=<lần>): lần trên tem khác lần đang hiệu lực → bản in đã lỗi thời (báo đỏ); biểu ✕ → đã ngừng dùng;
+  // biểu chưa ban hành (○ ◐) mà tem có lần → chưa có bản hiện hành. Biểu ● nhập từ Excel không ghi lần coi như lần 01.
   const scanned = query && query.r ? String(query.r) : '';
-  const stale = scanned && it.current_rev && scanned.padStart(2, '0') !== String(it.current_rev).padStart(2, '0');
+  const curRev = it.current_rev || (it.status === 'ISSUED' ? '01' : '');
+  const norm = (x) => String(x || '').replace(/^0+(?=\d)/, '').padStart(2, '0');
+  const scanState = !scanned ? '' : it.status === 'NA' ? 'na' : !curRev ? 'none' : norm(scanned) !== norm(curRev) ? 'stale' : 'ok';
+  const canRec = canSubmitRecord(it) && !recordCheck(it) && await can('record.submit');
   const iso = [['ISO 9001', it.iso9001], ['ISO 14001', it.iso14001], ['ISO 45001', it.iso45001], ['ISO 50001', it.iso50001]].filter((x) => x[1]);
   const vers = await versionsOf(it.item_id);
   const curV = vers.find((v) => v.version_id === it.current_version_id) || null;
@@ -52,7 +59,9 @@ export async function renderItem(view, { shell, params, query }) {
   const dueHtml = it.review_due ? esc(fmtDate(it.review_due)) + (it.status === 'ISSUED' && reviewSoon(it, t)
     ? ` <span class="badge ${dueDays < 0 ? 't-red' : 't-amber'}">${bi(dueDays < 0 ? 'item.review_over' : 'item.review_in', { N: Math.abs(dueDays) })}</span>` : '') : '—';
   view.innerHTML = `<div class="item">
-    ${scanned ? `<p class="banner ${stale ? 'err' : 'ok'}">${stale ? bi('item.stale', { R: esc(scanned), C: esc(it.current_rev) }) : bi('item.current', { R: esc(it.current_rev || scanned) })}</p>` : ''}
+    ${scanState ? `<div class="banner ${scanState === 'ok' ? 'ok' : scanState === 'none' ? 'warn' : 'err'} scan-banner"><p>${scanState === 'stale' ? bi('item.stale', { R: esc(scanned), C: esc(curRev) })
+      : scanState === 'na' ? bi('item.scan_na') : scanState === 'none' ? bi('item.scan_none', { R: esc(scanned) }) : bi('item.current', { R: esc(curRev) })}</p>
+      ${canRec && scanState !== 'na' ? `<a class="btn small primary" href="#/record/new?item=${encodeURIComponent(it.item_id)}">${ICON.upload}<span>${bi('item.submit_record')}</span></a>` : ''}</div>` : ''}
     <section class="card item-head">
       <div class="rec-top"><span class="code big">${esc(it.code)}</span>${statusDot(it.status)} ${badge('status.' + (it.status || 'NONE'))}</div>
       <h2 class="item-name">${pair(it.name_vi, it.name_zh)}</h2>
@@ -96,12 +105,12 @@ export async function renderItem(view, { shell, params, query }) {
       ${openV ? `<p class="lbl">${bi('ver.open')}</p><ul class="cat-list">${versionRow(openV, it, { um })}</ul>` : ''}
       ${hist.length ? `<details class="ver-hist"><summary>${bi('ver.history_n', { N: hist.length })}</summary><ul class="cat-list">${hist.map((v) => versionRow(v, it, { um })).join('')}</ul></details>` : ''}
     </section>
-    <section class="card soon-card"><div class="card-head"><h3>${bi('item.records')}</h3><span class="tag soon">${bi('soon.tag')}</span></div><p class="muted small">${bi('item.records_soon')}</p></section>
+    ${await itemRecordsCard(it)}
     <div class="row item-actions">
       ${canAttach ? `<a class="btn primary" href="#/version/new/${encodeURIComponent(it.item_id)}?attach=1">${ICON.upload}<span>${bi('ver.attach_btn')}</span></a>` : ''}
       ${canNew ? `<a class="btn${canAttach ? '' : ' primary'}" href="#/version/new/${encodeURIComponent(it.item_id)}">${ICON.edit}<span>${bi('item.new_version')}</span></a>` : ''}
       ${openV ? `<a class="btn primary" href="#/version/${encodeURIComponent(openV.version_id)}">${ICON.edit}<span>${bi('ver.open_it')}</span></a>` : ''}
-      <button type="button" class="btn" disabled title="${esc(biText('soon.tag'))}">${ICON.upload}<span>${bi('item.submit_record')}</span><span class="tag soon">${bi('soon.tag')}</span></button>
+      ${canRec ? `<a class="btn" href="#/record/new?item=${encodeURIComponent(it.item_id)}">${ICON.upload}<span>${bi('item.submit_record')}</span></a>` : ''}
       <button type="button" class="btn" disabled title="${esc(biText('soon.tag'))}">${ICON.qr}<span>${bi('item.qr_label')}</span><span class="tag soon">${bi('soon.tag')}</span></button>
     </div>
     ${manage ? `<section class="card"><h3>${bi('item.manage')}</h3><div class="row">
@@ -112,6 +121,7 @@ export async function renderItem(view, { shell, params, query }) {
     ${rel.length ? `<section class="card"><h3>${bi('item.related')}</h3><ul class="cat-list">${rel.slice(0, 30).map((x) => `<li><a class="cat-row" href="#/item/${encodeURIComponent(x.item_id)}"><span class="cat-top"><span class="code">${esc(x.code)}</span>${statusDot(x.status)}</span><span class="cat-name">${esc(x.name_vi || x.name_zh)}</span>${ICON.chevron}</a></li>`).join('')}</ul></section>` : ''}
   </div>`;
   wireDocButtons(view);
+  await wireItemRecords(view, it);
   const again = async (key) => { await afterCommit(); toast(bi(key), 'ok'); refresh(); };
   const on = (id, fn) => { const b = $('#' + id, view); if (b) b.addEventListener('click', async () => { if (!navigator.onLine) { toast(bi('sync.need_network'), 'err'); return; } busy(b, true); try { await fn(); } finally { busy(b, false); } }); };
   on('it-na', async () => {

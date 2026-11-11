@@ -7,7 +7,9 @@ var SYNC_ENTITIES_ = [
   { type: 'ITEM', sheet: 'Items', scoped: true },
   { type: 'CLAUSE', sheet: 'Clauses' },
   // Phiên bản (1b): theo phạm vi của biểu; cấp 1 (Tra cứu) chỉ nhận bản đang hiệu lực và lỗi thời
-  { type: 'VERSION', sheet: 'Versions', scoped: 'item' }
+  { type: 'VERSION', sheet: 'Versions', scoped: 'item' },
+  // Hồ sơ (1c): theo phạm vi của biểu; cấp 2+ và Thư ký ISO (cấp 1 Tra cứu không xem hồ sơ)
+  { type: 'RECORD', sheet: 'Records', scoped: 'record' }
 ];
 
 /** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */
@@ -26,6 +28,9 @@ function syncItemMap_(aux) {
 
 /** Dòng → bản ghi gửi client; null nếu không gửi (ngoài phạm vi bộ phận) */
 function syncProject_(ctx, ent, row, aux) {
+  if (ent.scoped === 'record') {
+    return canSeeRecords_(ctx.user, syncItemMap_(aux)[row.item_id]) ? projectRow_(ctx, row) : null;
+  }
   if (ent.scoped === 'item') {
     var it = syncItemMap_(aux)[row.item_id];
     if (!it || !itemVisible_(ctx.user, it)) return null;

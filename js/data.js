@@ -1,7 +1,8 @@
 // Dữ liệu đã tải trên máy: đọc nhanh theo loại, tra theo ID, quyền phía client (chỉ để ẩn/hiện nút — máy chủ vẫn kiểm lại),
 // phạm vi bộ phận, ngày theo máy chủ, tiện ích danh mục (tình trạng ○ ◐ ● ✕, nơi làm, kỳ hồ sơ)
 import { session, todayVN, nameText } from './core.js';
-import { getRecords, getMeta, KEY } from './sync.js';
+import { getRecords, getMeta, KEY, queueItems } from './sync.js';
+import { itemRecordStatus, periodTypeFromDays } from './periods.js';
 
 export { KEY };
 
@@ -193,3 +194,77 @@ export function reviewSoon(it, t = today()) {
   const warn = Number((session.settings || {}).review_warn_days || 30);
   return daysBetween(t, it.review_due) <= warn;
 }
+
+/* ---------------- Hồ sơ (phiên 1c) — quyền phía client chỉ để ẩn/hiện nút, máy chủ kiểm lại ---------------- */
+
+/** Máy chủ đã lên bản 1c (có record.submit trong danh sách quyền) — chưa có thì app ẩn phần nộp hồ sơ */
+export async function recordsOn() { return can('record.submit'); }
+/** Xem hồ sơ, bảng kỳ: cấp 2+ hoặc Thư ký ISO (cấp 1 Tra cứu không xem tổng hợp) */
+export function canSeeRecords() { return isSecretary() || roleLevel() >= 2; }
+/** Nộp hồ sơ cho biểu: cấp 2+ trong bộ phận, Thư ký ISO */
+export function canSubmitRecord(it) { return !!it && (isSecretary() || (roleLevel() >= 2 && deptWritable(it.dept_code))); }
+/** Trả lại hồ sơ nộp sai: trưởng bộ phận (cấp 3 trong bộ phận), Thư ký ISO */
+export function canReturnRecord(it) { return !!it && (isSecretary() || (roleLevel() >= 3 && deptWritable(it.dept_code))); }
+/** Gắn thêm tệp: người nộp, trưởng bộ phận, Thư ký ISO */
+export function canRecordFiles(it, r) {
+  if (isSecretary()) return true;
+  if (!it || !deptWritable(it.dept_code)) return false;
+  return r.submitted_by === myId() ? roleLevel() >= 2 : roleLevel() >= 3;
+}
+/** Biểu nhận hồ sơ (như máy chủ): '' được nộp · ITEM_NO_RECORD (○ ✕) · RECORD_FROM_APP (in từ M&E / Checksheet) */
+export function recordCheck(it) {
+  if (!it || it.status === 'NA' || it.status === 'NONE' || !it.status) return 'ITEM_NO_RECORD';
+  if (it.where === 'ME' || it.where === 'CS') return 'RECORD_FROM_APP';
+  return '';
+}
+export function periodTypeOf(it) {
+  return PERIOD_TYPES.includes(it && it.period_type) ? it.period_type : periodTypeFromDays(it && it.period_days);
+}
+
+/** Hồ sơ của tôi đang chờ gửi trong hàng chờ (record.submit chưa lên máy chủ), theo item_id */
+export async function queuedRecords() {
+  const uid = myId();
+  const out = new Map();
+  for (const o of await queueItems().catch(() => [])) {
+    if (o.action !== 'record.submit' || o.user_id !== uid || o.dataset_epoch !== session.epoch || o.state === 'REJECTED') continue;
+    const p = o.payload || {};
+    const list = out.get(p.item_id) || [];
+    list.push({ ...p, operation_id: o.operation_id, op_state: o.state, local_created_at: o.local_created_at, queued: true });
+    out.set(p.item_id, list);
+  }
+  return out;
+}
+
+/** Hồ sơ theo biểu (mới nhất trước) */
+export async function recordsOf(itemId) {
+  return (await recs('RECORD')).filter((r) => r.item_id === itemId)
+    .sort((a, b) => String(b.period_to).localeCompare(String(a.period_to)) || String(b.submitted_at).localeCompare(String(a.submitted_at)));
+}
+
+/**
+ * Tình trạng hồ sơ 12 kỳ của các biểu (giống record.status của máy chủ — js/periods.js), cộng hồ sơ đang chờ gửi trên máy.
+ * Trả Map item_id → kết quả itemRecordStatus.
+ */
+export async function recordStatusMap(list) {
+  if (!memo.__rs) {
+    const st = session.settings || {};
+    const byItem = new Map();
+    for (const r of await recs('RECORD')) {
+      if (r.status !== 'SUBMITTED') continue;
+      const a = byItem.get(r.item_id) || [];
+      a.push(r);
+      byItem.set(r.item_id, a);
+    }
+    const q = await queuedRecords();
+    const opts = { today: today(), grace: Number(st.record_grace_days ?? 3), startSetting: st.records_start_date || '' };
+    const m = new Map();
+    for (const it of await items()) m.set(it.item_id, itemRecordStatus(it, byItem.get(it.item_id) || [], { ...opts, pending: q.get(it.item_id) || [] }));
+    memo.__rs = m;
+  }
+  if (!list) return memo.__rs;
+  const out = new Map();
+  for (const it of list) if (memo.__rs.has(it.item_id)) out.set(it.item_id, memo.__rs.get(it.item_id));
+  return out;
+}
+/** Xóa bộ nhớ tạm tình trạng hồ sơ (vừa lưu hồ sơ vào hàng chờ) */
+export function invalidateRecordStatus() { delete memo.__rs; }

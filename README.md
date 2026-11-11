@@ -5,9 +5,9 @@ quá hạn, phủ điều khoản. Thay danh mục Excel DM-ISO-01 bằng hệ t
 GitHub Pages (iPhone và máy tính). Cùng lõi với M&E và Checksheet (chép từ repo `CS`): PIN 6 số, phiên, ghi có xác nhận, đồng bộ,
 hàng chờ khi mất mạng. Giao diện luôn song ngữ Việt · 中文.
 
-**Trạng thái:** bản `1.0.0-d1.2` — Đợt 1, phiên 1b (phiên bản & ban hành). **Đã phát hành THẬT** ở `/ISO/` (11/11/2026, không qua
-THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang `/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ.
-Cập nhật máy chủ lên 1b: dán `Code.gs` → chạy `migrateSchema` → Phiên bản mới (Hướng dẫn triển khai, mục "CẬP NHẬT LÊN BẢN 1b").
+**Trạng thái:** bản `1.0.0-d1.3` — Đợt 1, phiên 1c (hồ sơ). **Đã phát hành THẬT** ở `/ISO/` (từ 11/11/2026, không qua THỬ: máy chủ
+đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang `/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ.
+Cập nhật máy chủ lên 1c: dán `Code.gs` → chạy `migrateSchema` → Phiên bản mới (Hướng dẫn triển khai, mục "CẬP NHẬT LÊN BẢN 1c").
 
 ## Phiên 1a có gì
 
@@ -44,8 +44,32 @@ Cập nhật máy chủ lên 1b: dán `Code.gs` → chạy `migrateSchema` → P
 - Máy chủ dán `Code.gs` mới mà chưa `migrateSchema`: đăng nhập/đồng bộ vẫn chạy, trigger nền tự thêm sheet. `adminNoiLaiTep` nối lại ID
   tệp theo `file_map.json` khi khôi phục từ tài khoản thứ hai.
 
-Phiên sau: **1c** hồ sơ (nộp, bảng kỳ ✓ ! –, tem QR) · **1d** phủ điều khoản, trang chủ đầy đủ,
-phát hành THẬT. Đợt 2 kết nối M&E/Checksheet, Gmail, báo cáo PDF, in tem · Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
+## Phiên 1c có gì
+
+- **Nộp hồ sơ** (sheet `Records`, mã `HS-yymm-0001`): chọn biểu (quét tem, tìm, bấm ô của bảng kỳ hoặc nút trên chi tiết biểu), kỳ
+  (gợi ý kỳ còn thiếu gần nhất / kỳ hiện tại) hoặc **khoảng ngày** (cả quyển sổ — mặc định với biểu hằng ngày/tuần), chụp nhiều trang
+  (thu nhỏ ~1600 px, JPEG, bỏ GPS) hoặc chọn PDF/Excel/Word (≤ 30 tệp), ghi chú. **Làm được khi mất mạng**: `record.submit` rồi
+  `doc.upload` từng tệp vào hàng chờ, có mạng tự gửi (tệp gửi với thời gian chờ 180 giây). Ghi nhận ngay, không chờ duyệt.
+- Biểu nhận hồ sơ: ● và ◐ (sổ giấy đang dùng); không nhận ○, ✕, biểu in từ M&E / Checksheet (Đợt 2 lấy ngày có hồ sơ từ app kia);
+  "Một phần M&E/Checksheet" vẫn nộp bổ sung.
+- **Trả lại** hồ sơ nộp sai (trưởng bộ phận trong bộ phận, Thư ký ISO, cấp 4; PIN; quyền kiểm trước PIN) → kỳ đó tính lại như chưa có,
+  người nộp thấy ở Chờ bạn xử lý + số đỏ trên nút Hồ sơ, bấm **Nộp lại** (điền sẵn khoảng ngày).
+- **Tình trạng hồ sơ theo kỳ** (12 kỳ gần nhất): ✓ đúng hạn (có hồ sơ giao với kỳ) · ! quá hạn (kỳ kết thúc quá `record_grace_days`
+  ngày mà chưa có) · – chưa tới hạn · ô gạch = không tính (biểu chưa ban hành, in từ app, kỳ trước ngày bắt đầu tính). Biểu khi phát
+  sinh không bao giờ quá hạn, chỉ có lần nộp gần nhất. Ngày bắt đầu tính = `records_from` (đặt khi ban hành lần đầu trong app, không lùi
+  khi ban hành lại) / `records_start_date` với biểu ● nhập từ Excel / ngày ban hành. Máy chủ tính (`record.status`, bộ đệm 5 phút theo
+  phiên bản bảng) và app tính giống hệt trên máy (`js/periods.js`, dùng được khi mất mạng, có ô "chờ gửi"); test so hai bên.
+- Màn **Hồ sơ**: bảng kỳ theo loại kỳ (ngày, tuần, tháng, quý, nửa năm, năm) và bộ phận, lọc "kỳ gần nhất quá hạn", "có ô quá hạn",
+  "bị trả lại", tìm Việt/Trung không bật bàn phím; bấm ô → hồ sơ của kỳ, nộp cho kỳ đó. **Chi tiết hồ sơ**: ảnh xem trong app, tệp tải
+  qua máy chủ, thêm ảnh/tệp, trả lại. Chi tiết biểu có thẻ **Hồ sơ 12 kỳ gần nhất**. Trang chủ: ô **Hồ sơ quá hạn** = số biểu có kỳ đến
+  hạn xét gần nhất bị quá hạn. Cấp Tra cứu không xem hồ sơ.
+- **Tem QR** `…/#/f/<mã>?r=<lần>`: mở chi tiết; tem khác lần đang hiệu lực báo đỏ "bản in đã lỗi thời", biểu ✕ báo đỏ, biểu chưa ban
+  hành báo vàng; banner có nút Nộp hồ sơ.
+- Máy chủ dán `Code.gs` 1c mà chưa `migrateSchema`: lần nộp hồ sơ đầu tiên tự thêm sheet; app chỉ hiện phần hồ sơ khi máy chủ đã có
+  `record.submit`.
+
+Phiên sau: **1d** phủ điều khoản, trang chủ đầy đủ (lịch tuần). Đợt 2 kết nối M&E/Checksheet, Gmail, báo cáo PDF, in tem ·
+Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
 
 ## Cấu trúc
 
@@ -56,7 +80,8 @@ phát hành THẬT. Đợt 2 kết nối M&E/Checksheet, Gmail, báo cáo PDF, i
 | `js/xlsx.js` | SheetJS nạp theo nhu cầu; định dạng sau khi ghi (nền, viền, cố định ô, danh sách chọn, tô màu) |
 | `assets/` | Biểu tượng app (tờ tài liệu + dấu tick, navy trên vàng — SVG và PNG 180/192/512), ảnh nền |
 | `vendor/` | jsQR 1.4.0 (quét QR), SheetJS 0.20.3 (Excel) |
-| `server/src/` | Mã máy chủ theo mô-đun (`11_catalog.js` danh mục, `14_import.js` nhập Excel tổng) |
+| `server/src/` | Mã máy chủ theo mô-đun (`11_catalog.js` danh mục, `14_import.js` nhập Excel tổng, `16_versions.js` phiên bản, `17_records.js` hồ sơ) |
+| `js/periods.js` | Kỳ hồ sơ và tình trạng ✓ ! – (giống hệt máy chủ, Node chạy thẳng được trong test) |
 | `apps-script/` | `Code.gs` (tạo bằng `npm run build`) và `appsscript.json` để dán vào Apps Script; `SaoLuuPhu.gs` cho tài khoản thứ hai |
 | `i18n/labels.json` | Từ điển nhãn duy nhất [Việt, 中文] → `js/dict.js` và `LABELS` trong `Code.gs` |
 | `tests/` | Giả lập Apps Script cho Node, test máy chủ, test giao diện Playwright |

@@ -4,7 +4,6 @@ import { ICON } from '../ui.js';
 
 /** Màn → [nhãn tiêu đề, biểu tượng, phiên/đợt sẽ làm] */
 const SOON = {
-  records: ['nav.records', 'file', 'soon.when_1c'],
   coverage: ['nav.coverage', 'checklist', 'soon.when_1d'],
   reports: ['nav.reports', 'reports', 'soon.when_d2'],
   capa: ['nav.capa', 'repairs', 'soon.when_d3'],
@@ -13,8 +12,8 @@ const SOON = {
 };
 
 export async function renderSoon(view, { shell }) {
-  const key = (location.hash.replace(/^#\//, '').split(/[/?]/)[0]) || 'records';
-  const s = SOON[key] || SOON.records;
+  const key = (location.hash.replace(/^#\//, '').split(/[/?]/)[0]) || 'coverage';
+  const s = SOON[key] || SOON.coverage;
   shell.setScreen({ title: s[0] });
   view.innerHTML = `<div class="card empty-state soon-page">${ICON[s[1]]}
     <p><span class="tag soon">${bi('soon.tag')}</span></p>

@@ -32,6 +32,9 @@ var HANDLERS_ = {
   'version.cancel': function (ctx) { return versionCancel_(ctx); },
   'item.setNa': function (ctx) { return itemSetNa_(ctx); },
   'item.review': function (ctx) { return itemReview_(ctx); },
+  'record.submit': function (ctx) { return recordSubmit_(ctx); },
+  'record.return': function (ctx) { return recordReturn_(ctx); },
+  'record.status': function (ctx) { return recordStatus_(ctx); },
   'doc.upload': function (ctx) { return docUpload_(ctx); },
   'doc.get': function (ctx) { return docGet_(ctx); },
   'report.logo.get': function (ctx) { return reportLogoGet_(ctx); },
@@ -61,7 +64,8 @@ var HANDLERS_ = {
 var PRECHECK_ = {
   'version.approve': function (ctx) { precheckApprove_(ctx); },
   'version.return': function (ctx) { precheckReturn_(ctx); },
-  'version.issue': function (ctx) { precheckIssue_(ctx); }
+  'version.issue': function (ctx) { precheckIssue_(ctx); },
+  'record.return': function (ctx) { precheckRecordReturn_(ctx); }
 };
 
 /** Action không cần phiên */

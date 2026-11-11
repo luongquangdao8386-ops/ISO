@@ -98,8 +98,11 @@ test('iPhone: đăng nhập PIN, trang chủ (biểu tượng, 4 ô số, ô S�
     await go(page, `#/f/${it.qr_key}?r=02`);
     await page.waitForSelector('.item .banner.ok');
 
-    // Màn của phiên sau
+    // Hồ sơ (phiên 1c): nút Hồ sơ mở bảng kỳ
     await page.click('.bnav-item[data-nav="records"]');
+    await page.waitForSelector('.rg .rg-sec');
+    // Màn của phiên sau
+    await go(page, '#/coverage');
     await page.waitForSelector('.soon-page');
     assert.ok((await page.textContent('.soon-page')).includes('Sắp có'));
 
@@ -159,7 +162,7 @@ test('web: menu trái (màn phiên sau mờ "Sắp có"), Excel xuất đúng kh
     await login(page);
     assert.equal(await page.locator('.side .side-item').count(), 11);
     assert.equal(await page.locator('.side .side-item[data-nav="versions"]').count(), 1);
-    assert.equal(await page.locator('.side .side-item.soon').count(), 6);
+    assert.equal(await page.locator('.side .side-item.soon').count(), 5);
     assert.ok(await page.locator('.stats').isVisible());
     assert.ok(await page.locator('.home-depts').isVisible());
     await page.screenshot({ path: path.join(SHOTS, 'home-web.png'), fullPage: true });

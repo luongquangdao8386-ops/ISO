@@ -17,10 +17,12 @@ var DOC_MIME_ = {
   'application/msword': { magic: OLE_MAGIC_, ext: 'doc' }
 };
 
-/** Loại tệp theo việc: PDF bản ban hành (bắt buộc), tệp gốc để sửa lần sau (xlsx/docx) */
+/** Loại tệp theo việc: PDF bản ban hành (bắt buộc), tệp gốc để sửa lần sau (xlsx/docx); hồ sơ: ảnh trang sổ, tệp PDF/Excel/Word */
 var DOC_KIND_MIMES_ = {
   PDF: ['application/pdf'],
-  SOURCE: [XLSX_MIME_, DOCX_MIME_, 'application/vnd.ms-excel', 'application/msword']
+  SOURCE: [XLSX_MIME_, DOCX_MIME_, 'application/vnd.ms-excel', 'application/msword'],
+  PHOTO: ['image/jpeg', 'image/png'],
+  FILE: ['application/pdf', XLSX_MIME_, DOCX_MIME_, 'application/vnd.ms-excel', 'application/msword']
 };
 
 function magicOk_(bytes, mime) {
@@ -50,9 +52,12 @@ function cleanFileName_(s) {
 /* ---------------- doc.upload ---------------- */
 
 /**
- * doc.upload {document_id, entity_type: VERSION, entity_id: version_id, kind: PDF | SOURCE, mime_type, file_name, content_b64}
- * Phiên bản phải đang là Nháp và người gửi sửa được nháp đó (versionEditable_). Tải lại cùng loại → tệp cũ thôi dùng.
- * Trả {document_id, entity_type: VERSION, record: phiên bản sau khi gắn tệp, record_version của phiên bản}.
+ * doc.upload {document_id, entity_type: VERSION | RECORD, entity_id, kind, mime_type, file_name, content_b64, page_no?}
+ *  - VERSION (phiên 1b): kind PDF | SOURCE; phiên bản phải đang là Nháp và người gửi sửa được nháp đó (versionEditable_);
+ *    tải lại cùng loại → tệp cũ thôi dùng.
+ *  - RECORD (phiên 1c): kind PHOTO (ảnh trang sổ ≤ 1600 px) | FILE (PDF, Excel, Word); người nộp, trưởng bộ phận, Thư ký ISO;
+ *    gửi được từ hàng chờ khi có mạng lại (đi sau record.submit của cùng hồ sơ). Tối đa 30 tệp mỗi hồ sơ.
+ * Trả {document_id, entity_type, entity_id, record: bản ghi sau khi gắn tệp, record_version của bản ghi đó}.
  */
 function docUpload_(ctx) {
   var p = ctx.req.payload || {};
@@ -62,21 +67,29 @@ function docUpload_(ctx) {
   if (!et) errs.push(fieldError_('entity_type', 'INVALID_VALUE'));
   if (!isUuidV4_(p.entity_id)) errs.push(fieldError_('entity_id', 'ID_INVALID'));
   var kinds = DOC_KIND_MIMES_[p.kind];
-  if (!kinds) errs.push(fieldError_('kind', 'INVALID_VALUE'));
+  if (!kinds || (et && et.kinds.indexOf(p.kind) < 0)) errs.push(fieldError_('kind', 'INVALID_VALUE'));
   else if (kinds.indexOf(p.mime_type) < 0) errs.push(fieldError_('mime_type', 'FILE_TYPE'));
   if (typeof p.content_b64 !== 'string' || !p.content_b64) errs.push(fieldError_('content_b64', 'REQUIRED'));
   if (Number(ctx.req.expected_version || 0) !== 0) errs.push(fieldError_('expected_version', 'INVALID_VALUE'));
   if (errs.length) throw validationError_(errs);
+  var isRec = p.entity_type === 'RECORD';
   var entity = findOne_(et.sheet, et.key, p.entity_id);
   if (!entity || entity.archived_at) throw validationError_([fieldError_('entity_id', 'NOT_FOUND')]);
   var it = findOne_('Items', 'item_id', entity.item_id);
-  if (!it || !itemVisible_(ctx.user, it) || !versionEditable_(ctx.user, it, entity)) throw apiError_('FORBIDDEN');
-  if (entity.state !== 'DRAFT') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+  if (!it || !itemVisible_(ctx.user, it)) throw apiError_('FORBIDDEN');
+  if (isRec) {
+    if (!canRecordFiles_(ctx.user, it, entity)) throw apiError_('FORBIDDEN');
+    if (entity.status === 'VOID') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+  } else {
+    if (!versionEditable_(ctx.user, it, entity)) throw apiError_('FORBIDDEN');
+    if (entity.state !== 'DRAFT') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+  }
 
   // Đã có thao tác này → không tạo thêm tệp
   var ex = findOne_('Operations', 'operation_id', ctx.req.operation_id);
   if (ex) return withWriteLock_(function () { return existingOpResponse_(ctx, ex, payloadHash_(ctx)); });
   if (findRowNums_('Documents', 'document_id', p.document_id).length) throw validationError_([fieldError_('document_id', 'ID_EXISTS')]);
+  if (isRec && (entity.files_json || []).length >= RECORD_MAX_FILES_) throw validationError_([fieldError_('content_b64', 'TOO_MANY_FILES')]);
 
   var bytes;
   try { bytes = b64d_(p.content_b64); } catch (e) { throw validationError_([fieldError_('content_b64', 'INVALID_VALUE')]); }
@@ -84,9 +97,13 @@ function docUpload_(ctx) {
   if (bytes.length > Number(setting_('doc_max_bytes'))) throw validationError_([fieldError_('content_b64', 'FILE_TOO_LARGE')]);
   if (!magicOk_(bytes, p.mime_type)) throw validationError_([fieldError_('mime_type', 'FILE_TYPE')]);
   var ext = DOC_MIME_[p.mime_type].ext;
-  var shown = cleanFileName_(p.file_name) || (it.code + '.' + ext);
-  // Tên trên Drive dễ tìm khi mở thư mục: <mã biểu>_L<lần>[_goc]_<8 ký tự>.<đuôi>
-  var driveName = String(it.code).replace(/[\/\\]/g, '-') + '_L' + entity.rev + (p.kind === 'SOURCE' ? '_goc' : '') + '_' + p.document_id.slice(0, 8) + '.' + ext;
+  var pageNo = Number(p.page_no) > 0 && Number(p.page_no) <= 999 ? Math.floor(Number(p.page_no)) : null;
+  var codeSafe = String(it.code).replace(/[\/\\]/g, '-');
+  var shown = cleanFileName_(p.file_name) || (it.code + (isRec ? '_' + (pageNo || 1) : '') + '.' + ext);
+  // Tên trên Drive dễ tìm khi mở thư mục: <mã biểu>_L<lần>[_goc]_<8 ký tự> (phiên bản) · <mã biểu>_<mã HS>_p<trang>_<8 ký tự> (hồ sơ)
+  var driveName = isRec
+    ? codeSafe + '_' + entity.code + '_p' + (pageNo || 0) + '_' + p.document_id.slice(0, 8) + '.' + ext
+    : codeSafe + '_L' + entity.rev + (p.kind === 'SOURCE' ? '_goc' : '') + '_' + p.document_id.slice(0, 8) + '.' + ext;
   // Drive: ngoài khóa ghi
   var folder = appFolder_();
   var file = folder.createFile(Utilities.newBlob(bytes, p.mime_type, driveName));
@@ -98,40 +115,51 @@ function docUpload_(ctx) {
       entity_type: 'DOCUMENT', entity_id: p.document_id,
       build: function () {
         if (findRowNums_('Documents', 'document_id', p.document_id).length) throw validationError_([fieldError_('document_id', 'ID_EXISTS')]);
-        var vRow = findOne_(et.sheet, et.key, p.entity_id);
-        if (!vRow || vRow.state !== 'DRAFT') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
-        var v = clone_(vRow); delete v.__row;
-        var col = p.kind === 'PDF' ? 'pdf' : 'source';
+        var eRow = findOne_(et.sheet, et.key, p.entity_id);
+        if (!eRow) throw validationError_([fieldError_('entity_id', 'NOT_FOUND')]);
+        var row = clone_(eRow); delete row.__row;
         var writes = [];
-        var oldDocId = v[col + '_doc_id'];
-        if (oldDocId) {
-          var od = findOne_('Documents', 'document_id', oldDocId);
-          if (od && od.active) {
-            oldDriveId = od.drive_file_id;
-            var odRow = clone_(od); delete odRow.__row;
-            odRow.active = false;
-            cUpdate_(ctx, odRow);
-            writes.push({ sheet: 'Documents', mode: 'update', row: odRow });
+        var oldDocId = '';
+        if (isRec) {
+          if (row.status === 'VOID') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+          var files = Array.isArray(row.files_json) ? row.files_json.slice() : [];
+          if (files.length >= RECORD_MAX_FILES_) throw validationError_([fieldError_('content_b64', 'TOO_MANY_FILES')]);
+          files.push({ document_id: p.document_id, kind: p.kind, mime_type: p.mime_type, file_name: shown, size_bytes: bytes.length, page_no: pageNo || files.length + 1 });
+          files.sort(function (a, b) { return (Number(a.page_no) || 0) - (Number(b.page_no) || 0); });
+          row.files_json = files;
+        } else {
+          if (row.state !== 'DRAFT') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+          var col = p.kind === 'PDF' ? 'pdf' : 'source';
+          oldDocId = row[col + '_doc_id'];
+          if (oldDocId) {
+            var od = findOne_('Documents', 'document_id', oldDocId);
+            if (od && od.active) {
+              oldDriveId = od.drive_file_id;
+              var odRow = clone_(od); delete odRow.__row;
+              odRow.active = false;
+              cUpdate_(ctx, odRow);
+              writes.push({ sheet: 'Documents', mode: 'update', row: odRow });
+            }
           }
+          row[col + '_doc_id'] = p.document_id;
+          row[col + '_file_name'] = shown;
+          row[col + '_size'] = bytes.length;
+          if (col === 'source') row.source_mime = p.mime_type;
         }
         var doc = cNew_(ctx, {
           document_id: p.document_id, entity_type: p.entity_type, entity_id: p.entity_id, kind: p.kind, drive_file_id: file.getId(),
           mime_type: p.mime_type, file_name: shown, access_scope: 'PRIVATE', active: true, managed_folder_id: folder.getId(),
-          owned_by_app: true, size_bytes: bytes.length, thumb_drive_file_id: '', sha256: sha, page_no: null
+          owned_by_app: true, size_bytes: bytes.length, thumb_drive_file_id: '', sha256: sha, page_no: pageNo
         });
         writes.unshift({ sheet: 'Documents', mode: 'insert', row: doc });
-        v[col + '_doc_id'] = p.document_id;
-        v[col + '_file_name'] = shown;
-        v[col + '_size'] = bytes.length;
-        if (col === 'source') v.source_mime = p.mime_type;
-        cUpdate_(ctx, v);
-        writes.push({ sheet: et.sheet, mode: 'update', row: v });
+        cUpdate_(ctx, row);
+        writes.push({ sheet: et.sheet, mode: 'update', row: row });
         return {
           writes: writes,
-          result: { document_id: p.document_id, entity_type: 'VERSION', entity_id: v.version_id, record_version: v.record_version, record: projectRow_(ctx, v) },
-          record_version: v.record_version,
+          result: { document_id: p.document_id, entity_type: p.entity_type, entity_id: p.entity_id, record_version: row.record_version, record: projectRow_(ctx, row) },
+          record_version: row.record_version,
           audit: { entity_type: 'DOCUMENT', entity_id: p.document_id, before_json: oldDocId ? { replaced: oldDocId } : null,
-            after_json: { kind: p.kind, entity_type: p.entity_type, entity_id: p.entity_id, size_bytes: bytes.length, file_name: shown } }
+            after_json: { kind: p.kind, entity_type: p.entity_type, entity_id: p.entity_id, size_bytes: bytes.length, file_name: shown, page_no: pageNo } }
         };
       }
     });
@@ -149,6 +177,7 @@ function docUpload_(ctx) {
 /**
  * doc.get {document_id}: nội dung tệp (base64) cho người xem được hồ sơ chứa tệp.
  * Phiên bản đang hiệu lực: ai thấy biểu đều tải được (bản in). Nháp, chờ duyệt, lỗi thời: cấp 2 trở lên trong bộ phận, Thư ký ISO.
+ * Ảnh / tệp hồ sơ: cấp 2 trở lên trong phạm vi biểu, Thư ký ISO.
  */
 function docGet_(ctx) {
   var p = ctx.req.payload || {};
@@ -161,6 +190,12 @@ function docGet_(ctx) {
     if (!v || !it) throw apiError_('NOT_FOUND');
     if (!itemVisible_(ctx.user, it)) throw apiError_('FORBIDDEN');
     if (v.state !== 'ISSUED' && !isSecretary_(ctx.user) && !(Number(ctx.user.role_level) >= 2 && deptWritable_(ctx.user, it.dept_code))) throw apiError_('FORBIDDEN');
+  } else if (d.entity_type === 'RECORD') {
+    // Ảnh / tệp hồ sơ: người xem được hồ sơ của biểu (cấp 2+ trong phạm vi, Thư ký ISO)
+    var r = findOne_('Records', 'record_id', d.entity_id);
+    var it2 = r ? findOne_('Items', 'item_id', r.item_id) : null;
+    if (!r || !it2) throw apiError_('NOT_FOUND');
+    if (!canSeeRecords_(ctx.user, it2)) throw apiError_('FORBIDDEN');
   } else {
     throw apiError_('FORBIDDEN');
   }

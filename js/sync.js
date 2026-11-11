@@ -44,7 +44,7 @@ export async function bootstrap({ onPage, page1 = null } = {}) {
 
 /** Khóa chính theo loại hồ sơ (khớp SYNC_ENTITIES_ của máy chủ) */
 export const KEY = {
-  DEPT: 'dept_code', GROUP: 'group_key', ITEM: 'item_id', CLAUSE: 'clause_id', VERSION: 'version_id'
+  DEPT: 'dept_code', GROUP: 'group_key', ITEM: 'item_id', CLAUSE: 'clause_id', VERSION: 'version_id', RECORD: 'record_id'
 };
 
 function keyOf(type, rec) {
@@ -124,7 +124,7 @@ export async function pullChanges({ first = null, onPage } = {}) {
 /* ---------------- Hàng chờ offline ---------------- */
 
 /**
- * Thêm một thao tác vào hàng chờ (chỉ action loại offline: record.submit, doc.upload — phiên 1c).
+ * Thêm một thao tác vào hàng chờ (chỉ action loại offline: record.submit, doc.upload — phiên 1c; tệp gửi với thời gian chờ 180 giây).
  * parent_id: hồ sơ cha (vd phiếu của ảnh) — thao tác của một phiếu đi tuần tự; mục trước bị từ chối/xung đột thì mục sau chờ.
  * chain: thao tác sửa nối tiếp trên cùng hồ sơ — expected_version tính tiếp từ mục trước trong hàng chờ (mỗi lần ghi +1)
  *   và được chỉnh lại theo record_version máy chủ trả về khi gửi.
@@ -251,7 +251,7 @@ export async function flushQueue(onProgress) {
         return { sent, committed, stopped_code: st.code };
       }
     }
-    const res = await api('sync.push', { op: { action: op.action, operation_id: op.operation_id, entity_type: op.entity_type, entity_id: op.entity_id, expected_version: op.expected_version, payload: op.payload, local_created_at: op.local_created_at } }, { timeoutMs: 55000, write: true, operation_id: op.operation_id, expected_version: op.expected_version });
+    const res = await api('sync.push', { op: { action: op.action, operation_id: op.operation_id, entity_type: op.entity_type, entity_id: op.entity_id, expected_version: op.expected_version, payload: op.payload, local_created_at: op.local_created_at } }, { timeoutMs: op.action === 'doc.upload' ? 180000 : 55000, write: true, operation_id: op.operation_id, expected_version: op.expected_version });
     sent++;
     if (res.ok && res.state === 'COMMITTED') {
       if (op.chain && typeof res.record_version === 'number') lastVer.set(op.entity_id, res.record_version);

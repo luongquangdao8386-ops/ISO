@@ -43,7 +43,7 @@ test('phạm vi bộ phận: cấp 1–3 chỉ thấy bộ phận mình + tài l
   assert.ok(ch.data.changes.some((c) => c.entity_id === it.item_id && c.op === 'TOMBSTONE'));
 });
 
-test('quyền: cấp 1–3 không phải Thư ký bị FORBIDDEN (trước khi hỏi PIN) khi sửa danh mục, nhập Excel; chức năng phiên sau trả FEATURE_NOT_ENABLED', () => {
+test('quyền: cấp 1–3 không phải Thư ký bị FORBIDDEN (trước khi hỏi PIN) khi sửa danh mục, nhập Excel; chức năng đợt sau trả FEATURE_NOT_ENABLED', () => {
   const { env } = seeded();
   const it = env.rows('Items')[0];
   const head = userClient(env, 'CL3', 3, '583921', { depts: 'CL' });
@@ -54,11 +54,11 @@ test('quyền: cấp 1–3 không phải Thư ký bị FORBIDDEN (trước khi h
   assert.equal(look.write('settings.edit', { changes: { record_grace_days: 4 } }).code, 'FORBIDDEN');
   assert.equal(look.write('user.create', { user_id: uuid() }).code, 'FORBIDDEN');
   assert.equal(head.call('user.view', {}).code, 'FORBIDDEN');
-  // Phiên 1c: action đã đăng ký nhưng chưa có mã
-  assert.equal(head.write('record.submit', {}).code, 'FEATURE_NOT_ENABLED');
+  // Đợt 3: action đã đăng ký nhưng chưa có mã
+  assert.equal(head.write('capa.edit', {}).code, 'FEATURE_NOT_ENABLED');
   const p = head.call('sync.bootstrap', {}).data.permissions.actions;
-  assert.ok(!p.includes('item.edit') && !p.includes('import.preview') && !p.includes('version.issue') && !p.includes('record.submit'));
-  assert.ok(p.includes('version.save') && p.includes('version.approve') && p.includes('doc.get'));
+  assert.ok(!p.includes('item.edit') && !p.includes('import.preview') && !p.includes('version.issue') && !p.includes('capa.edit'));
+  assert.ok(p.includes('version.save') && p.includes('version.approve') && p.includes('doc.get') && p.includes('record.submit') && p.includes('record.return'));
   assert.ok(!look.call('sync.bootstrap', {}).data.permissions.actions.includes('version.save'));
 });
 
