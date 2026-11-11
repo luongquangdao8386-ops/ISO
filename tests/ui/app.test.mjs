@@ -49,7 +49,8 @@ test('iPhone: đăng nhập PIN, trang chủ (biểu tượng, 4 ô số, ô S�
     assert.equal(await page.locator('.home-hero img.brand-logo[src*="iso-tile.svg"]').count(), 1);
     assert.equal(await page.locator('.stats > .stat').count(), 4);
     assert.ok((await page.textContent('.stats')).includes('25'));
-    assert.ok(await page.locator('.grid9 .tile.soon').count() >= 4, 'ô của phiên sau mờ "Sắp có"');
+    assert.equal(await page.locator('.grid9 .tile.soon').count(), 3, 'ô của phiên sau mờ "Sắp có" (Báo cáo, Khắc phục, Đánh giá; Kết nối có từ 2a)');
+    assert.equal(await page.locator('.grid9 .tile[href="#/links"]:not(.soon)').count(), 1);
     assert.ok((await page.textContent('.pend-card')).includes('chưa có tệp'));
     assert.ok(await noOverflow(page));
     assert.deepEqual(await noRawKeys(page), []);
@@ -164,7 +165,8 @@ test('web: menu trái (màn phiên sau mờ "Sắp có"), Excel xuất đúng kh
     await login(page);
     assert.equal(await page.locator('.side .side-item').count(), 11);
     assert.equal(await page.locator('.side .side-item[data-nav="versions"]').count(), 1);
-    assert.equal(await page.locator('.side .side-item.soon').count(), 4, 'Báo cáo, Khắc phục, Đánh giá, Kết nối (Phủ điều khoản đã có ở 1d)');
+    assert.equal(await page.locator('.side .side-item.soon').count(), 3, 'Báo cáo, Khắc phục, Đánh giá (Kết nối có từ 2a)');
+    assert.equal(await page.locator('.side .side-item[data-nav="links"]:not(.soon)').count(), 1);
     assert.ok(await page.locator('.stats').isVisible());
     assert.ok(await page.locator('.home-depts').isVisible());
     await page.screenshot({ path: path.join(SHOTS, 'home-web.png'), fullPage: true });

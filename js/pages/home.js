@@ -127,7 +127,7 @@ async function gridHtml(list) {
     { key: 'reports', icon: 'reports', href: '/reports', soon: 1 },
     { key: 'capa', icon: 'repairs', href: '/capa', soon: 1, lvl: 2 },
     { key: 'audits', icon: 'inspections', href: '/audits', soon: 1, lvl: 2 },
-    { key: 'links', icon: 'link', href: '/links', soon: 1, lvl: 4 },
+    { key: 'links', icon: 'link', href: '/links', lvl: 4 },
     { key: 'drafts', icon: 'sync', href: '/account/drafts', tail: q ? bi('sync.queued_count', { N: q }) : bi('home.none_drafts') }
   ].filter((x) => (x.show !== undefined ? x.show : !x.lvl || lvl >= x.lvl));
   return `<section class="grid9" aria-label="${esc(biText('menu.title'))}">${tiles.map((x) => `<a class="tile${x.soon ? ' soon' : ''}" href="#${x.href}">${ICON[x.icon]}<span class="tile-label">${bi('tile.' + x.key)}</span>${x.soon ? `<span class="tile-count tag soon">${bi('soon.tag')}</span>` : (x.tail ? `<span class="tile-count">${x.tail}</span>` : '')}</a>`).join('')}</section>`;

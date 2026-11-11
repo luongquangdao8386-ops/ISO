@@ -56,7 +56,7 @@ function auditView_(ctx) {
 /* ---------------- Cấu hình ---------------- */
 
 /** Khóa không sửa trong màn Cấu hình (logo sửa ở màn riêng) */
-var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, backup_mirror_email: 1 };
+var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, backup_mirror_email: 1, evidence_sources: 1 };
 var SETTINGS_BOUNDS_ = {
   session_days: [1, 90], session_warn_days: [0, 30], change_pin_session_minutes: [5, 60], reauth_window_minutes: [1, 30], temp_pin_hours: [1, 168],
   max_sessions_per_user: [1, 50], login_fail_limit: [3, 20], login_fail_window_minutes: [1, 120], login_lock_minutes: [1, 1440],
@@ -225,6 +225,23 @@ function healthRows_() {
   } else {
     add('records', false, 'Thiếu sheet Records', 'Chạy migrateSchema');
   }
+  // Kết nối M&E / Checksheet (2a): ngày có hồ sơ từ app kia
+  EVIDENCE_SRC_LIST_.forEach(function (src) {
+    var inf = linkSourceInfo_(src, st);
+    var nm = inf.name;
+    var hk = src === 'ME' ? 'link_me' : 'link_cs';
+    if (!inf.linked) { add(hk, true, 'OFF', 'Chưa nối ' + nm + ' — Tài khoản → Quản trị → Kết nối M&E / Checksheet'); return; }
+    var okAt = parseTime_(inf.ok_at);
+    var fresh = okAt && now_().getTime() - okAt.getTime() < 3 * 3600000;
+    var s = inf.stats || {};
+    var unk = (inf.unknown || []).map(function (u) { return u.code + ' (' + u.n + ')'; });
+    var val = (inf.ok_at ? 'Lần lấy được gần nhất ' + String(inf.ok_at).slice(0, 16).replace('T', ' ') : 'Chưa lấy được lần nào') +
+      (s.matched !== undefined ? ' · ' + s.matched + ' biểu · ' + s.dates + ' dòng ngày' : '');
+    var note = inf.last_status === 'FAILED' ? 'Lần gần nhất lỗi: ' + inf.last_error + ' — Kết nối → Thử kết nối'
+      : (!fresh ? 'Quá 3 giờ chưa cập nhật — kiểm trigger syncEvidenceHourly (chạy installTriggers)' : '');
+    if (unk.length) note = (note ? note + ' · ' : '') + 'Mã biểu không có trong danh mục ISO (bỏ qua): ' + unk.join(', ');
+    add(hk, inf.last_status !== 'FAILED' && !!fresh, val, note);
+  });
   var nofile = items.filter(function (it) { return it.status === 'ISSUED' && it.file_missing; }).length;
   add('file_missing', true, nofile, nofile ? 'Biểu ● chưa có tệp: Danh mục → lọc Chưa có tệp → Gắn tệp' : '');
   var today = todayVN_();

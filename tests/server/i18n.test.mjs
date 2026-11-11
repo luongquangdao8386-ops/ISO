@@ -52,6 +52,19 @@ test('họ khóa ghép động đủ thành viên', () => {
     'rec.reason_short.': ['NOT_ISSUED', 'FROM_APP', 'NO_START'],
     'rec.no_record.': ['ITEM_NO_RECORD', 'RECORD_FROM_APP'],
     'mirror_status.': ['OK', 'FAILED', 'OFF'],
+    // Kết nối M&E / Checksheet (2a)
+    'link.err.': ['NO_RESPONSE', 'FORBIDDEN', 'NO_FEED', 'MAINTENANCE', 'REMOTE_ERROR', 'WRONG_APP', 'BAD_DATA', 'TOO_MANY', 'NOT_LINKED', 'ERROR'],
+    'link.st.': ['ON', 'OFF', 'FAILED'],
+    'link.last.': ['OK', 'FAILED'],
+    'link.src.': ['ME', 'CS'],
+    'link.src_short.': ['ME', 'CS'],
+    'link.got.': ['ME', 'CS'],
+    'link.key_hint.': ['ME', 'CS'],
+    'link.off_hint.': ['ME', 'CS'],
+    'link.clear_confirm.': ['ME', 'CS'],
+    'ev.line.': ['ME', 'CS'],
+    'ev.check_in.': ['ME', 'CS'],
+    'ev.src_note.': ['ME', 'CS'],
     'imp.act.': ['ADD', 'UPDATE', 'SAME', 'ERROR'],
     'imp.status.': ['STAGING', 'PREVIEWED', 'COMMITTING', 'COMPLETED', 'CANCELLED'],
     'soon.what.': ['records', 'coverage', 'reports', 'capa', 'audits', 'links'],
@@ -60,7 +73,8 @@ test('họ khóa ghép động đủ thành viên', () => {
       'freq_vi', 'freq_zh', 'flow', 'keep', 'priority', 'where', 'where_note', 'status', 'current_rev', 'issued_at', 'period_days', 'note', 'group_label']
   };
   // Dòng kiểm tra sức khỏe máy chủ (24_system.js add('khóa', …))
-  fam['health.'] = [...fs.readFileSync(path.join(ROOT, 'server', 'src', '24_system.js'), 'utf8').matchAll(/\badd\('([a-z_0-9]+)'/g)].map((m) => m[1]);
+  const sys = fs.readFileSync(path.join(ROOT, 'server', 'src', '24_system.js'), 'utf8');
+  fam['health.'] = [...sys.matchAll(/\badd\('([a-z_0-9]+)'/g)].map((m) => m[1]).concat([...sys.matchAll(/'(link_[a-z]+)'/g)].map((m) => m[1]));
   const missing = [];
   for (const [p, list] of Object.entries(fam)) for (const k of list) if (!labels[p + k]) missing.push(p + k);
   assert.deepEqual(missing, []);

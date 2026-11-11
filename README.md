@@ -5,10 +5,10 @@ quá hạn, phủ điều khoản. Thay danh mục Excel DM-ISO-01 bằng hệ t
 GitHub Pages (iPhone và máy tính). Cùng lõi với M&E và Checksheet (chép từ repo `CS`): PIN 6 số, phiên, ghi có xác nhận, đồng bộ,
 hàng chờ khi mất mạng. Giao diện luôn song ngữ Việt · 中文.
 
-**Trạng thái:** bản `1.0.0-d1.4` — **Đợt 1 xong code** (phiên 1d: phủ điều khoản, trang chủ đầy đủ). **Đã phát hành THẬT** ở `/ISO/`
+**Trạng thái:** bản `1.0.0-d2.1` — **Đợt 2 phiên 2a** (Kết nối M&E / Checksheet). Đợt 1 xong code. **Đã phát hành THẬT** ở `/ISO/`
 (từ 11/11/2026, không qua THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang `/ISO-thu/` (repo `ISO-thu`) tạm
-chưa gắn máy chủ. Cập nhật máy chủ lên 1d: dán `Code.gs` → Phiên bản mới, không cần `migrateSchema` (Hướng dẫn triển khai, mục
-"CẬP NHẬT LÊN BẢN 1d"); chưa lên 1c thì làm mục "CẬP NHẬT LÊN BẢN 1c" (có `migrateSchema`) trước.
+chưa gắn máy chủ. Cập nhật máy chủ lên 2a: dán `Code.gs` → `migrateSchema` (cho phép quyền "Kết nối với dịch vụ bên ngoài") →
+`installTriggers` → Phiên bản mới (Hướng dẫn triển khai, mục "CẬP NHẬT LÊN BẢN 2a").
 
 ## Phiên 1a có gì
 
@@ -84,7 +84,21 @@ chưa gắn máy chủ. Cập nhật máy chủ lên 1d: dán `Code.gs` → Phi�
   bấm ô / dòng → hồ sơ của kỳ hoặc Nộp hồ sơ kỳ này. Ô lưới Phủ điều khoản hết "Sắp có".
 - Trạng thái hệ thống có dòng **Phủ điều khoản** (số điều khoản có biểu, bắt buộc chưa có biểu, chủ đề BRCGS có biểu).
 
-Sau Đợt 1: Đợt 2 kết nối M&E/Checksheet, Gmail, báo cáo PDF, in tem · Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
+### Đợt 2 phiên 2a (1.0.0-d2.1) — Kết nối M&E / Checksheet
+
+- **Màn Kết nối** (Quản trị cấp 4; web: menu trái, iPhone: Tài khoản → Quản trị): link `/exec` + mã kết nối `FEED_KEY_ISO` của từng app,
+  **Thử kết nối** (không lưu), **Lưu** (PIN — lấy bằng link mới trước, lỗi thì không lưu gì), **Ngắt kết nối** (PIN), **Cập nhật ngay**;
+  lần lấy gần nhất, mã biểu lạ, biểu nhận ngày có hồ sơ và biểu in từ app chưa nhận ngày nào. Mã kết nối chỉ ở Thuộc tính tập lệnh.
+- Máy chủ (`server/src/18_evidence.js`): gọi `feed.isoEvidence {key, since, client}` của M&E / Checksheet (400 ngày), gộp mã con về mã
+  cha (`BM-CĐ-03-03a` → `BM-CĐ-03-03`, Đ ≡ D, hoa/thường), gom theo kỳ của biểu ISO vào sheet **`Evidence`** (`<app>|<item_id>|<kỳ>`;
+  biểu hằng ngày giữ 62 ngày, tuần 126, còn lại 400), chỉ ghi dòng đổi; trigger **`syncEvidenceHourly`**; dòng bỏ quá 35 ngày xóa hẳn.
+- Ô ✓ của bảng kỳ / lịch tuần / `record.status`: có hồ sơ nộp **hoặc** dòng Evidence giao với kỳ (`js/periods.js` = `17_records.js`,
+  test so hai bên). Biểu nơi làm M&E / Checksheet được tính khi app đó đã nối (`Settings.evidence_sources`), kỳ trước khoảng còn giữ
+  ngày không tính; chưa nối thì vẫn "in từ app, chưa nối". Hộp thoại ô ghi "Có hồ sơ trong M&E · N lượt · gần nhất …".
+- Trạng thái hệ thống: dòng **Kết nối M&E**, **Kết nối Checksheet** (lần lấy được, số biểu, mã lạ; cảnh báo khi lỗi hoặc quá 3 giờ).
+- Hợp đồng cho hai app kia: Hướng dẫn triển khai **Phần K** (làm trong chat M&E và chat Checksheet).
+
+Tiếp: Đợt 2 — Gmail nhắc hạn, báo cáo PDF, đề nghị tài liệu / phân phối / in tem · Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
 
 ## Cấu trúc
 
@@ -120,7 +134,7 @@ Triển khai: xem `HUONG_DAN_TRIEN_KHAI.md`.
   `config.js`), PIN, khóa bí mật, logo công ty. Bí mật nằm trong Thuộc tính tập lệnh của Apps Script. Test dùng dữ liệu giả.
 - Mọi tên lưu trữ trình duyệt có tiền tố `iso` (IndexedDB `iso_data`, `iso_auth`, Cache `iso-shell-*`, localStorage `iso.*`; trang
   THỬ `iso_thu`) — chung origin `github.io` với M&E (`me*`) và Checksheet (`cs*`) mà không đụng nhau.
-- Chỉ **đọc** M&E và Checksheet (Đợt 2, qua mã kết nối); không ghi sang hai app đó.
+- Chỉ **đọc** M&E và Checksheet (`feed.isoEvidence`, mã kết nối `FEED_KEY_ISO`); không ghi sang hai app đó.
 - Biểu tượng app chỉ ở biểu tượng iPhone, màn đăng nhập và trang chủ. Logo công ty chỉ ở báo cáo PDF / Excel.
 - Mã hiển thị: hồ sơ `HS-yymm-0001`, đề nghị tài liệu `DN-yymm-001`, khắc phục `KP-yymm-001`, đánh giá nội bộ `DG-yy-01`,
   báo cáo `BC-yymm-001`.

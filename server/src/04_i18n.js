@@ -26,7 +26,8 @@ var MSG = {
   QUOTA_EXCEEDED: ['Đã hết hạn mức của Google hôm nay', '今日谷歌配额已用尽'],
   INTERNAL_ERROR: ['Lỗi máy chủ', '服务器错误'],
   SYSTEM_NOT_READY: ['Máy chủ chưa được cài đặt', '服务器尚未初始化'],
-  RECOVERY_REQUIRED: ['Thao tác ghi chưa hoàn tất, cần phục hồi', '写入未完成，需要恢复']
+  RECOVERY_REQUIRED: ['Thao tác ghi chưa hoàn tất, cần phục hồi', '写入未完成，需要恢复'],
+  LINK_FAILED: ['Không lấy được dữ liệu từ app kia', '无法从该App获取数据']
 };
 
 /** Lời báo cho mã con trong errors[] */
@@ -82,6 +83,9 @@ var SUB_MSG = {
   ITEM_NO_RECORD: ['Biểu chưa có (○) hoặc không áp dụng (✕): không nộp hồ sơ', '表单尚未建立（○）或不适用（✕）：不能提交记录'],
   RECORD_FROM_APP: ['Biểu in từ app M&E / Checksheet: ngày có hồ sơ lấy từ app đó, không nộp ở đây', '由机电/点检表App打印的表单：记录日期取自该App，无需在此提交'],
   TOO_MANY_FILES: ['Hồ sơ đã đủ 30 tệp', '该记录已有30个文件'],
+  // Kết nối M&E / Checksheet (phiên 2a)
+  KEY_FORMAT: ['Mã kết nối là chuỗi dài 24–200 ký tự (chép từ nhật ký của app kia)', '连接码为24–200个字符（从该App的日志复制）'],
+  LINK_FAILED: ['Không kết nối được', '无法连接'],
   MIRROR_SAME_ACCOUNT: ['Tài khoản thứ hai phải khác tài khoản đang chạy máy chủ', '第二个账户须与运行服务器的账户不同']
 };
 

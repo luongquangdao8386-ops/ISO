@@ -6,7 +6,7 @@ import { bi, biText, esc, fmtDate, fmtDateTime, badge, nameText, uuid, session, 
 import { ICON, toast, dialog, $, setViewHtml, wireSearch, freshFilters, listChunk, wireMore } from '../ui.js';
 import { isWide } from '../shell.js';
 import { byId, recs, items, depts, users, userName, today, seesAll, myDepts, itemHay, foldVi, canSeeRecords, canSubmitRecord, canReturnRecord,
-  canRecordFiles, recordCheck, periodTypeOf, recordsOf, recordStatusMap, invalidateRecordStatus, invalidate, recordsOn } from '../data.js';
+  canRecordFiles, recordCheck, periodTypeOf, recordsOf, recordStatusMap, invalidateRecordStatus, invalidate, recordsOn, evidenceOf, roleLevel } from '../data.js';
 import { enqueue, queueItems } from '../sync.js';
 import { navigate, refresh } from '../router.js';
 import { app, syncNow, afterCommit, updateSyncStatus } from '../app.js';
@@ -62,6 +62,11 @@ export function reasonHtml(s) {
   return `<p class="muted small">${bi('rec.reason.' + s.reason)}</p>`;
 }
 
+/** Ngày có hồ sơ từ M&E / Checksheet (Đợt 2): "Từ M&E · 2 lượt · gần nhất 25/10/2026" */
+export function evidenceLine(e) {
+  return `<li class="ev-row">${ICON.link}<span>${bi('ev.line.' + e.source, { N: Number(e.count) || 0, D: esc(fmtDate(e.last_date)) })}</span></li>`;
+}
+
 /** Huy hiệu trạng thái hồ sơ (máy chủ hoặc hàng chờ) */
 export function recBadge(r) {
   if (r.queued) return badge(r.op_state === 'REJECTED' ? 'rec.st.REJECTED' : r.op_state === 'CONFLICT' ? 'rec.st.REJECTED' : 'rec.st.QUEUED');
@@ -104,13 +109,17 @@ export async function openCell(it, s, idx) {
   if (!c) return;
   const type = s.type;
   const list = [...(c.recs || []), ...(c.pend || []).map((p) => ({ ...p, queued: true }))];
+  const evs = c.ev || [];
   const can = canSubmitRecord(it) && !recordCheck(it);
   const um = await users();
+  const appHint = s.src && (c.st === 'LATE' || c.st === 'DUE') ? `<p class="muted small">${bi('ev.check_in.' + s.src)}</p>` : '';
   const go = await dialog({
     title: `${esc(it.code)} · ${periodName(type, c)}`,
     body: `<p>${badge('cell.' + c.st)} <span class="muted small">${rangeText(c.from, c.to)}</span></p>
-      ${list.length ? `<ul class="cat-list">${list.map((r) => recordRow(r, it, { um })).join('')}</ul>` : `<p class="muted">${bi('rec.cell_none')}</p>`}
-      ${c.st === 'NA' && !list.length ? reasonHtml(s) || `<p class="muted small">${bi('rec.before_start', { D: esc(fmtDate(s.start)) })}</p>` : ''}`,
+      ${evs.length ? `<ul class="plain ev-list">${evs.map(evidenceLine).join('')}</ul>` : ''}
+      ${list.length ? `<ul class="cat-list">${list.map((r) => recordRow(r, it, { um })).join('')}</ul>` : (evs.length ? '' : `<p class="muted">${bi('rec.cell_none')}</p>`)}
+      ${appHint}
+      ${c.st === 'NA' && !list.length && !evs.length ? reasonHtml(s) || `<p class="muted small">${bi(s.src ? 'rec.before_start_app' : 'rec.before_start', { D: esc(fmtDate(s.start)) })}</p>` : ''}`,
     actions: [{ label: bi('btn.close'), value: false }].concat(can ? [{ label: bi('rec.submit_period'), kind: 'primary', value: true }] : [])
   });
   if (go) navigate(`/record/new?item=${encodeURIComponent(it.item_id)}&p=${encodeURIComponent(c.key)}`);
@@ -215,7 +224,7 @@ export async function renderRecords(view, ctx) {
       ${chips}${deptSel}${legendHtml()}
       <p class="muted small">${bi('rec.how', { N: Number((session.settings || {}).record_grace_days ?? 3) })}</p>
       ${empty}${sections}${evHtml}
-      ${fromApp.length ? `<p class="muted small rg-app">${bi('rec.from_app_n', { N: fromApp.length })}</p>` : ''}
+      ${fromApp.length ? `<p class="muted small rg-app">${bi('rec.from_app_n', { N: fromApp.length })}${roleLevel() >= 4 ? ` <a href="#/links">${bi('nav.links')}</a>` : ''}</p>` : ''}
       <div class="row"><a class="btn primary" href="#/record/new">${ICON.upload}<span>${bi('item.submit_record')}</span></a></div></div>`);
     wire();
   };
@@ -593,6 +602,7 @@ export async function itemRecordsCard(it) {
   const s = (await recordStatusMap()).get(it.item_id);
   if (!s) return '';
   const list = (await recordsWithQueued(it.item_id)).slice(0, 8);
+  const evs = (await evidenceOf(it.item_id)).slice(0, 6);
   const um = await users();
   const bad = recordCheck(it);
   const can = !bad && canSubmitRecord(it);
@@ -602,6 +612,8 @@ export async function itemRecordsCard(it) {
        ${s.counted ? `<p class="muted small">${bi('rec.start', { D: esc(fmtDate(s.start)) })} · ${bi('rec.grace', { N: Number((session.settings || {}).record_grace_days ?? 3) })}${s.overdue ? ` · <span class="t-red-text">${bi('rec.overdue_now', { K: esc(s.due_key) })}</span>` : ''}</p>` : ''}`;
   return `<section class="card rec-card-item" id="item-records"><div class="card-head"><h3>${bi('item.records')}</h3>${can ? `<a class="btn small primary" href="#/record/new?item=${encodeURIComponent(it.item_id)}">${ICON.upload}<span>${bi('item.submit_record')}</span></a>` : ''}</div>
     ${strip}${reasonHtml(s)}${bad === 'RECORD_FROM_APP' && s.reason !== 'FROM_APP' ? `<p class="muted small">${bi('rec.no_record.RECORD_FROM_APP')}</p>` : ''}
+    ${s.src ? `<p class="muted small">${bi('ev.src_note.' + s.src)}</p>` : ''}
+    ${evs.length ? `<p class="lbl">${bi('ev.recent')}</p><ul class="plain ev-list">${evs.map((e) => evidenceLine({ ...e, last_date: e.last_date })).join('')}</ul>` : ''}
     ${list.length ? `<p class="lbl">${bi('rec.recent')}</p><ul class="cat-list">${list.map((r) => recordRow(r, it, { um })).join('')}</ul>` : ''}</section>`;
 }
 

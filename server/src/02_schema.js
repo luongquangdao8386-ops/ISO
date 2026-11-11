@@ -42,6 +42,11 @@ var SHEETS = {
   Records: { book: 'B', dot: 1, key: 'record_id', c: true,
     cols: 'record_id code item_id dept_code period_type period_from period_to record_date pages files_json note status ' +
       'submitted_at submitted_by client_created_at returned_at returned_by return_reason void_at void_by void_reason' },
+  // Ngày có hồ sơ lấy từ M&E / Checksheet (Đợt 2, phiên 2a): gom theo kỳ của biểu ISO, một dòng = một app × một biểu × một kỳ.
+  // evidence_id = <app>|<item_id>|<mã kỳ> (biểu khi phát sinh: |EVENT, khoảng ngày = ngày đầu – ngày cuối). Chỉ máy chủ ghi (trigger mỗi giờ).
+  // src_codes: mã biểu bên app kia đã ghép vào biểu này (vd BM-CĐ-03-03a, BM-CĐ-03-03b → BM-CĐ-03-03)
+  Evidence: { book: 'B', dot: 1, key: 'evidence_id', c: true,
+    cols: 'evidence_id source item_id form_code period_type period_key period_from period_to count last_date src_codes synced_at' },
   // Điều khoản ISO 9001 và chủ đề BRCGS Packaging (std|key)
   Clauses: { book: 'B', dot: 1, key: 'clause_id', c: true, i18n: true,
     cols: 'clause_id std key group_vi group_zh name_vi name_zh mandatory_record sort_order active' },
@@ -94,7 +99,8 @@ var TYPE_OVERRIDES_ = {
   file_missing: 'BOOL', mandatory_record: 'BOOL',
   i18n_meta: 'JSON', schema_version: 'STRING', email: 'STRING', note: 'STRING', where: 'STRING',
   issued_at: 'DATE', review_due: 'DATE', due_date: 'DATE', run_date: 'DATE', records_from: 'DATE', period_from: 'DATE', period_to: 'DATE',
-  pages: 'INT', client_created_at: 'STRING', void_by: 'STRING', period_type: 'STRING'
+  pages: 'INT', client_created_at: 'STRING', void_by: 'STRING', period_type: 'STRING',
+  evidence_id: 'STRING', period_key: 'STRING', count: 'INT', last_date: 'DATE', src_codes: 'STRING', source: 'STRING'
 };
 
 /** Kiểu cột suy theo tên. */

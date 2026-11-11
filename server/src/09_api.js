@@ -35,6 +35,10 @@ var HANDLERS_ = {
   'record.submit': function (ctx) { return recordSubmit_(ctx); },
   'record.return': function (ctx) { return recordReturn_(ctx); },
   'record.status': function (ctx) { return recordStatus_(ctx); },
+  'link.info': function (ctx) { return linkInfo_(ctx); },
+  'link.test': function (ctx) { return linkTest_(ctx); },
+  'link.set': function (ctx) { return linkSet_(ctx); },
+  'evidence.sync': function (ctx) { return evidenceSyncAction_(ctx); },
   'doc.upload': function (ctx) { return docUpload_(ctx); },
   'doc.get': function (ctx) { return docGet_(ctx); },
   'report.logo.get': function (ctx) { return reportLogoGet_(ctx); },
@@ -65,7 +69,8 @@ var PRECHECK_ = {
   'version.approve': function (ctx) { precheckApprove_(ctx); },
   'version.return': function (ctx) { precheckReturn_(ctx); },
   'version.issue': function (ctx) { precheckIssue_(ctx); },
-  'record.return': function (ctx) { precheckRecordReturn_(ctx); }
+  'record.return': function (ctx) { precheckRecordReturn_(ctx); },
+  'link.set': function (ctx) { precheckLinkSet_(ctx); }
 };
 
 /** Action không cần phiên */

@@ -25,7 +25,7 @@ export const SIDE = [
   { key: 'reports', label: 'nav.reports', icon: 'reports', path: '/reports', lvl: 1, soon: true },
   { key: 'capa', label: 'nav.capa', icon: 'repairs', path: '/capa', lvl: 2, soon: true },
   { key: 'audits', label: 'nav.audits', icon: 'inspections', path: '/audits', lvl: 2, soon: true },
-  { key: 'links', label: 'nav.links', icon: 'link', path: '/links', lvl: 4, soon: true },
+  { key: 'links', label: 'nav.links', icon: 'link', path: '/links', lvl: 4 },
   { key: 'account', label: 'nav.account', icon: 'user', path: '/account', lvl: 1 }
 ];
 

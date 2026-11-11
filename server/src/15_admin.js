@@ -231,14 +231,16 @@ function adminResetOwnerPin() {
   log_('Đã cấp PIN tạm cho owner ' + code + ' (hạn 72 giờ). Mọi phiên cũ của owner đã bị thu hồi; đăng nhập rồi đổi PIN ngay. Đã xóa OWNER_RESET_TEMP_PIN.');
 }
 
-var TRIGGER_FUNCS_ = ['runBackgroundJobs', 'backupData'];
+var TRIGGER_FUNCS_ = ['syncEvidenceHourly', 'runBackgroundJobs', 'backupData'];
 
-/** Xóa trigger trùng tên rồi tạo lại đúng 2 trigger định kỳ: dịch bù mỗi 3 giờ, sao lưu hằng tuần.
- *  Đợt 2 thêm syncEvidenceHourly (đọc ngày có hồ sơ từ M&E, Checksheet) và nhắc hạn Gmail. */
+/** Xóa trigger trùng tên rồi tạo lại đúng 3 trigger định kỳ: ngày có hồ sơ từ M&E / Checksheet mỗi giờ (2a), dịch bù mỗi 3 giờ,
+ *  sao lưu hằng tuần. Lần đầu chạy sau khi dán Code.gs 2a: Google hỏi quyền "kết nối dịch vụ bên ngoài" (gọi link /exec của M&E,
+ *  Checksheet) — bấm Cho phép. Phiên 2b thêm nhắc hạn Gmail. */
 function installTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (TRIGGER_FUNCS_.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
   });
+  ScriptApp.newTrigger('syncEvidenceHourly').timeBased().everyHours(1).create();
   ScriptApp.newTrigger('runBackgroundJobs').timeBased().everyHours(3).create();
   var wd = ScriptApp.WeekDay[String(setting_('backup_weekday') || 'SUNDAY')] || ScriptApp.WeekDay.SUNDAY;
   ScriptApp.newTrigger('backupData').timeBased().onWeekDay(wd).atHour(Number(setting_('backup_hour'))).inTimezone(TZ).create();
@@ -276,7 +278,7 @@ function adminFlushAuthCache() {
   log_('Đã xóa ' + keys.length + ' khóa cache phiên/người dùng.');
 }
 
-/* runBackgroundJobs (dịch bù) ở 21_i18n.js; backupData (sao lưu hằng tuần) ở 23_backup.js */
+/* runBackgroundJobs (dịch bù) ở 21_i18n.js; backupData (sao lưu hằng tuần) ở 23_backup.js; syncEvidenceHourly ở 18_evidence.js */
 
 /* ---------------- Chuyển máy chủ THỬ thành THẬT (không dựng THỬ riêng) ---------------- */
 

@@ -6,8 +6,7 @@ import { ICON } from '../ui.js';
 const SOON = {
   reports: ['nav.reports', 'reports', 'soon.when_d2'],
   capa: ['nav.capa', 'repairs', 'soon.when_d3'],
-  audits: ['nav.audits', 'inspections', 'soon.when_d4'],
-  links: ['nav.links', 'link', 'soon.when_d2']
+  audits: ['nav.audits', 'inspections', 'soon.when_d4']
 };
 
 export async function renderSoon(view, { shell }) {

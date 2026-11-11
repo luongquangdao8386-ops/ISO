@@ -1523,3 +1523,13 @@ a.wk-lbl { color: var(--navy); font-weight: 700; text-decoration: none; }
 .wk-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 0.875rem; line-height: 1.3; }
 .wk-txt .code { font-weight: 700; color: var(--navy); }
 .wk-note { margin: 8px 0 0; }
+
+/* Kết nối M&E / Checksheet, ngày có hồ sơ từ app kia (Đợt 2, phiên 2a) */
+ul.plain { list-style: none; padding: 0; margin: 6px 0; }
+.ev-row { display: flex; gap: 8px; align-items: center; font-size: 0.875rem; padding: 4px 0; color: var(--navy); }
+.ev-row svg { width: 1rem; height: 1rem; flex: none; }
+.lk-card .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.lk-form { margin-top: 8px; }
+.lk-form .inp { width: 100%; }
+.lk-unk summary { cursor: pointer; font-size: 0.875rem; padding: 6px 0; color: var(--amber); }
+.lk-res:empty { display: none; }

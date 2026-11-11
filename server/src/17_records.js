@@ -4,7 +4,9 @@
  * Một lần nộp phủ một kỳ hoặc một khoảng ngày (vd cả quyển sổ tháng 10 của biểu hằng ngày): kỳ nào giao với khoảng đó là có hồ sơ.
  * Tình trạng hồ sơ theo kỳ (record.status, bộ đệm 5 phút): ✓ Đúng hạn · ! Quá hạn (kỳ đã kết thúc quá record_grace_days ngày mà chưa có)
  * · – Chưa tới hạn · Không tính (biểu chưa ban hành, không áp dụng, in từ M&E/Checksheet, kỳ trước ngày bắt đầu tính). Biểu khi phát
- * sinh (EVENT) không bao giờ quá hạn, chỉ có lần nộp gần nhất. App tính giống hệt ở js/periods.js (dùng được khi mất mạng). */
+ * sinh (EVENT) không bao giờ quá hạn, chỉ có lần nộp gần nhất. App tính giống hệt ở js/periods.js (dùng được khi mất mạng).
+ * Đợt 2 (2a): kỳ cũng ✓ khi app M&E / Checksheet có hồ sơ trong kỳ (sheet Evidence, 18_evidence.js); biểu nơi làm M&E / Checksheet
+ * được tính khi app đó đã nối (Settings.evidence_sources), kỳ trước khoảng còn giữ ngày từ app kia (evidenceFrom_) không tính. */
 
 /* ---------------- Quyền ---------------- */
 
@@ -85,24 +87,45 @@ function recordsStart_(it, startSetting) {
 }
 
 /**
+ * Biểu có tính hồ sơ không: {type, counted, reason, start, src}. reason: NOT_ISSUED (○ ◐ ✕) · FROM_APP (nơi làm M&E / Checksheet
+ * mà app đó chưa nối) · NO_START (chưa có ngày bắt đầu tính). src: app đã nối cung cấp ngày có hồ sơ cho biểu ('' nếu không) —
+ * khi đó ngày bắt đầu tính không sớm hơn evidenceFrom_ (kỳ cũ hơn không còn ngày từ app kia: không tính, không báo quá hạn).
+ * Giống hệt countInfo() trong js/periods.js.
+ */
+function recordCountInfo_(it, startSetting, today, srcs) {
+  var type = itemPeriodType_(it);
+  var src = evidenceSourceOf_(it);
+  var live = !!(src && srcs && srcs[src]);
+  var reason = it.status !== 'ISSUED' ? 'NOT_ISSUED' : ((it.where === 'ME' || it.where === 'CS') && !live ? 'FROM_APP' : '');
+  var start = reason ? '' : recordsStart_(it, startSetting);
+  if (!reason && !isDateStr_(start)) { reason = 'NO_START'; start = ''; }
+  if (!reason && live && type !== 'EVENT') {
+    var ef = evidenceFrom_(type, today);
+    if (ef > start) start = ef;
+  }
+  return { type: type, counted: !reason, reason: reason, start: start, src: live ? src : '' };
+}
+
+/**
  * Tình trạng hồ sơ của một biểu: n kỳ gần nhất (cũ → mới) và kỳ "đến hạn xét" gần nhất.
- * recs: hồ sơ SUBMITTED của biểu. Trả {type, counted, reason, start, cells:[{key, from, to, st}], due_key, due_st, overdue, late_n,
- *  last_date, count}. reason: NOT_ISSUED (○ ◐ ✕) · FROM_APP (in từ M&E/Checksheet, Đợt 2) · NO_START (chưa có ngày bắt đầu tính).
+ * recs: hồ sơ SUBMITTED của biểu; evs: dòng Evidence (ngày có hồ sơ từ M&E / Checksheet) của biểu; srcs: app đã nối {ME, CS}.
+ * Trả {type, counted, reason, start, src, cells:[{key, from, to, st}], due_key, due_st, overdue, late_n, last_date, count}.
+ * Ô OK khi có hồ sơ giao với kỳ hoặc dòng Evidence (số lượt > 0) giao với kỳ. count = số hồ sơ + số lượt từ app kia.
  * Kỳ "đến hạn xét" = kỳ mới nhất đã kết thúc quá số ngày cho phép trễ; Quá hạn ở đó → biểu tính là "hồ sơ quá hạn" ở trang chủ.
  * Giống hệt itemRecordStatus() trong js/periods.js.
  */
-function itemRecordStatus_(it, recs, today, grace, startSetting, n) {
-  var type = itemPeriodType_(it);
-  var reason = it.status !== 'ISSUED' ? 'NOT_ISSUED' : (it.where === 'ME' || it.where === 'CS' ? 'FROM_APP' : '');
-  var start = reason ? '' : recordsStart_(it, startSetting);
-  if (!reason && !isDateStr_(start)) { reason = 'NO_START'; start = ''; }
-  var counted = !reason;
-  var last = '';
+function itemRecordStatus_(it, recs, today, grace, startSetting, n, evs, srcs) {
+  evs = evs || [];
+  var ci = recordCountInfo_(it, startSetting, today, srcs);
+  var type = ci.type, counted = ci.counted, start = ci.start;
+  var last = '', cnt = recs.length;
   recs.forEach(function (r) { var d = String(r.period_to || r.record_date || ''); if (d > last) last = d; });
-  var out = { type: type, counted: counted, reason: reason, start: start, cells: [], due_key: '', due_st: '', overdue: false, late_n: 0, last_date: last, count: recs.length };
+  evs.forEach(function (e) { var d = String(e.last_date || ''); if (d > last) last = d; cnt += Number(e.count) || 0; });
+  var out = { type: type, counted: counted, reason: ci.reason, start: start, src: ci.src, cells: [], due_key: '', due_st: '', overdue: false, late_n: 0, last_date: last, count: cnt };
   if (type === 'EVENT') return out;
   var cellState = function (p) {
     for (var i = 0; i < recs.length; i++) if (String(recs[i].period_from) <= p.to && String(recs[i].period_to) >= p.from) return 'OK';
+    for (var j = 0; j < evs.length; j++) if (Number(evs[j].count) > 0 && String(evs[j].period_from) <= p.to && String(evs[j].period_to) >= p.from) return 'OK';
     if (!counted || p.to < start) return 'NA';
     return addDaysIso_(p.to, grace) < today ? 'LATE' : 'DUE';
   };
@@ -232,35 +255,45 @@ function recordReturn_(ctx) {
 var CELL_FROM_CODE_ = { O: 'OK', L: 'LATE', D: 'DUE', N: 'NA' };
 
 /**
- * Tình trạng hồ sơ của mọi biểu, gọn để đệm: {today, grace, start_setting, n, items: {item_id: [type, counted, reason, start,
- * chuỗi ô (O L D N, cũ → mới), due_key, due_st, late_n, last_date, count]}}. Khóa đệm theo phiên bản bảng Items/Records, hôm nay,
- * số ngày cho phép trễ, ngày bắt đầu tính → không bao giờ trả số cũ sau khi có ghi; hết hạn sau record_status_cache_seconds.
+ * Tình trạng hồ sơ của mọi biểu, gọn để đệm: {today, grace, start_setting, sources, n, items: {item_id: [type, counted, reason, start,
+ * chuỗi ô (O L D N, cũ → mới), due_key, due_st, late_n, last_date, count, src]}}. Khóa đệm theo phiên bản bảng Items/Records/Evidence,
+ * hôm nay, số ngày cho phép trễ, ngày bắt đầu tính, app đã nối → không bao giờ trả số cũ sau khi có ghi; hết hạn sau
+ * record_status_cache_seconds.
  */
 function recordStatusAll_() {
   var st = readState_();
   var today = todayVN_();
   var grace = graceDays_();
   var startSet = String(setting_('records_start_date') || '');
+  var srcs = evidenceSources_();
+  var srcStr = evidenceSourcesStr_(srcs);
   var n = 12;
-  var key = 'rs1:' + (sysProps_().dataset_epoch || '') + ':' + Number(stateGet_(st, 'table_rev.Records', 0)) + ':' +
-    Number(stateGet_(st, 'table_rev.Items', 0)) + ':' + today + ':' + grace + ':' + startSet + ':' + (st.map.schema_version || '');
+  var key = 'rs2:' + (sysProps_().dataset_epoch || '') + ':' + Number(stateGet_(st, 'table_rev.Records', 0)) + ':' +
+    Number(stateGet_(st, 'table_rev.Items', 0)) + ':' + Number(stateGet_(st, 'table_rev.Evidence', 0)) + ':' + today + ':' + grace + ':' +
+    startSet + ':' + srcStr + ':' + (st.map.schema_version || '');
   var c = cache_();
   try { var hit = c.get(key); if (hit) return JSON.parse(hit); } catch (e) { /* tính lại */ }
-  var hasRec = sheetExists_('Records');
-  var tc = tableCache_(hasRec ? ['Items', 'Records'] : ['Items'], st);
-  var byItem = {};
+  var hasRec = sheetExists_('Records'), hasEv = sheetExists_('Evidence');
+  var tc = tableCache_(['Items'].concat(hasRec ? ['Records'] : [], hasEv ? ['Evidence'] : []), st);
+  var byItem = {}, evByItem = {};
   if (hasRec) {
     tc.rows('Records').forEach(function (r) {
       if (r.archived_at || r.status !== 'SUBMITTED') return;
       (byItem[r.item_id] = byItem[r.item_id] || []).push(r);
     });
   }
-  var out = { today: today, grace: grace, start_setting: startSet, n: n, items: {} };
+  if (hasEv) {
+    tc.rows('Evidence').forEach(function (e) {
+      if (e.archived_at || !(Number(e.count) > 0)) return;
+      (evByItem[e.item_id] = evByItem[e.item_id] || []).push(e);
+    });
+  }
+  var out = { today: today, grace: grace, start_setting: startSet, sources: srcStr, n: n, items: {} };
   tc.rows('Items').forEach(function (it) {
     if (it.archived_at) return;
-    var s = itemRecordStatus_(it, byItem[it.item_id] || [], today, grace, startSet, n);
+    var s = itemRecordStatus_(it, byItem[it.item_id] || [], today, grace, startSet, n, evByItem[it.item_id] || [], srcs);
     out.items[it.item_id] = [s.type, s.counted ? 1 : 0, s.reason, s.start, s.cells.map(function (x) { return CELL_CODES_[x.st]; }).join(''),
-      s.due_key, s.due_st ? CELL_CODES_[s.due_st] : '', s.late_n, s.last_date, s.count];
+      s.due_key, s.due_st ? CELL_CODES_[s.due_st] : '', s.late_n, s.last_date, s.count, s.src];
   });
   try {
     var ttl = Math.max(60, Math.min(21600, Number(setting_('record_status_cache_seconds')) || 300));
@@ -278,7 +311,7 @@ function expandRecordStatus_(it, a, today, n) {
   }
   return {
     item_id: it.item_id, code: it.code, dept_code: it.dept_code, type: a[0], counted: !!a[1], reason: a[2], start: a[3], cells: cells,
-    due_key: a[5], due_st: a[6] ? CELL_FROM_CODE_[a[6]] : '', overdue: a[6] === 'L', late_n: a[7], last_date: a[8], count: a[9]
+    due_key: a[5], due_st: a[6] ? CELL_FROM_CODE_[a[6]] : '', overdue: a[6] === 'L', late_n: a[7], last_date: a[8], count: a[9], src: a[10] || ''
   };
 }
 
@@ -300,5 +333,5 @@ function recordStatus_(ctx) {
     if (s.overdue) overdue++;
     list.push(s);
   });
-  return { today: all.today, grace: all.grace, start_setting: all.start_setting, n: all.n, items: list, overdue_count: overdue };
+  return { today: all.today, grace: all.grace, start_setting: all.start_setting, sources: all.sources || '', n: all.n, items: list, overdue_count: overdue };
 }

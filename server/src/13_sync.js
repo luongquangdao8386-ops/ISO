@@ -9,7 +9,9 @@ var SYNC_ENTITIES_ = [
   // Phiên bản (1b): theo phạm vi của biểu; cấp 1 (Tra cứu) chỉ nhận bản đang hiệu lực và lỗi thời
   { type: 'VERSION', sheet: 'Versions', scoped: 'item' },
   // Hồ sơ (1c): theo phạm vi của biểu; cấp 2+ và Thư ký ISO (cấp 1 Tra cứu không xem hồ sơ)
-  { type: 'RECORD', sheet: 'Records', scoped: 'record' }
+  { type: 'RECORD', sheet: 'Records', scoped: 'record' },
+  // Ngày có hồ sơ từ M&E / Checksheet (2a): như hồ sơ — cấp 2+ và Thư ký ISO, theo phạm vi của biểu
+  { type: 'EVIDENCE', sheet: 'Evidence', scoped: 'record' }
 ];
 
 /** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */

@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d1.4 (Đợt 1, phiên 1d — Đợt 1 xong code)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.1 (Đợt 2, phiên 2a — Kết nối M&E / Checksheet)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -9,8 +9,59 @@ chi tiết biểu), nhập/xuất file Excel tổng, quản trị. Phiên 1b th�
 ban hành, bản cũ tự lỗi thời, PDF + tệp gốc lưu riêng tư trên Drive của máy chủ), **gắn tệp** cho biểu ● nhập từ Excel, đặt **Không áp
 dụng ✕**, **Đã rà soát** (gia hạn rà soát), ô **Chờ bạn xử lý** và số đỏ trên nút. Phiên 1c thêm: **hồ sơ** — nộp hồ sơ bằng ảnh / tệp
 (cả khi mất mạng), bảng kỳ ✓ ! –, trả lại hồ sơ nộp sai, tem QR báo bản in lỗi thời. Phiên 1d thêm: **Phủ điều khoản** ISO 9001 và
-BRCGS (đếm giống hệt file Excel tổng), trang chủ đầy đủ (**lịch tuần hồ sơ đến hạn**, Chờ bạn xử lý thêm hồ sơ quá hạn cần nộp). Báo
-cáo, Khắc phục, Đánh giá nội bộ, Kết nối M&E/Checksheet (Đợt 2–4) vẫn mờ "Sắp có · 即将推出".
+BRCGS (đếm giống hệt file Excel tổng), trang chủ đầy đủ (**lịch tuần hồ sơ đến hạn**, Chờ bạn xử lý thêm hồ sơ quá hạn cần nộp).
+Phiên 2a thêm: **Kết nối M&E / Checksheet** — mỗi giờ app ISO hỏi hai app kia "mã biểu nào có hồ sơ vào ngày nào" (chỉ đọc), biểu in
+từ app có ô ✓ mà không ai phải nộp lại. Báo cáo, Khắc phục, Đánh giá nội bộ (Đợt 2–4) vẫn mờ "Sắp có · 即将推出".
+
+## CẬP NHẬT LÊN BẢN 2a (1.0.0-d2.1) — làm một lần, trên máy tính
+
+Bản 2a **thêm sheet `Evidence`** và **gọi ra ngoài** (link `/exec` của M&E, Checksheet) — Google sẽ hỏi thêm một quyền. Làm **đúng
+thứ tự**: chạy hàm và cấp quyền (bước 2–3) **trước** khi triển khai Phiên bản mới (bước 4), nếu không app ISO báo lỗi cho tới khi cấp
+quyền. App 2a vẫn chạy với máy chủ cũ (màn Kết nối báo "Máy chủ ISO chưa lên bản 2a").
+
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** (ô chọn hàm cạnh nút Gỡ lỗi) → **Chạy**. Lần chạy đầu Google hỏi quyền: **Xem lại quyền** → chọn tài
+   khoản Google của máy chủ → **Nâng cao** → **Đi tới ISO_MayChu_THAT (không an toàn)** → **Cho phép** (quyền mới: "Kết nối với dịch
+   vụ bên ngoài"). Nhật ký: `migrateSchema xong. Thêm: Evidence. schema_version=1.0.3`.
+3. Chọn hàm **`installTriggers`** → **Chạy** (đã cho phép ở bước 2 thì không hỏi lại) → Nhật ký:
+   `Đã cài trigger: syncEvidenceHourly, runBackgroundJobs, backupData`.
+4. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d2.1 ket noi ME CS` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+5. Mở app `/ISO/` trên máy tính → **Tài khoản → Thông tin** ghi `1.0.0-d2.1` (màn báo lỗi thì bấm **Tải lại bản mới**).
+   **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.3**; **Trigger đã cài** có `syncEvidenceHourly`; hai dòng mới
+   **Kết nối M&E (ngày có hồ sơ)** và **Kết nối Checksheet (ngày có hồ sơ)** = **OFF**.
+6. Thử ngay (M&E, Checksheet chưa có cửa đọc cho ISO): **Tài khoản → Quản trị → Kết nối M&E / Checksheet** → thẻ **App M&E** → dán link
+   `/exec` M&E đang dùng → ô **Mã kết nối** gõ tạm 24 chữ `a` → **Thử kết nối** → báo đỏ "App kia từ chối: sai mã kết nối, hoặc app kia
+   chưa có cửa đọc cho ISO (feed.isoEvidence)" là **đúng** lúc này. **Không bấm Lưu.**
+7. Nối thật sau khi M&E / Checksheet đã lên bản có `feed.isoEvidence` (Phần K, làm trong chat của từng app): xem mục "Nối M&E /
+   Checksheet" ngay dưới.
+
+### Nối M&E / Checksheet (sau khi app đó có `feed.isoEvidence`)
+
+1. Ở app kia (M&E hoặc Checksheet): <https://script.google.com> → dự án máy chủ THẬT của app đó → chọn hàm **`adminCreateFeedKeyIso`** →
+   **Chạy** → **Nhật ký thực thi** có dòng "Mã kết nối cho app ISO: …" → chép mã (không gửi mã qua chat).
+2. App ISO trên máy tính: **Tài khoản → Quản trị → Kết nối M&E / Checksheet** → thẻ của app đó → dán **Link /exec** (link đang dùng của
+   app đó) và **Mã kết nối** → **Thử kết nối** → khung xanh "Kết nối được: N dòng ngày, ghép được M biểu" (và danh sách mã biểu không có
+   trong danh mục ISO, nếu có) → **Lưu** → nhập PIN → thẻ chuyển **Đã nối**, lấy ngay ngày có hồ sơ.
+3. Kiểm: **Hồ sơ** (bảng kỳ) có các biểu nơi làm M&E / Checksheet đã ban hành ●; ô ✓ bấm vào ghi "Có hồ sơ trong M&E · N lượt · gần
+   nhất …". Ô ! của biểu in từ app ghi "kiểm phiếu trong M&E, không nộp ở đây". **Trạng thái hệ thống** dòng **Kết nối M&E** = ĐẠT.
+4. Cuối thẻ Kết nối: **Biểu nhận ngày có hồ sơ từ app** và **biểu in từ app chưa nhận ngày nào** (thường do mã biểu bên app kia — mẫu
+   checksheet, checklist bảo trì — khác mã trong danh mục ISO: sửa mã bên app kia cho khớp).
+
+### Dùng Kết nối
+
+- Mỗi giờ (trigger `syncEvidenceHourly`) và khi bấm **Cập nhật ngay**: app ISO lấy 400 ngày gần nhất, gom theo kỳ của từng biểu (ngày,
+  tuần, tháng, quý, nửa năm, năm, khi phát sinh), chỉ ghi dòng đổi vào sheet `Evidence`. Biểu hằng ngày giữ 62 ngày, hằng tuần 126 ngày,
+  còn lại 400 ngày; kỳ cũ hơn của biểu in từ app không tính (không báo quá hạn).
+- Mã con tự gộp về mã cha khi danh mục ISO không có mã con: `BM-CĐ-03-03a` → `BM-CĐ-03-03`, `BM-CĐ-07-06-KT` → `BM-CĐ-07-06`. Chữ
+  hoa/thường và `Đ`/`D` coi như nhau.
+- Biểu nơi làm **M&E / Checksheet** chỉ tính đúng hạn / quá hạn khi app đó **đã nối**; chưa nối thì vẫn "in từ app, chưa nối". Biểu
+  **Một phần M&E / Checksheet**, **Đề xuất Checksheet** vẫn nộp tay được; ngày từ app kia cộng thêm ô ✓.
+- Biểu chưa ban hành (○ ◐) vẫn hiện ô ✓ nếu app kia có hồ sơ, nhưng không tính quá hạn.
+- Lỗi mạng một lần: dữ liệu cũ giữ nguyên, **Trạng thái hệ thống** báo dòng Kết nối = CẢNH BÁO; quá 3 giờ chưa lấy được cũng báo.
+- **Ngắt kết nối** (PIN): xóa link + mã, bỏ ngày từ app đó, biểu nơi làm app đó về "chưa nối". Nối lại được bất cứ lúc nào.
+- App ISO **không ghi gì** sang M&E / Checksheet. Mã kết nối lưu trong Thuộc tính tập lệnh của máy chủ ISO, không hiện lại trong app.
 
 ## CẬP NHẬT LÊN BẢN 1d (1.0.0-d1.4) — làm một lần, trên máy tính
 
@@ -301,6 +352,7 @@ Xong thì khóa hai tài khoản thử. Chỗ nào chưa đạt: gửi Claude **
 1. Dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
    `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → chép → dán → **Lưu**.
 2. Nếu Claude báo bản mới **thêm sheet/cột**: chọn hàm **`migrateSchema`** → **Chạy** (chạy nhiều lần vẫn an toàn).
+   Nếu Claude báo bản mới **cần quyền mới** (như 2a): chọn hàm **`installTriggers`** → **Chạy** → **Cho phép**, trước bước 3.
 3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → **Triển khai** (link `/exec` giữ nguyên).
 4. Mở app → tự tải bản mới (nếu màn báo lỗi, bấm **Tải lại bản mới** dưới thông báo lỗi).
 
@@ -398,6 +450,48 @@ M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyệ
 **Đợt 2 trở đi** (kết nối M&E / Checksheet, email nhắc hạn, báo cáo PDF): email và kết nối chạm tới người thật và hai app kia, nên đầu
 Đợt 2 quyết định có dựng lại máy chủ THỬ (Phần C, trang `/ISO-thu/`) để thử trước hay không.
 
+## Phần K — Cửa đọc `feed.isoEvidence` cho app ISO (làm trong chat M&E và chat Checksheet)
+
+App ISO chỉ **đọc**; mỗi app M&E / Checksheet thêm một cửa chỉ-đọc (giống `feed.equipment` của M&E mà Checksheet đang dùng). Phần này
+là hợp đồng để chat của từng app làm theo — app ISO bản 2a đã gọi đúng như sau.
+
+**Gọi:** `POST <link /exec của app>` thân `text/plain` JSON
+`{api_contract_version: '1.0', action: 'feed.isoEvidence', payload: {key, since: 'YYYY-MM-DD', client: 'ISO'}, device_id: <UUID v4>, app_version: '1.0.0-d2.1'}`.
+
+**Quy tắc phía app M&E / Checksheet:**
+- Action **public** (không cần phiên), chỉ đọc; thêm vào `PUBLIC_ACTIONS_` và bảng quyền như `feed.equipment`; **không** kiểm
+  `min_client_version` (app_version là phiên bản máy chủ ISO); vẫn kiểm `device_id` là UUID v4, vẫn chặn khi bảo trì.
+- Khóa bằng thuộc tính `FEED_KEY_ISO` (riêng, khác `FEED_KEY_CS`), so sánh hằng thời gian; thiếu hoặc sai mã → `FORBIDDEN`.
+  Hàm chạy tay **`adminCreateFeedKeyIso`**: chưa có thì tạo (32 byte ngẫu nhiên, base64url), in ra nhật ký "Mã kết nối cho app ISO: …";
+  có rồi thì in lại mã cũ. Đổi mã: xóa `FEED_KEY_ISO` trong Thuộc tính tập lệnh rồi chạy lại. Trạng thái hệ thống thêm dòng `iso_feed` ON/OFF.
+- `since`: thiếu, sai dạng hoặc cũ hơn hôm nay − 400 ngày → dùng hôm nay − 400 ngày (giờ Việt Nam). Không báo lỗi.
+- Trả `data = {app_id: 'ME' | 'CS', items: [{form_code, date, count}], server_time}`: mỗi cặp (mã biểu, ngày) một dòng; `date` từ
+  `since` tới hôm nay; `count` = số hồ sơ / lượt trong ngày (≥ 1); tối đa 60 000 dòng. **Không** trả thêm gì khác (tên thiết bị, giá,
+  người, ảnh…).
+- `form_code` viết đúng mã biểu trong danh mục ISO (vd `BM-CĐ-04-03`). Mã con được (`BM-CĐ-03-03a`, `BM-CĐ-07-06-KT`): ISO tự gộp về mã
+  cha nếu danh mục ISO không có mã con. Hồ sơ đã hủy / xóa không tính.
+- Đọc bằng bộ đệm bảng như `feed.equipment`, nên chạy dưới 10 giây (ISO hỏi mỗi giờ).
+
+**Checksheet** (`Templates.form_code` đã có từ d1.2): ngày có hồ sơ = ngày làm việc của lượt kiểm (Runs) của mẫu có `form_code`;
+`count` = số lượt kiểm trong ngày của các mẫu mang mã đó (mẫu đã ngừng vẫn tính lượt cũ). Không cần `migrateSchema`.
+
+**M&E** (chưa có cột mã biểu): bảng ánh xạ `iso_form_map` trong Settings (JSON, sửa được ở Cấu hình) + cột `form_code` cho mẫu
+checklist bảo trì. Mặc định:
+
+| Mã biểu | Ngày có hồ sơ lấy từ |
+| --- | --- |
+| BM-CĐ-02-01, 02-02 | Ngày sửa hồ sơ thiết bị gần nhất |
+| BM-CĐ-03-01, 03-02 | Ngày sửa kế hoạch bảo trì |
+| BM-CĐ-03-03 (và 9 checklist 03-03a…i) | Ngày nghiệm thu phiếu bảo trì, theo `form_code` của checklist (không có thì tính cho 03-03) |
+| BM-CĐ-07-08, 07-09 | Ngày nghiệm thu phiếu bảo trì có checklist mang mã đó |
+| BM-CĐ-04-01 | Ngày báo phiếu sửa chữa |
+| BM-CĐ-04-02, 04-03 | Ngày hoàn thành phiếu sửa chữa |
+| BM-CĐ-05-06 | Ngày ghi dịch vụ hợp đồng |
+| BM-CĐ-06-05 | Ngày ghi kết quả kiểm định |
+| Một phần: 05-01, 06-01, 08-01, 09-09, 14-01 | Ngày sửa vật tư; kiểm định loại Hiệu chuẩn; ngày đọc chỉ số điện nước; kiểm định dụng cụ an toàn; ngày lưu báo cáo bảo trì / sửa chữa |
+
+Sổ dừng máy BM-CĐ-04-03 còn thiếu cột **ca** và **phản hồi** (người dùng đồng ý 06/11/2026) — làm ở phía M&E cùng lúc.
+
 ## Hàm chạy tay trong trình soạn Apps Script
 
 | Hàm | Dùng khi |
@@ -405,10 +499,11 @@ M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyệ
 | `setup` | Lần đầu dựng máy chủ (đã có thì không làm gì) |
 | `adminSetupOwner` | Tạo owner đầu tiên từ 3 thuộc tính `SETUP_OWNER_*` |
 | `adminResetOwnerPin` | Owner quên PIN: đặt `OWNER_RESET_TEMP_PIN` (6 số) rồi chạy |
-| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần) |
+| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần; 2a: sheet `Evidence`) |
 | `adminNoiLaiTep` | Khôi phục từ bản chép ở tài khoản thứ hai: nối lại ID tệp theo `file_map.json` (Phần I.5) |
 | `healthCheck` | Xem nhanh tình trạng máy chủ |
-| `installTriggers` | Trigger bị xóa nhầm |
+| `installTriggers` | Trigger bị xóa nhầm; bản 2a: cấp quyền gọi ra ngoài + cài trigger `syncEvidenceHourly` (3 trigger) |
+| `adminSyncEvidenceNow` | Lấy ngay ngày có hồ sơ từ M&E / Checksheet đã nối, in kết quả (số dòng, mã lạ) vào nhật ký |
 | `adminSeedSample` | Dữ liệu mẫu (chỉ THỬ) — PIN tạm in trong nhật ký |
 | `adminChuyenSangTHAT` | Một lần: máy chủ THỬ thành THẬT (xóa dữ liệu thử, đổi tên bỏ `_THU`); đã là THẬT thì không làm gì |
 | `adminMaintenanceOn` / `adminMaintenanceOff` | Tạm khóa / mở lại app khi cần sửa dữ liệu tay |
@@ -416,6 +511,16 @@ M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyệ
 | `caiDat`, `chepNgay`, `kiemTra`, `danhSachNguon` | Script **SaoLuu_Phu** ở tài khoản thứ hai (Phần I) |
 
 ## Xử lý sự cố
+
+- **Kết nối báo "App kia từ chối: sai mã kết nối…"**: chép lại mã từ nhật ký `adminCreateFeedKeyIso` của app đó (đủ ký tự, không dấu
+  cách); app đó chưa lên bản có `feed.isoEvidence` cũng báo vậy.
+- **Kết nối báo "Không nhận được phản hồi đúng từ link /exec"**: link không phải link `/exec` đang dùng của app đó, hoặc app đó chưa
+  triển khai "Bất kỳ ai" — mở link đó trên trình duyệt phải thấy chữ `NOT_FOUND` (JSON), không phải trang đăng nhập Google.
+- **"Link này là của app khác"**: dán link M&E vào ô Checksheet hoặc ngược lại.
+- **App ISO báo lỗi ngay sau khi triển khai 2a** ("Cần quyền…" / không đăng nhập được): chưa cấp quyền — chạy `installTriggers` →
+  **Cho phép** (mục "CẬP NHẬT LÊN BẢN 2a" bước 3), rồi tải lại app.
+- **Biểu in từ app không có ô ✓**: cuối màn Kết nối xem "biểu in từ app chưa nhận ngày nào" và "mã biểu không có trong danh mục ISO" —
+  sửa mã biểu bên app kia (mẫu checksheet: ô Mã biểu mẫu; M&E: bảng ánh xạ `iso_form_map` / mã checklist) cho khớp danh mục ISO.
 
 - **Phủ điều khoản trống ("Chưa có danh sách điều khoản")**: file Excel đã nhập thiếu trang Phủ ISO 9001 / Phủ BRCGS — nhập lại file
   Excel tổng đủ 5 trang (Excel → Nhập lô); số biểu theo điều khoản tự tính lại.

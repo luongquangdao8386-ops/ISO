@@ -69,6 +69,7 @@ export async function renderAccount(view, { shell }) {
   if (await can('report.logo.set')) admin.push(['admin.report_logo', '/admin/report-logo']);
   if (await can('backup.view')) admin.push(['admin.backup', '/admin/backup']);
   if (await can('audit.view')) admin.push(['admin.audit', '/admin/audit']);
+  if (await can('link.info')) admin.push(['nav.links', '/links']);
   if (await can('system.status')) admin.push(['admin.status', '/admin/status']);
   if (isOwner() && b.env === 'THU' && await can('sample.seed')) admin.push(['admin.sample', '/admin/sample']);
   view.innerHTML = `

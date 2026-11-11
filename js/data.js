@@ -2,7 +2,7 @@
 // phạm vi bộ phận, ngày theo máy chủ, tiện ích danh mục (tình trạng ○ ◐ ● ✕, nơi làm, kỳ hồ sơ)
 import { session, todayVN, nameText } from './core.js';
 import { getRecords, getMeta, KEY, queueItems } from './sync.js';
-import { itemRecordStatus, periodTypeFromDays, weekAgenda, mondayOf } from './periods.js';
+import { itemRecordStatus, periodTypeFromDays, weekAgenda, mondayOf, parseSources } from './periods.js';
 
 export { KEY };
 
@@ -247,9 +247,9 @@ export async function recordsOf(itemId) {
  */
 export async function recordStatusMap(list) {
   if (!memo.__rs) {
-    const { byItem, queued, opts } = await recordInputs();
+    const { byItem, queued, evByItem, opts } = await recordInputs();
     const m = new Map();
-    for (const it of await items()) m.set(it.item_id, itemRecordStatus(it, byItem.get(it.item_id) || [], { ...opts, pending: queued.get(it.item_id) || [] }));
+    for (const it of await items()) m.set(it.item_id, itemRecordStatus(it, byItem.get(it.item_id) || [], { ...opts, pending: queued.get(it.item_id) || [], evidence: evByItem.get(it.item_id) || [] }));
     memo.__rs = m;
   }
   if (!list) return memo.__rs;
@@ -260,25 +260,38 @@ export async function recordStatusMap(list) {
 /** Xóa bộ nhớ tạm tình trạng hồ sơ (vừa lưu hồ sơ vào hàng chờ) */
 export function invalidateRecordStatus() { delete memo.__rs; delete memo.__ri; }
 
-/** Đầu vào tính tình trạng hồ sơ (bảng kỳ, lịch tuần): hồ sơ SUBMITTED theo biểu, hồ sơ chờ gửi, {today, grace, startSetting} */
+/**
+ * Đầu vào tính tình trạng hồ sơ (bảng kỳ, lịch tuần): hồ sơ SUBMITTED theo biểu, hồ sơ chờ gửi, ngày có hồ sơ từ M&E / Checksheet
+ * (EVIDENCE, Đợt 2) theo biểu, {today, grace, startSetting, sources}.
+ */
 async function recordInputs() {
   if (!memo.__ri) {
     const st = session.settings || {};
-    const byItem = new Map();
-    for (const r of await recs('RECORD')) {
-      if (r.status !== 'SUBMITTED') continue;
-      const a = byItem.get(r.item_id) || [];
-      a.push(r);
-      byItem.set(r.item_id, a);
-    }
-    memo.__ri = { byItem, queued: await queuedRecords(), opts: { today: today(), grace: Number(st.record_grace_days ?? 3), startSetting: st.records_start_date || '' } };
+    const group = (list) => {
+      const m = new Map();
+      for (const r of list) { const a = m.get(r.item_id) || []; a.push(r); m.set(r.item_id, a); }
+      return m;
+    };
+    const byItem = group((await recs('RECORD')).filter((r) => r.status === 'SUBMITTED'));
+    const evByItem = group((await recs('EVIDENCE')).filter((e) => !e.archived_at && Number(e.count) > 0));
+    memo.__ri = { byItem, evByItem, queued: await queuedRecords(),
+      opts: { today: today(), grace: Number(st.record_grace_days ?? 3), startSetting: st.records_start_date || '', sources: st.evidence_sources || '' } };
   }
   return memo.__ri;
 }
 
+/** App đã nối để lấy ngày có hồ sơ: {ME: true, CS: true} (cài đặt evidence_sources do máy chủ đặt ở màn Kết nối) */
+export function evidenceSources() { return parseSources((session.settings || {}).evidence_sources || ''); }
+
+/** Ngày có hồ sơ từ M&E / Checksheet của một biểu (mới nhất trước) */
+export async function evidenceOf(itemId) {
+  return (await recs('EVIDENCE')).filter((e) => e.item_id === itemId && !e.archived_at && Number(e.count) > 0)
+    .sort((a, b) => String(b.last_date).localeCompare(String(a.last_date)));
+}
+
 /** Lịch tuần hồ sơ đến hạn (trang chủ): tuần lệch `off` tuần so với tuần hiện tại (js/periods.js weekAgenda) */
 export async function recordWeek(off = 0) {
-  const { byItem, queued, opts } = await recordInputs();
-  const entries = (await items()).map((it) => ({ it, recs: byItem.get(it.item_id) || [], pending: queued.get(it.item_id) || [] }));
+  const { byItem, queued, evByItem, opts } = await recordInputs();
+  const entries = (await items()).map((it) => ({ it, recs: byItem.get(it.item_id) || [], pending: queued.get(it.item_id) || [], evidence: evByItem.get(it.item_id) || [] }));
   return weekAgenda(entries, { ...opts, mon: addDaysIso(mondayOf(opts.today), 7 * off) });
 }

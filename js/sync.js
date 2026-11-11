@@ -44,7 +44,7 @@ export async function bootstrap({ onPage, page1 = null } = {}) {
 
 /** Khóa chính theo loại hồ sơ (khớp SYNC_ENTITIES_ của máy chủ) */
 export const KEY = {
-  DEPT: 'dept_code', GROUP: 'group_key', ITEM: 'item_id', CLAUSE: 'clause_id', VERSION: 'version_id', RECORD: 'record_id'
+  DEPT: 'dept_code', GROUP: 'group_key', ITEM: 'item_id', CLAUSE: 'clause_id', VERSION: 'version_id', RECORD: 'record_id', EVIDENCE: 'evidence_id'
 };
 
 function keyOf(type, rec) {

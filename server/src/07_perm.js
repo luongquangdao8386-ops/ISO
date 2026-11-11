@@ -50,8 +50,11 @@ var ACTION_TABLE_ = [
   'record.submit|2|offline|W',
   'record.return|2|pin|W',
   'record.status|2|net|R',
-  // Đợt 2–4: báo cáo PDF, kết nối M&E/Checksheet, khắc phục, đánh giá nội bộ
+  // Đợt 2–4: báo cáo PDF, khắc phục, đánh giá nội bộ
   'report.pdf|1|net|R',
+  // Kết nối M&E / Checksheet (phiên 2a): link /exec + mã kết nối của từng app; thử kết nối; Cập nhật ngay
+  'link.info|4|net|R',
+  'link.test|4|net|R',
   'link.set|4|pin|W',
   'evidence.sync|4|net|W',
   'capa.edit|2|net|W',
