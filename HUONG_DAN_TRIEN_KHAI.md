@@ -8,16 +8,63 @@ Phiên 1a có: đăng nhập PIN, người dùng (bộ phận, Thư ký ISO, Đ�
 chi tiết biểu), nhập/xuất file Excel tổng, quản trị. Phiên bản & ban hành (1b), hồ sơ (1c), phủ điều khoản + trang chủ đầy đủ (1d) hiện
 mờ "Sắp có · 即将推出".
 
+## BẮT ĐẦU Ở ĐÂY — đưa lên THẬT ngay (chốt 11/11/2026, không qua THỬ)
+
+Anh đã dựng một máy chủ (dự án `ISO_MayChu_THU`, link `/exec` đã gửi Claude). Máy chủ đó **chuyển thành máy chủ THẬT**, không dựng
+máy chủ thứ hai. Trang app THẬT: <https://luongquangdao8386-ops.github.io/ISO/> (đã cố định link `/exec`). Làm trên máy tính, trong
+hồ sơ Chrome của tài khoản Google dùng chung (Phần A).
+
+**Bước 1 — Dán mã máy chủ mới.** <https://script.google.com> → dự án `ISO_MayChu_THU` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+`https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu** (Ctrl+S).
+
+**Bước 2 — Đã chạy `setup` chưa?** **Cài đặt dự án** (bánh răng) → **Thuộc tính tập lệnh**:
+- **Có** dòng `BUSINESS_SPREADSHEET_ID` → đã setup, sang bước 3. Nếu còn thấy `SETUP_OWNER_CODE` (hoặc anh chưa từng đặt mã owner)
+  thì làm Phần C bước 5, 6 trước.
+- **Không có** → sửa `ENV` thành `THAT` (chưa có thì thêm), rồi làm Phần C bước 2 (múi giờ), 4, 5, 6 trong dự án này; bỏ qua bước 3
+  (chạy cũng được, nhật ký báo `Máy chủ đã là THẬT`), đổi tên dự án thành `ISO_MayChu_THAT` cho dễ nhận.
+
+**Bước 3 — Chuyển thành THẬT.** Ô chọn hàm → **`adminChuyenSangTHAT`** → **Chạy** (Google hỏi quyền thì cho phép như Phần C bước 4).
+Nhật ký: `Xong: máy chủ này là THẬT (ENV=THAT). Đã xóa dữ liệu thử: … Đổi tên: …`. Hàm này:
+- xóa biểu, nhóm, điều khoản, lô nhập đã có (dữ liệu mẫu/thử) và 4 tài khoản mẫu `MAU-*`; **giữ** owner, PIN, tài khoản khác, bộ phận,
+  cài đặt, logo, nhật ký;
+- đặt `ENV = THAT`, `app_base_url` = trang `/ISO/`, bỏ thuộc tính `TEST_*`;
+- đổi tên bỏ đuôi `_THU`: dự án thành `ISO_MayChu_THAT`, thư mục `ISO_HeThong`, `ISO_Data`, `ISO_Backups`, bảng tính `ISO_NghiepVu`,
+  `ISO_BaoMat` (tải lại trang Apps Script để thấy tên mới; đổi không được thì nhật ký báo — đổi tay, không ảnh hưởng app);
+- mọi máy đang mở app phải đăng nhập lại.
+Chạy lần hai không làm gì (nhật ký `Máy chủ đã là THẬT`), nên chạy nhầm cũng không mất dữ liệu thật.
+
+**Bước 4 — Triển khai bản mới, giữ link.** **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** →
+Mô tả `THẬT d1.1` → **Triển khai**. Link `/exec` giữ nguyên. (Chưa từng triển khai thì làm Phần C bước 7 và gửi Claude link mới.)
+
+**Bước 5 — Bật trang THẬT.** <https://github.com/luongquangdao8386-ops/ISO> → **Settings → Pages** → Source: **Deploy from a branch** →
+Branch: `main`, thư mục `/ (root)` → **Save** → chờ 2–3 phút.
+
+**Bước 6 — Đăng nhập.** Mở <https://luongquangdao8386-ops.github.io/ISO/> → mã owner + PIN (lần đầu là PIN tạm → app bắt đổi PIN).
+Không có nhãn vàng THỬ là đúng máy chủ THẬT. **Tài khoản → Quản trị → Trạng thái hệ thống** → dòng `app_base_url` phải là
+`https://luongquangdao8386-ops.github.io/ISO/` (bước 3 tự đặt; đi đường "Không có" ở bước 2 thì bấm **Sửa** và dán vào).
+
+**Bước 7 — Nhập danh mục 221 biểu.** Menu trái **Excel** → **Nhập lô → Chọn file Excel tổng** → chọn
+`Danh_muc_bieu_mau_ISO_tong_Viet-Trung_1.xlsx` → Xem trước phải là **221 Thêm · 0 Lỗi · 72 điều khoản** (ISO 9001: 41, BRCGS: 31) →
+**Ghi vào danh mục** → PIN. Owner là Quản trị nên tự ghi được. Xong: Danh mục có 221 biểu (○ 115, ◐ 106), 42 nhóm.
+
+**Bước 8 — Dùng.** Tạo tài khoản, đặt trưởng bộ phận, logo (Phần F); iPhone: Safari mở `/ISO/` → **Chia sẻ → Thêm vào MH chính**.
+
+**Bước 9 — Bản sao ở tài khoản thứ hai.** Phần I (I.1 trong app `/ISO/`; I.2–I.4 một lần cho cả ba app).
+
+Gặp lỗi: chụp màn hình gửi Claude — sửa trên bản THẬT luôn (Phần H để dán bản sửa).
+
 ## Hai môi trường
 
-| | THỬ (làm trước) | THẬT (phiên 1d, khi nói "phát hành ISO") |
+| | THẬT (đang dùng, từ 11/11/2026) | THỬ (tạm không có máy chủ) |
 | --- | --- | --- |
-| Dự án Apps Script | `ISO_MayChu_THU`, thuộc tính `ENV = THU` | `ISO_MayChu_THAT`, `ENV = THAT` |
-| Thư mục Drive tự tạo | `ISO_HeThong_THU` | `ISO_HeThong` |
-| Trang app | <https://luongquangdao8386-ops.github.io/ISO-thu/> (repo `ISO-thu`) | <https://luongquangdao8386-ops.github.io/ISO/> (repo `ISO`) |
+| Dự án Apps Script | `ISO_MayChu_THAT` (đổi tên từ `ISO_MayChu_THU`), `ENV = THAT` | dựng lại theo Phần C khi cần thử bản lớn |
+| Thư mục Drive | `ISO_HeThong` | `ISO_HeThong_THU` |
+| Trang app | <https://luongquangdao8386-ops.github.io/ISO/> (repo `ISO`) | <https://luongquangdao8386-ops.github.io/ISO-thu/> (repo `ISO-thu`, chưa gắn máy chủ) |
 
-App THỬ có nhãn vàng **THỬ** trên đầu màn hình; tên trên iPhone là "ISO THỬ". Dữ liệu trên máy dùng tiền tố `iso_thu` (trang THẬT
-`iso`), không đụng dữ liệu của M&E (`me`) và Checksheet (`cs`) trên cùng iPhone.
+App THỬ có nhãn vàng **THỬ** trên đầu màn hình; tên trên iPhone là "ISO THỬ". Dữ liệu trên máy dùng tiền tố `iso` (trang THỬ
+`iso_thu`), không đụng dữ liệu của M&E (`me`) và Checksheet (`cs`) trên cùng iPhone.
+
+Các Phần B–G dưới đây viết cho máy chủ THỬ; nay chỉ dùng các bước được trỏ tới từ phần **BẮT ĐẦU Ở ĐÂY**.
 
 ---
 
@@ -135,7 +182,8 @@ vàng ô nhập, danh sách chọn ○ ◐ ● ✕, tô màu theo tình trạng,
 
 ## Phần H — Cập nhật máy chủ khi có bản mới (phiên 1b, 1c, 1d…)
 
-1. Dự án `ISO_MayChu_THU` → tệp `Code.gs` → Ctrl+A → xóa → dán `Code.gs` mới từ link raw ở Phần C → **Lưu**.
+1. Dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → chép → dán → **Lưu**.
 2. Nếu Claude báo bản mới **thêm sheet/cột**: chọn hàm **`migrateSchema`** → **Chạy** (chạy nhiều lần vẫn an toàn).
 3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → **Triển khai** (link `/exec` giữ nguyên).
 4. Mở app → tự tải bản mới (nếu màn báo lỗi, bấm **Tải lại bản mới** dưới thông báo lỗi).
@@ -215,10 +263,10 @@ Bản chép ở tài khoản thứ hai chứa dữ liệu tới lần sao lưu h
 
 M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyện của từng app).
 
-## Phần THẬT — làm ở phiên 1d
+## Phần THẬT
 
-Khi anh nói "phát hành ISO": dựng `ISO_MayChu_THAT` (như Phần C, `ENV = THAT`, cùng tài khoản Google), Claude cố định link
-`/exec` THẬT trong `config.js` (`/ISO/` → THẬT, `/ISO-thu/` → THỬ) và đẩy `main` của repo `ISO`, anh bật Pages cho repo `ISO`.
+Đã chốt 11/11/2026: phát hành THẬT ngay ở phiên 1a, không qua THỬ — làm theo phần **BẮT ĐẦU Ở ĐÂY** ở đầu tài liệu. Các phiên sau
+(1b, 1c, 1d…) cập nhật thẳng máy chủ THẬT theo Phần H; Claude chạy đủ test trên máy giả lập trước khi đẩy `main`.
 
 ## Hàm chạy tay trong trình soạn Apps Script
 
@@ -231,6 +279,7 @@ Khi anh nói "phát hành ISO": dựng `ISO_MayChu_THAT` (như Phần C, `ENV = 
 | `healthCheck` | Xem nhanh tình trạng máy chủ |
 | `installTriggers` | Trigger bị xóa nhầm |
 | `adminSeedSample` | Dữ liệu mẫu (chỉ THỬ) — PIN tạm in trong nhật ký |
+| `adminChuyenSangTHAT` | Một lần: máy chủ THỬ thành THẬT (xóa dữ liệu thử, đổi tên bỏ `_THU`); đã là THẬT thì không làm gì |
 | `adminMaintenanceOn` / `adminMaintenanceOff` | Tạm khóa / mở lại app khi cần sửa dữ liệu tay |
 | `adminClearLoginPause`, `adminFlushAuthCache` | Đăng nhập bị tạm dừng / phiên lạ sau khi sửa tay sheet Users |
 | `caiDat`, `chepNgay`, `kiemTra`, `danhSachNguon` | Script **SaoLuu_Phu** ở tài khoản thứ hai (Phần I) |

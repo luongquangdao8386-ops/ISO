@@ -5,8 +5,8 @@ quá hạn, phủ điều khoản. Thay danh mục Excel DM-ISO-01 bằng hệ t
 GitHub Pages (iPhone và máy tính). Cùng lõi với M&E và Checksheet (chép từ repo `CS`): PIN 6 số, phiên, ghi có xác nhận, đồng bộ,
 hàng chờ khi mất mạng. Giao diện luôn song ngữ Việt · 中文.
 
-**Trạng thái:** bản `1.0.0-d1.1` — Đợt 1, phiên 1a (lõi + danh mục). Trang thử `/ISO-thu/` (repo `ISO-thu`); trang THẬT `/ISO/`
-phát hành ở phiên 1d.
+**Trạng thái:** bản `1.0.0-d1.1` — Đợt 1, phiên 1a (lõi + danh mục). **Đã phát hành THẬT** ở `/ISO/` (11/11/2026, không qua
+THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang `/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ.
 
 ## Phiên 1a có gì
 

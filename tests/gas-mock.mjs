@@ -312,6 +312,7 @@ function makeDrive() {
   });
   const mkFile = (rec) => ({
     getId: () => rec.id, getName: () => rec.name, getSize: () => rec.bytes.length, getMimeType: () => rec.mime,
+    setName: (n) => { rec.name = String(n); return mkFile(rec); },
     getBlob: () => { guard(rec); return new MockBlob(rec.bytes, rec.mime, rec.name); },
     getAs: (mime) => {
       const d = drive._docs.get(rec.id);
@@ -338,6 +339,7 @@ function makeDrive() {
   });
   const mkFolder = (rec) => ({
     getId: () => rec.id, getName: () => rec.name, setName: (n) => { rec.name = String(n); return mkFolder(rec); },
+    getParents: () => iter(rec.parent && folders.get(rec.parent) ? [folders.get(rec.parent)] : []),
     createFolder: (name) => newFolder(name, rec.id),
     createFile: (blob) => {
       const id = 'f_' + crypto.randomBytes(8).toString('hex');

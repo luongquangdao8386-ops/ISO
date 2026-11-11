@@ -3771,6 +3771,89 @@ function adminFlushAuthCache() {
 
 /* runBackgroundJobs (dịch bù) ở 21_i18n.js; backupData (sao lưu hằng tuần) ở 23_backup.js */
 
+/* ---------------- Chuyển máy chủ THỬ thành THẬT (không dựng THỬ riêng) ---------------- */
+
+var THAT_BASE_URL_ = 'https://luongquangdao8386-ops.github.io/ISO/';
+/** Sheet danh mục xóa sạch khi chuyển: dữ liệu thử/mẫu; danh mục thật nhập lại từ file Excel tổng */
+var THAT_WIPE_SHEETS_ = ['Items', 'Groups', 'Clauses', 'ImportBatches', 'ImportRows'];
+
+/**
+ * Chạy MỘT LẦN trong trình soạn Apps Script của máy chủ đang chạy (ENV=THU) để dùng nó làm máy chủ THẬT:
+ *  - xóa biểu, nhóm, điều khoản, lô nhập đã có (dữ liệu mẫu/thử) — nhập lại file Excel tổng ngay sau đó;
+ *  - xóa 4 tài khoản mẫu MAU-*; giữ owner, tài khoản khác, bộ phận, cài đặt, nhật ký, logo, sao lưu;
+ *  - ENV = THAT, bỏ thuộc tính TEST_*, app_base_url → trang /ISO/, ngày bắt đầu tính hồ sơ đặt lại khi nhập danh mục;
+ *  - đổi tên thư mục, bảng tính, dự án: bỏ đuôi _THU (ISO_MayChu_THU → ISO_MayChu_THAT);
+ *  - đổi DATASET_EPOCH: mọi máy đăng nhập lại, tải dữ liệu từ đầu.
+ * Máy chủ đã là THẬT thì không làm gì (chạy nhầm lần hai không mất dữ liệu thật). Link /exec giữ nguyên.
+ */
+function adminChuyenSangTHAT() {
+  var props = PropertiesService.getScriptProperties();
+  if (String(props.getProperty('ENV') || '').trim() === 'THAT') {
+    log_('Máy chủ đã là THẬT (ENV=THAT) — không làm gì.');
+    return { already: true };
+  }
+  if (!props.getProperty('BUSINESS_SPREADSHEET_ID')) {
+    props.setProperty('ENV', 'THAT');
+    log_('Chưa setup: đã đặt ENV=THAT. Chạy tiếp hàm setup.');
+    return { env_only: true };
+  }
+  dbReset_();
+  var out = withWriteLock_(function () {
+    var res = { wiped: {}, users_removed: [] };
+    THAT_WIPE_SHEETS_.forEach(function (name) {
+      var sheet = sh_(name);
+      var last = sheet.getLastRow();
+      res.wiped[name] = Math.max(0, readRows_(name).length);
+      if (last >= 2) sheet.getRange(2, 1, last - 1, Math.max(1, sheet.getLastColumn())).clearContent();
+    });
+    // Tài khoản mẫu: xóa dòng (từ dưới lên), bỏ trưởng bộ phận trỏ tới tài khoản đã xóa
+    var gone = {};
+    readRows_('Users').filter(function (u) { return /^MAU-/.test(String(u.employee_code || '')); })
+      .sort(function (a, b) { return b.__row - a.__row; })
+      .forEach(function (u) { sh_('Users').deleteRow(u.__row); gone[u.user_id] = true; res.users_removed.push(u.employee_code); });
+    dbReset_();
+    readRows_('Depts').forEach(function (d) {
+      if (d.head_user_id && gone[d.head_user_id]) writeCells_('Depts', d.__row, { head_user_id: '' });
+    });
+    TEST_PROP_KEYS_.forEach(function (k) { delProp_(k); });
+    setProp_('ENV', 'THAT');
+    setProp_('DATASET_EPOCH', uuid_());
+    clearSysCaches_();
+    dbReset_();
+    writeSetting_('app_base_url', THAT_BASE_URL_, SYSTEM_USER);
+    writeSetting_('records_start_date', '', SYSTEM_USER);
+    var st = readState_();
+    var rev = Number(stateGet_(st, 'sync_revision', 0)) + 1;
+    var su = { dataset_epoch: ['STRING', prop_('DATASET_EPOCH')], sync_revision: ['INT', rev] };
+    THAT_WIPE_SHEETS_.concat(['Users', 'Depts', 'Settings']).forEach(function (s) { su['table_rev.' + s] = ['INT', rev]; });
+    stateWrite_(st, su, SYSTEM_USER);
+    writeAudit_({ user_id: SYSTEM_USER, action: 'system.env_that', entity_type: 'SYSTEM', entity_id: APP_ID, before_json: { env: 'THU' },
+      after_json: { env: 'THAT', wiped: res.wiped, users_removed: res.users_removed }, auth_basis: 'SYSTEM' });
+    return res;
+  });
+  // Đổi tên: bỏ đuôi _THU (chia sẻ, ID, link không đổi)
+  var renamed = [];
+  var rn = function (obj) {
+    try {
+      var n = obj.getName();
+      if (/_THU$/.test(n)) { obj.setName(n.replace(/_THU$/, n.indexOf('MayChu') >= 0 ? '_THAT' : '')); renamed.push(n); }
+    } catch (e) { log_('Không đổi được tên (' + (e && e.message) + ') — đổi tay được, không ảnh hưởng app.'); }
+  };
+  ['BUSINESS_SPREADSHEET_ID', 'SECURITY_SPREADSHEET_ID'].forEach(function (k) { rn(DriveApp.getFileById(props.getProperty(k))); });
+  var data = DriveApp.getFolderById(props.getProperty('DRIVE_ROOT_FOLDER_ID'));
+  rn(data);
+  rn(DriveApp.getFolderById(props.getProperty('DRIVE_BACKUP_FOLDER_ID')));
+  try { var ps = data.getParents(); if (ps.hasNext()) rn(ps.next()); } catch (e) { /* thư mục cha: đổi tay */ }
+  try { rn(DriveApp.getFileById(ScriptApp.getScriptId())); } catch (e) { /* dự án gắn bảng tính hoặc không đọc được: đổi tay */ }
+  clearSysCaches_();
+  adminFlushAuthCache();
+  var w = out.wiped;
+  log_('Xong: máy chủ này là THẬT (ENV=THAT). Đã xóa dữ liệu thử: ' + w.Items + ' biểu, ' + w.Groups + ' nhóm, ' + w.Clauses + ' điều khoản, ' +
+    w.ImportBatches + ' lô nhập; tài khoản mẫu: ' + (out.users_removed.join(', ') || 'không có') + '. Đổi tên: ' + (renamed.join(', ') || 'không có') +
+    '. Bước tiếp: Triển khai → Quản lý → sửa → Phiên bản mới (giữ link), mở ' + THAT_BASE_URL_ + ', đăng nhập owner, Excel → Nhập lô file Excel tổng.');
+  return { wiped: w, users_removed: out.users_removed, renamed: renamed };
+}
+
 // ===== 20_users.js =====
 /* 20_users: quản trị người dùng (lấy từ M&E qua Checksheet; phạm vi bộ phận + cờ Thư ký ISO, Đánh giá viên).
  * Giới hạn: không thao tác lên chính mình; không thao tác lên owner trừ khi người làm là owner;

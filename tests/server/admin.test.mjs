@@ -1,7 +1,7 @@
 // Đăng nhập PIN, người dùng (bộ phận, Thư ký ISO, Đánh giá viên), bộ phận, cài đặt, logo, trạng thái hệ thống
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshServer, ownerClient, userClient, makeClient, uuid, fakePngB64, OWNER_PIN, OWNER_CODE } from '../helpers.mjs';
+import { freshServer, ownerClient, userClient, makeClient, addUser, uuid, fakePngB64, OWNER_PIN, OWNER_CODE } from '../helpers.mjs';
 
 const NOW = '2026-11-06T08:00:00+07:00';
 
@@ -99,4 +99,54 @@ test('cài đặt: chu kỳ rà soát 12 tháng, cho phép trễ 3 ngày (đổi
   const st = owner.call('system.status', {});
   assert.ok(st.data.checks.some((c) => c.key === 'items'));
   assert.ok(st.data.checks.some((c) => c.key === 'clauses'));
+});
+
+test('adminChuyenSangTHAT: máy chủ THỬ thành THẬT — xóa danh mục thử + tài khoản mẫu, giữ owner/người thật/logo, đổi tên bỏ _THU, đăng nhập lại; chạy lần hai không làm gì', () => {
+  const env = freshServer({ now: NOW });
+  const owner = ownerClient(env);
+  owner.pin(OWNER_PIN);
+  assert.equal(owner.write('report.logo.set', { content_b64: fakePngB64(), mime_type: 'image/png' }).ok, true);
+  env.g.dbReset_();
+  env.g.seedSample_('SYSTEM');
+  addUser(env, 'CL3', 3, '271828', { depts: 'CL' });
+  env.props.setProperty('TEST_TODAY', '2026-11-06');
+  env.g.dbReset_();
+  assert.ok(env.rows('Items').length > 20);
+  assert.ok(env.rows('Users').some((u) => /^MAU-/.test(u.employee_code)));
+  assert.ok(env.rows('Depts').find((d) => d.dept_code === 'CL').head_user_id);
+  const epoch0 = env.props.getProperty('DATASET_EPOCH');
+
+  const out = env.g.adminChuyenSangTHAT();
+  env.g.dbReset_();
+  assert.equal(env.props.getProperty('ENV'), 'THAT');
+  assert.equal(env.props.getProperty('TEST_TODAY'), null);
+  assert.notEqual(env.props.getProperty('DATASET_EPOCH'), epoch0);
+  for (const s of ['Items', 'Groups', 'Clauses', 'ImportBatches', 'ImportRows']) assert.equal(env.rows(s).length, 0, s);
+  assert.equal(out.wiped.Items, 25);
+  assert.equal(JSON.stringify(out.users_removed.slice().sort()), JSON.stringify(['MAU-CL3', 'MAU-KD1', 'MAU-SX2', 'MAU-TK']));
+  assert.deepEqual(env.rows('Users').map((u) => u.employee_code).sort(), ['CL3', OWNER_CODE].sort());
+  assert.equal(env.rows('Depts').length, 10);
+  assert.equal(env.rows('Depts').find((d) => d.dept_code === 'CL').head_user_id, '');
+  const names = [...env.drive._folders.values()].map((f) => f.name).concat([...env.drive._files.values()].map((f) => f.name));
+  assert.ok(!names.some((n) => /^ISO_.*_THU$/.test(n)), names.join(','));
+  for (const n of ['ISO_HeThong', 'ISO_Data', 'ISO_Backups', 'ISO_NghiepVu', 'ISO_BaoMat']) assert.ok(names.includes(n), n);
+
+  // Phiên cũ: DATASET_RESET → đăng nhập lại, dữ liệu trống, app_base_url trang THẬT, logo còn
+  assert.equal(owner.call('sync.bootstrap', {}).code, 'DATASET_RESET');
+  const o2 = makeClient(env);
+  assert.equal(o2.login(OWNER_CODE, OWNER_PIN).ok, true);
+  const b = o2.call('sync.bootstrap', {});
+  assert.equal(b.ok, true, JSON.stringify(b));
+  assert.equal(b.data.records.ITEM.length, 0);
+  assert.equal(env.rows('Settings').find((s) => s.setting_key === 'app_base_url').value, 'https://luongquangdao8386-ops.github.io/ISO/');
+  assert.ok(o2.call('report.logo.get', {}).data.content_b64);
+  assert.equal(b.data.env, 'THAT');
+  assert.throws(() => env.g.seedSample_('SYSTEM'), /THỬ/);
+
+  // Chạy nhầm lần hai: không xóa gì
+  env.g.dbReset_();
+  env.g.seedBaseRows_();
+  const n0 = env.rows('Users').length;
+  assert.equal(JSON.stringify(env.g.adminChuyenSangTHAT()), '{"already":true}');
+  assert.equal(env.rows('Users').length, n0);
 });
