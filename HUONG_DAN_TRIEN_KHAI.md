@@ -200,11 +200,11 @@ Cách chạy: tài khoản chính **chia sẻ chỉ xem** thư mục Sao lưu (v
 trong tài khoản thứ hai, mỗi ngày 3 giờ sáng chép bản sao lưu đã kiểm chứng (VERIFIED) và tệp dữ liệu mới về thư mục `SaoLuu_Phu`
 trong Drive của nó, giữ 12 bản mới nhất mỗi app. Thư mục chứa bảng tính đang chạy (`…_HeThong…`) **không** chia sẻ.
 
-### I.1 — App ISO: đặt tài khoản thứ hai trong app (làm ở THỬ, sau này ở THẬT)
+### I.1 — App ISO: đặt tài khoản thứ hai trong app (trang `/ISO/`)
 
 1. App ISO → **Tài khoản → Quản trị → Sao lưu** → khung **Tài khoản sao lưu thứ hai**.
 2. Nhập email tài khoản thứ hai → **Lưu và chia sẻ** → PIN.
-3. Trạng thái thành **Đang chia sẻ**, thư mục đã chia sẻ: `ISO_Backups_THU, ISO_Data_THU` (THẬT: `ISO_Backups, ISO_Data`).
+3. Trạng thái thành **Đang chia sẻ**, thư mục đã chia sẻ: `ISO_Backups, ISO_Data`.
    Google gửi thư báo chia sẻ tới tài khoản thứ hai. Mỗi lần sao lưu hằng tuần máy chủ kiểm lại việc chia sẻ;
    **Trạng thái hệ thống** có dòng "Bản sao ở tài khoản Google thứ hai".
 
@@ -227,11 +227,11 @@ Làm trong hồ sơ Chrome của **tài khoản chính**, mở <https://drive.go
    `SaoLuu_Phu`.
 2. **Cài đặt dự án** → **Múi giờ** `(GMT+07:00) … Hồ Chí Minh` (hoặc Bangkok).
 3. Trình chỉnh sửa → tệp `Code.gs` → Ctrl+A → xóa → mở link
-   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO-thu/main/apps-script/SaoLuuPhu.gs` → Ctrl+A → Ctrl+C → dán vào →
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/SaoLuuPhu.gs` → Ctrl+A → Ctrl+C → dán vào →
    **Lưu**.
 4. Chọn hàm **`caiDat`** → **Chạy** → cấp quyền (Xem lại quyền → chọn tài khoản thứ hai → Nâng cao → Đi tới SaoLuu_Phu → Cho phép).
-5. Nhật ký thực thi: `Đã cài lịch chép hằng ngày lúc 3 giờ sáng`, danh sách thư mục nguồn (vd `ISO_Backups_THU`, `ISO_Data_THU`,
-   `ME_Backups_THU`…) và các dòng `XONG … chép N bản sao lưu mới`.
+5. Nhật ký thực thi: `Đã cài lịch chép hằng ngày lúc 3 giờ sáng`, danh sách thư mục nguồn (vd `ISO_Backups`, `ISO_Data`,
+   `ME_Backups`…) và các dòng `XONG … chép N bản sao lưu mới`.
    - Không thấy thư mục nào: kiểm tra I.1, I.2 đã chia sẻ đúng email chưa, và script có đang chạy trong **tài khoản thứ hai** không
      (hàm **`danhSachNguon`** in tài khoản đang chạy).
    - Thấy thư mục nhưng `chép 0`: app đó chưa có bản sao lưu **Đã kiểm chứng** — trong app bấm **Sao lưu ngay**, chờ vài phút, rồi
