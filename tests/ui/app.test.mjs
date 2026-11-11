@@ -33,7 +33,7 @@ const noOverflow = (page) => page.evaluate(() => document.documentElement.scroll
 /** Không còn khóa nhãn thô (vd "cat.code") lọt ra màn hình */
 async function noRawKeys(page) {
   const txt = await page.evaluate(() => document.body.innerText);
-  const raw = txt.match(/\b(?:nav|home|cat|item|imp|xl|soon|adm|admin|account|sync|btn|draft|logo|status|kind|where|period|role|tile)\.[a-z_]+[A-Z_0-9]*\b/g);
+  const raw = txt.match(/\b(?:nav|home|cat|item|imp|xl|soon|adm|admin|account|sync|btn|draft|logo|status|kind|where|period|role|tile|cov|wd|rec|cell)\.[a-z_]+[A-Z_0-9]*\b/g);
   return raw ? [...new Set(raw)] : [];
 }
 
@@ -101,8 +101,10 @@ test('iPhone: đăng nhập PIN, trang chủ (biểu tượng, 4 ô số, ô S�
     // Hồ sơ (phiên 1c): nút Hồ sơ mở bảng kỳ
     await page.click('.bnav-item[data-nav="records"]');
     await page.waitForSelector('.rg .rg-sec');
-    // Màn của phiên sau
+    // Phủ điều khoản (phiên 1d) có màn thật; màn của đợt sau vẫn "Sắp có"
     await go(page, '#/coverage');
+    await page.waitForSelector('.cov .cov-row');
+    await go(page, '#/reports');
     await page.waitForSelector('.soon-page');
     assert.ok((await page.textContent('.soon-page')).includes('Sắp có'));
 
@@ -162,7 +164,7 @@ test('web: menu trái (màn phiên sau mờ "Sắp có"), Excel xuất đúng kh
     await login(page);
     assert.equal(await page.locator('.side .side-item').count(), 11);
     assert.equal(await page.locator('.side .side-item[data-nav="versions"]').count(), 1);
-    assert.equal(await page.locator('.side .side-item.soon').count(), 5);
+    assert.equal(await page.locator('.side .side-item.soon').count(), 4, 'Báo cáo, Khắc phục, Đánh giá, Kết nối (Phủ điều khoản đã có ở 1d)');
     assert.ok(await page.locator('.stats').isVisible());
     assert.ok(await page.locator('.home-depts').isVisible());
     await page.screenshot({ path: path.join(SHOTS, 'home-web.png'), fullPage: true });

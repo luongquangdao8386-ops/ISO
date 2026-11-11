@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d1.3 (Đợt 1, phiên 1c)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d1.4 (Đợt 1, phiên 1d — Đợt 1 xong code)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -8,8 +8,41 @@ Phiên 1a có: đăng nhập PIN, người dùng (bộ phận, Thư ký ISO, Đ�
 chi tiết biểu), nhập/xuất file Excel tổng, quản trị. Phiên 1b thêm: **phiên bản & ban hành** (soạn → gửi duyệt → duyệt / trả lại →
 ban hành, bản cũ tự lỗi thời, PDF + tệp gốc lưu riêng tư trên Drive của máy chủ), **gắn tệp** cho biểu ● nhập từ Excel, đặt **Không áp
 dụng ✕**, **Đã rà soát** (gia hạn rà soát), ô **Chờ bạn xử lý** và số đỏ trên nút. Phiên 1c thêm: **hồ sơ** — nộp hồ sơ bằng ảnh / tệp
-(cả khi mất mạng), bảng kỳ ✓ ! –, trả lại hồ sơ nộp sai, tem QR báo bản in lỗi thời. Phủ điều khoản + lịch tuần trên trang chủ (1d) hiện
-mờ "Sắp có · 即将推出".
+(cả khi mất mạng), bảng kỳ ✓ ! –, trả lại hồ sơ nộp sai, tem QR báo bản in lỗi thời. Phiên 1d thêm: **Phủ điều khoản** ISO 9001 và
+BRCGS (đếm giống hệt file Excel tổng), trang chủ đầy đủ (**lịch tuần hồ sơ đến hạn**, Chờ bạn xử lý thêm hồ sơ quá hạn cần nộp). Báo
+cáo, Khắc phục, Đánh giá nội bộ, Kết nối M&E/Checksheet (Đợt 2–4) vẫn mờ "Sắp có · 即将推出".
+
+## CẬP NHẬT LÊN BẢN 1d (1.0.0-d1.4) — làm một lần, trên máy tính
+
+Bản 1d **không thêm sheet hay cột** — không cần `migrateSchema`. App 1d vẫn chạy với máy chủ 1c; `Code.gs` mới chỉ thêm dòng **Phủ điều
+khoản** ở Trạng thái hệ thống. **Chưa lên bản 1c** (Trạng thái hệ thống không có dòng **Hồ sơ**) → làm mục "CẬP NHẬT LÊN BẢN 1c" ngay
+dưới (có `migrateSchema`) thay cho các bước này — `Code.gs` ở link đó đã là bản 1d.
+
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d1.4 phủ điều khoản` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+3. Mở app `/ISO/` trên máy tính và iPhone → app tự tải bản mới (**Tài khoản → Thông tin** ghi `1.0.0-d1.4`; màn báo lỗi thì bấm
+   **Tải lại bản mới**). **Tài khoản → Quản trị → Trạng thái hệ thống** có dòng **Phủ điều khoản**
+   ("ISO 9001: …/41 điều khoản có biểu · bắt buộc chưa có biểu … · BRCGS: …/31 chủ đề có biểu").
+4. Làm **Phần G** (nghiệm thu Đợt 1, đủ 8 mục) rồi gửi Claude ảnh màn hình chỗ chưa đạt.
+
+### Dùng Phủ điều khoản và trang chủ
+
+- **Phủ điều khoản** (menu trái; iPhone: ô **Phủ điều khoản** ở trang chủ hoặc Tài khoản → Phủ điều khoản): thẻ **ISO 9001** (41 điều
+  khoản) và **BRCGS** (31 chủ đề). Mỗi dòng: số biểu, số đã ban hành ●, số in từ app M&E / Checksheet, trạng thái **Thiếu biểu – bắt
+  buộc** (đỏ — điều khoản bắt buộc lưu hồ sơ mà chưa có biểu nào) · **Chưa có biểu** · **Có biểu, chưa ban hành** · **Đã có**. Bấm nút
+  trạng thái để lọc; chọn **Bộ phận** để xem phủ của một bộ phận. Bấm một dòng → danh sách biểu của điều khoản → bấm biểu để mở, hoặc
+  **Mở trong Danh mục** (Danh mục lọc sẵn theo điều khoản, bấm ✕ trên nút lọc để bỏ).
+- Cách đếm **giống hệt** trang Phủ ISO 9001 / Phủ BRCGS của file Excel tổng: biểu thuộc điều khoản khi một mã ở cột ISO 9001 **bắt đầu
+  bằng** số điều khoản (9.2 gồm cả 9.2.2); biểu thuộc chủ đề BRCGS khi cột BRCGS Packaging **chứa** khóa chủ đề. Biểu ✕ vẫn được đếm
+  như Excel. Danh sách điều khoản lấy từ hai trang Phủ của file Excel khi nhập — sửa điều khoản thì sửa file rồi nhập lại.
+- **Trang chủ**: ô **Điều khoản bắt buộc thiếu biểu** bấm vào mở Phủ điều khoản đã lọc. Thẻ **Hồ sơ đến hạn trong tuần** (‹ › đổi tuần):
+  biểu hằng ngày mỗi biểu một dòng 7 ô Thứ Hai … Chủ nhật; biểu tuần / tháng / quý / năm hiện ở **ngày kết thúc kỳ**; kỳ đã hết từ tuần
+  trước mà chưa nộp và còn trong 3 ngày cho phép trễ hiện ở ngày **hạn chót**. Bấm ô hoặc dòng → hồ sơ của kỳ / **Nộp hồ sơ kỳ này**.
+  Chỉ tính biểu ● làm tay có chu kỳ — danh mục hiện toàn ○ ◐ nên thẻ trống cho tới khi ban hành biểu.
+- **Chờ bạn xử lý** thêm: "N biểu quá hạn hồ sơ — nộp ngay" (biểu bạn nộp được có kỳ gần nhất quá hạn), "N thao tác gửi không được"
+  (mở Nháp chờ đồng bộ), "tài liệu sắp/quá hạn rà soát" cả với người được đặt làm người phụ trách tài liệu.
 
 ## CẬP NHẬT LÊN BẢN 1c (1.0.0-d1.3) — làm một lần, trên máy tính
 
@@ -163,7 +196,7 @@ Các Phần B–G dưới đây viết cho máy chủ THỬ; nay chỉ dùng cá
 3. Chờ 2–3 phút → mở <https://luongquangdao8386-ops.github.io/ISO-thu/> → thấy màn đăng nhập có biểu tượng **tờ tài liệu + dấu tick**
    (navy trên vàng).
 
-Repo `ISO` (trang THẬT) để trống tới phiên 1d — chỉ đẩy khi anh nói "phát hành ISO".
+Repo `ISO` (trang THẬT) đã phát hành từ 11/11/2026 — xem Phần THẬT.
 
 ## Phần C — Dựng máy chủ THỬ (`ISO_MayChu_THU`)
 
@@ -243,26 +276,27 @@ vàng ô nhập, danh sách chọn ○ ◐ ● ✕, tô màu theo tình trạng,
    → đăng nhập.
 6. **Bản sao ở tài khoản thứ hai**: làm Phần I.
 
-## Phần G — Thử nghiệm thu Đợt 1 (mục 1–6, 8; mục 7 ở phiên 1d)
+## Phần G — Nghiệm thu Đợt 1 (đủ 8 mục, làm trên THẬT)
 
-1. **Đăng nhập PIN** trên iPhone (app ở Màn hình chính) và máy tính. Tắt Wi-Fi + 4G → mở lại app → **Mở bằng PIN** → vẫn xem
-   được danh mục, chi tiết biểu (dải đỏ "Ngoại tuyến").
-2. **Nhập file Excel tổng**: đủ 221 dòng, Xem trước không lỗi; ghi xong vào **Danh mục** bấm các nút ○ ◐ ● ✕ → số biểu từng tình
-   trạng khớp file. **Xuất** rồi nhập lại file vừa xuất → **Không đổi**.
-3. **Danh mục trên iPhone**: bấm nút tình trạng, mở **Bộ lọc** chọn bộ phận/nhóm — bàn phím không bật lên; gõ tìm không dấu
-   ("dao tao") hoặc tiếng Trung ("培训") — ô tìm giữ nguyên, bàn phím không nhảy.
-4. **Phạm vi bộ phận**: đăng nhập `MAU-SX2` (hoặc một Nhân viên bộ phận SX) → chỉ thấy biểu SX và tài liệu chung của Ban ISO; không
-   có Excel, không có nút sửa. Người không có quyền làm thao tác cần PIN → báo **Không có quyền** ngay, không hỏi PIN.
-5. **Phiên bản (mục 4)**: soạn phiên bản cho một biểu → gửi duyệt → người soạn (cấp 1–3) **không thấy nút Duyệt**; trưởng bộ phận
-   (hoặc Quản trị) duyệt → Thư ký ISO ban hành → bản cũ thành **Lỗi thời**; trang chủ cập nhật **% ban hành**.
-6. **Hồ sơ khi mất mạng (mục 5)**: trên iPhone tắt Wi-Fi + 4G → mở một biểu ● hằng ngày → **Nộp hồ sơ** → **Khoảng ngày** (vd
-   01/11 → 07/11) → chụp 2 trang → **Lưu hồ sơ** → màn hồ sơ ghi "Chờ gửi", bảng kỳ hiện ô vàng. Bật mạng lại → vài giây sau ô thành
-   ✓ xanh, hồ sơ có mã `HS-…`. Bấm một ô ✓ → hồ sơ → **Trả lại** (lý do, PIN) → các ô đó về **!** hoặc **–**.
-7. **Bảng kỳ (mục 6)**: với biểu ngày / tuần / tháng / năm, kỳ đã kết thúc quá 3 ngày mà chưa có hồ sơ là **!**, kỳ hiện tại là **–**;
-   biểu "khi phát sinh" không bao giờ có **!**. (Cần vài biểu ● — ban hành thử ở màn Phiên bản hoặc nhập Excel có T = ●.)
-8. Gửi Claude **ảnh màn hình** chỗ lỗi (không cần dán log dài).
+App đang chạy THẬT với dữ liệu thật, nên thử sao cho dọn được: tài khoản thử tạo xong thì **khóa** (Quản trị → Người dùng → bỏ tích
+Đang hoạt động), hồ sơ thử thì **Trả lại** với lý do "thử nghiệm", phiên bản thử thì **Hủy** (hoặc dùng luôn một biểu thật sắp ban hành).
+Mục 4 và 8 cần người cấp 1–3: tạo tạm hai tài khoản **Nhân viên** (cấp 2, bộ phận SX) và **Tra cứu** (cấp 1, bộ phận KD) ở
+**Tài khoản → Quản trị → Người dùng** (PIN tạm hiện một lần — ghi lại).
 
-## Phần H — Cập nhật máy chủ khi có bản mới (phiên 1b, 1c, 1d…)
+| # | Mục nghiệm thu | Cách thử | Đạt khi |
+| --- | --- | --- | --- |
+| 1 | Đăng nhập, mất mạng, bộ nhớ riêng | Đăng nhập PIN trên iPhone (app ở Màn hình chính) và máy tính. iPhone tắt Wi-Fi + 4G → mở lại app → **Mở bằng PIN** | Xem được danh mục, chi tiết biểu, dải đỏ "Ngoại tuyến"; app M&E, Checksheet trên cùng iPhone không bị đăng xuất hay mất nháp |
+| 2 | Nhập / xuất Excel tổng | Đã nhập 221 biểu. **Excel → Xuất 221 biểu** → **Nhập lô** chính file vừa xuất → Xem trước | Danh mục: ○ 115 · ◐ 106 (đúng 4 nút ○ ◐ ● ✕); xem trước báo **221 Không đổi**, 0 lỗi |
+| 3 | Lọc, tìm trên iPhone | Danh mục: bấm nút tình trạng, mở **Bộ lọc** chọn bộ phận / nhóm; gõ "dao tao" rồi "培训" | Bấm nút / chọn không bật bàn phím; lúc gõ ô tìm không mất chữ, bàn phím không nhảy |
+| 4 | Soạn → duyệt → ban hành | Đăng nhập tài khoản Nhân viên SX → mở một biểu SX → **Soạn phiên bản mới** (PDF) → **Lưu và gửi duyệt**. Đăng nhập Quản trị → Chờ bạn xử lý → **Duyệt** (PIN) → **Ban hành** (PIN) | Nhân viên **không thấy nút Duyệt** ở bản mình soạn; bản cũ (nếu có) thành **Lỗi thời**; trang chủ **% ban hành** tăng |
+| 5 | Hồ sơ khi mất mạng, khoảng ngày, trả lại | iPhone tắt mạng → biểu ● hằng ngày (vd biểu vừa ban hành ở mục 4, đặt chu kỳ 1 ngày) → **Nộp hồ sơ** → **Khoảng ngày** 3 ngày → chụp 2 trang → **Lưu hồ sơ** → bật mạng lại. Bấm ô ✓ → hồ sơ → **Trả lại** (lý do "thử nghiệm", PIN) | Lúc mất mạng ô vàng "chờ gửi"; có mạng vài giây sau thành ✓, hồ sơ có mã `HS-…`, đủ 3 ô ngày; trả lại → các ô về **!** hoặc **–** |
+| 6 | Bảng kỳ ✓ ! – | Màn **Hồ sơ** với biểu ● ngày / tuần / tháng / năm và một biểu "khi phát sinh" | Kỳ đã kết thúc quá 3 ngày chưa có hồ sơ là **!**, kỳ hiện tại **–**, kỳ có hồ sơ **✓**; biểu khi phát sinh không bao giờ có **!** |
+| 7 | Phủ điều khoản khớp Excel | **Excel → Xuất** → mở file bằng Excel → trang **Phủ ISO 9001 - 条款覆盖** và **Phủ BRCGS - BRCGS覆盖**; trong app mở **Phủ điều khoản** | Từng dòng: **Số biểu**, **Đã ban hành**, **In từ app**, **Trạng thái** trùng cột D, E, F, G của file; ô "Điều khoản bắt buộc thiếu biểu" ở trang chủ = ô N7 trang Tổng hợp. (So với file gốc `Danh_muc_bieu_mau_ISO_tong_Viet-Trung.xlsx` cũng phải trùng nếu chưa sửa danh mục trong app.) |
+| 8 | Phạm vi bộ phận, không có quyền thì không hỏi PIN | Đăng nhập Nhân viên SX: Danh mục, Phủ điều khoản, Hồ sơ, mở hồ sơ thử ở mục 5. Đăng nhập Tra cứu KD | Nhân viên SX chỉ thấy biểu SX + tài liệu chung Ban ISO (Phủ điều khoản ghi "Chỉ đếm biểu của bộ phận SX…"), không có Excel, không có nút sửa, Duyệt, Trả lại. Tra cứu: không có Hồ sơ, Phủ điều khoản, lịch tuần. (Máy chủ trả **Không có quyền** trước khi hỏi PIN — Claude đã thử tự động cho mọi thao tác cần PIN.) |
+
+Xong thì khóa hai tài khoản thử. Chỗ nào chưa đạt: gửi Claude **ảnh màn hình** (không cần dán log dài).
+
+## Phần H — Cập nhật máy chủ khi có bản mới (phiên 1b, 1c, 1d, Đợt 2…)
 
 1. Dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
    `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → chép → dán → **Lưu**.
@@ -348,8 +382,21 @@ M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyệ
 
 ## Phần THẬT
 
-Đã chốt 11/11/2026: phát hành THẬT ngay ở phiên 1a, không qua THỬ — làm theo phần **BẮT ĐẦU Ở ĐÂY** ở đầu tài liệu. Các phiên sau
-(1b, 1c, 1d…) cập nhật thẳng máy chủ THẬT theo Phần H; Claude chạy đủ test trên máy giả lập trước khi đẩy `main`.
+Đã chốt 11/11/2026: phát hành THẬT ngay ở phiên 1a, không qua THỬ — làm theo phần **BẮT ĐẦU Ở ĐÂY** ở đầu tài liệu. Toàn bộ Đợt 1
+(1a → 1d) đã lên THẬT:
+
+| | THẬT |
+| --- | --- |
+| Máy chủ | dự án Apps Script `ISO_MayChu_THAT` (`ENV = THAT`), thư mục Drive `ISO_HeThong`, `ISO_Data`, `ISO_Backups` |
+| Trang app | <https://luongquangdao8386-ops.github.io/ISO/> — repo `ISO`, nhánh `main`, link `/exec` cố định trong `config.js` |
+| Cập nhật | Phần H: dán `Code.gs` (+ `migrateSchema` khi Claude báo thêm sheet/cột) → Phiên bản mới; Claude chạy đủ test giả lập rồi mới đẩy `main` |
+| Sao lưu | tự động hằng tuần (Quản trị → Sao lưu) + bản sao ở tài khoản Google thứ hai (Phần I) |
+
+**Thứ tự khi bản mới đổi máy chủ:** anh dán `Code.gs` (+ `migrateSchema`) **trước**, Claude mới đẩy `main` của trang app. Bản chỉ đổi app
+(như 1d: app chạy được với máy chủ 1c) thì Claude đẩy `main` ngay, anh dán `Code.gs` lúc tiện.
+
+**Đợt 2 trở đi** (kết nối M&E / Checksheet, email nhắc hạn, báo cáo PDF): email và kết nối chạm tới người thật và hai app kia, nên đầu
+Đợt 2 quyết định có dựng lại máy chủ THỬ (Phần C, trang `/ISO-thu/`) để thử trước hay không.
 
 ## Hàm chạy tay trong trình soạn Apps Script
 
@@ -358,7 +405,7 @@ M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyệ
 | `setup` | Lần đầu dựng máy chủ (đã có thì không làm gì) |
 | `adminSetupOwner` | Tạo owner đầu tiên từ 3 thuộc tính `SETUP_OWNER_*` |
 | `adminResetOwnerPin` | Owner quên PIN: đặt `OWNER_RESET_TEMP_PIN` (6 số) rồi chạy |
-| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`) |
+| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần) |
 | `adminNoiLaiTep` | Khôi phục từ bản chép ở tài khoản thứ hai: nối lại ID tệp theo `file_map.json` (Phần I.5) |
 | `healthCheck` | Xem nhanh tình trạng máy chủ |
 | `installTriggers` | Trigger bị xóa nhầm |
@@ -370,6 +417,9 @@ M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyệ
 
 ## Xử lý sự cố
 
+- **Phủ điều khoản trống ("Chưa có danh sách điều khoản")**: file Excel đã nhập thiếu trang Phủ ISO 9001 / Phủ BRCGS — nhập lại file
+  Excel tổng đủ 5 trang (Excel → Nhập lô); số biểu theo điều khoản tự tính lại.
+- **Số phủ khác file Excel**: danh mục trong app đã sửa sau lần xuất — xuất lại rồi so; vẫn khác thì chụp dòng lệch gửi Claude.
 - **Màn đăng nhập báo "Máy chủ chưa được cài đặt"**: chưa chạy `setup`, hoặc dán link `/exec` của dự án khác.
 - **"Cần cập nhật app"**: đóng hẳn app rồi mở lại; máy chủ mới hơn app quá xa.
 - **Nhập Excel báo "Tệp không đúng khuôn"**: tệp thiếu sheet `Danh mục tổng - 总清单` hoặc dòng tiêu đề có cột "Mã biểu mẫu".

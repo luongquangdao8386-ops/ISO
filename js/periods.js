@@ -101,26 +101,34 @@ export function covers(r, p) { return String(r.period_from) <= p.to && String(r.
  * Trả {type, counted, reason, start, cells:[{key, from, to, st, recs, pend}], due_key, due_st, overdue, late_n, last_date, count}.
  * st: OK ✓ đúng hạn · PEND ✓ chờ gửi · LATE ! quá hạn · DUE – chưa tới hạn · NA không tính.
  */
-export function itemRecordStatus(it, recs, { today, grace = 3, startSetting = '', n = 12, pending = [] } = {}) {
+/** Biểu có tính hồ sơ không (như máy chủ): {type, counted, reason, start}; reason NOT_ISSUED | FROM_APP | NO_START */
+export function countInfo(it, startSetting = '') {
   const type = itemPeriodType(it);
   let reason = it.status !== 'ISSUED' ? 'NOT_ISSUED' : (it.where === 'ME' || it.where === 'CS' ? 'FROM_APP' : '');
   let start = reason ? '' : recordsStart(it, startSetting);
   if (!reason && !isDate(start)) { reason = 'NO_START'; start = ''; }
-  const counted = !reason;
+  return { type, counted: !reason, reason, start };
+}
+
+/** Ô của một kỳ p: {key, from, to, st, recs, pend} — st OK · PEND · NA (không tính / trước ngày bắt đầu) · LATE · DUE */
+export function periodCell(p, recs, pending, { counted, start, today, grace = 3 }) {
+  const hit = recs.filter((r) => covers(r, p));
+  const pend = pending.filter((r) => covers(r, p));
+  let st;
+  if (hit.length) st = 'OK';
+  else if (pend.length) st = 'PEND';
+  else if (!counted || p.to < start) st = 'NA';
+  else st = addDays(p.to, grace) < today ? 'LATE' : 'DUE';
+  return { key: p.key, from: p.from, to: p.to, st, recs: hit, pend };
+}
+
+export function itemRecordStatus(it, recs, { today, grace = 3, startSetting = '', n = 12, pending = [] } = {}) {
+  const { type, counted, reason, start } = countInfo(it, startSetting);
   let last = '';
   for (const r of recs) { const d = String(r.period_to || r.record_date || ''); if (d > last) last = d; }
   const out = { type, counted, reason, start, cells: [], due_key: '', due_st: '', overdue: false, late_n: 0, last_date: last, count: recs.length, pend_n: pending.length };
   if (type === 'EVENT') return out;
-  const cellOf = (p) => {
-    const hit = recs.filter((r) => covers(r, p));
-    const pend = pending.filter((r) => covers(r, p));
-    let st;
-    if (hit.length) st = 'OK';
-    else if (pend.length) st = 'PEND';
-    else if (!counted || p.to < start) st = 'NA';
-    else st = addDays(p.to, grace) < today ? 'LATE' : 'DUE';
-    return { key: p.key, from: p.from, to: p.to, st, recs: hit, pend };
-  };
+  const cellOf = (p) => periodCell(p, recs, pending, { counted, start, today, grace });
   for (const p of lastPeriods(type, today, n)) {
     const c = cellOf(p);
     if (c.st === 'LATE') out.late_n++;
@@ -148,4 +156,48 @@ export function periodTicks(type, p) {
     case 'YEAR': return [p.key, ''];
     default: return ['', ''];
   }
+}
+
+/** Thứ Hai của tuần chứa ngày iso */
+export function mondayOf(iso) {
+  const dow = new Date(iso + 'T00:00:00Z').getUTCDay() || 7;
+  return addDays(iso, 1 - dow);
+}
+
+/**
+ * Lịch tuần của trang chủ (phiên 1d): hồ sơ đến hạn trong tuần bắt đầu từ Thứ Hai `mon`, chỉ biểu đang tính hồ sơ (● làm tay).
+ * entries: [{it, recs, pending}] (recs: hồ sơ SUBMITTED của biểu; pending: hồ sơ chờ gửi trên máy).
+ * Trả {mon, sun, days: [7 ngày], daily: [{it, info, cells: [7 ô]}], agenda: [{date, list: [{it, info, cell, carry, deadline}]}]}.
+ * - Biểu hằng ngày: 7 ô Thứ Hai … Chủ nhật (ô trước ngày bắt đầu tính là NA); biểu không có ô nào được tính thì bỏ.
+ * - Kỳ khác (tuần, tháng, quý, nửa năm, năm): hiện ở ngày kết thúc kỳ nếu ngày đó trong tuần; kỳ đã kết thúc trước tuần mà hạn chót
+ *   (ngày kết thúc + số ngày cho phép trễ) rơi vào tuần và còn thiếu hồ sơ → hiện ở ngày hạn chót (carry). Kỳ trước ngày bắt đầu tính bỏ qua.
+ * - Biểu khi phát sinh không có hạn, không hiện.
+ */
+export function weekAgenda(entries, { mon, today, grace = 3, startSetting = '' }) {
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push(addDays(mon, i));
+  const sun = days[6];
+  const daily = [];
+  const byDay = new Map(days.map((d) => [d, []]));
+  for (const { it, recs = [], pending = [] } of entries) {
+    const info = countInfo(it, startSetting);
+    if (!info.counted || info.type === 'EVENT') continue;
+    const o = { counted: true, start: info.start, today, grace };
+    if (info.type === 'DAY') {
+      const cells = days.map((d) => periodCell(periodOf('DAY', d), recs, pending, o));
+      if (cells.some((c) => c.st !== 'NA')) daily.push({ it, info, cells });
+      continue;
+    }
+    const lo = addDays(mon, -grace);
+    for (let p = periodOf(info.type, sun), g = 0; p && p.to >= lo && g < 60; p = prevPeriod(info.type, p), g++) {
+      if (p.to > sun) continue;
+      const cell = periodCell(p, recs, pending, o);
+      if (cell.st === 'NA') continue;
+      const deadline = addDays(p.to, grace);
+      if (p.to >= mon) byDay.get(p.to).push({ it, info, cell, carry: false, deadline });
+      else if (deadline >= mon && deadline <= sun && (cell.st === 'DUE' || cell.st === 'LATE')) byDay.get(deadline).push({ it, info, cell, carry: true, deadline });
+    }
+  }
+  const agenda = days.map((date) => ({ date, list: byDay.get(date) })).filter((d) => d.list.length);
+  return { mon, sun, days, daily, agenda };
 }

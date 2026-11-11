@@ -99,7 +99,7 @@ function queuedAsRecord(o) {
 /**
  * Hộp thoại một ô: kỳ, hồ sơ phủ kỳ đó (đã ghi nhận / chờ gửi), nút Nộp hồ sơ kỳ này.
  */
-async function openCell(it, s, idx) {
+export async function openCell(it, s, idx) {
   const c = s.cells[idx];
   if (!c) return;
   const type = s.type;

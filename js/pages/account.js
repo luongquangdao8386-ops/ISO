@@ -82,7 +82,7 @@ export async function renderAccount(view, { shell }) {
   <section class="card acc-links"><h2>${bi('account.work')}</h2>
     ${lvl >= 2 || sec ? link('nav.versions', '/versions') : ''}
     ${lvl >= 3 || sec ? link('nav.excel', '/excel') : ''}
-    ${lvl >= 2 ? link('nav.coverage', '/coverage', `<span class="tag soon">${bi('soon.tag')}</span>`) : ''}
+    ${lvl >= 2 || sec ? link('nav.coverage', '/coverage') : ''}
     ${link('nav.reports', '/reports', `<span class="tag soon">${bi('soon.tag')}</span>`)}
     ${lvl >= 2 ? link('nav.capa', '/capa', `<span class="tag soon">${bi('soon.tag')}</span>`) : ''}
     ${lvl >= 2 ? link('nav.audits', '/audits', `<span class="tag soon">${bi('soon.tag')}</span>`) : ''}

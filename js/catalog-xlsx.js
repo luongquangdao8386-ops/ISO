@@ -2,6 +2,7 @@
 // 5 sheet: Tổng hợp - 汇总 (D4 = số ngày cho phép trễ) · Danh mục tổng - 总清单 (tiêu đề dòng 4, dữ liệu từ dòng 5, công thức dòng 5–600,
 // cố định ô D5) · Phủ ISO 9001 - 条款覆盖 · Phủ BRCGS - BRCGS覆盖 · Hướng dẫn - 说明; thêm sheet _meta (template_key, version, dataset_epoch).
 // Hàm thuần (nhận đối tượng XLSX), dùng được cả trong test Node.
+import { isoMatch, brcMatch } from './coverage.js';
 
 export const SHEET = {
   summary: 'Tổng hợp - 汇总',
@@ -233,7 +234,6 @@ export function buildCatalogWorkbook(X, data) {
   const cls = (data.clauses || []).filter((c) => c.active !== false).sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
   const iso = cls.filter((c) => c.std === 'ISO9001');
   const brc = cls.filter((c) => c.std === 'BRC');
-  const isoKeys = items.map((it) => ({ code: it.code, k: ';' + String(it.iso9001 || '').replace(/ /g, '') + ';' }));
   const statusIso = (r) => `IF(D${r}=0,IF(LEFT(C${r},2)="Có","Thiếu biểu – bắt buộc · 缺表单（强制）","Chưa có biểu · 无表单"),IF(E${r}=0,"Có biểu, chưa ban hành · 有表单未发布","Đã có · 已覆盖"))`;
   const wi = {};
   put(wi, 'A1', S('PHỦ ĐIỀU KHOẢN ISO 9001 · ISO 9001条款覆盖'));
@@ -251,7 +251,7 @@ export function buildCatalogWorkbook(X, data) {
     put(wi, 'E' + r, F(`COUNTIFS(${rng('AA')},${k},${rng('T')},"●")`, 'n'));
     put(wi, 'F' + r, F(`COUNTIFS(${rng('AA')},${k},${rng('R')},"M&E*")+COUNTIFS(${rng('AA')},${k},${rng('R')},"Checksheet*")`, 'n'));
     put(wi, 'G' + r, F(statusIso(r)));
-    put(wi, 'H' + r, S(isoKeys.filter((x) => x.k.includes(';' + c.key)).map((x) => x.code).join(', ')));
+    put(wi, 'H' + r, S(items.filter((it) => isoMatch(it, c.key)).map((it) => it.code).join(', ')));
   });
   const isoLast = 4 + Math.max(1, iso.length);
   wi['!ref'] = `A1:H${isoLast}`;
@@ -284,7 +284,7 @@ export function buildCatalogWorkbook(X, data) {
     put(wbr, 'F' + r, F(`COUNTIFS(${rng('K')},${k},${rng('R')},"M&E*")+COUNTIFS(${rng('K')},${k},${rng('R')},"Checksheet*")`, 'n'));
     put(wbr, 'G' + r, F(`IF(D${r}=0,"Chưa có biểu · 无表单",IF(E${r}=0,"Có biểu, chưa ban hành · 有表单未发布","Đã có · 已覆盖"))`));
     put(wbr, 'H' + r, S(c.key));
-    put(wbr, 'I' + r, S(items.filter((it) => String(it.brc_topics || '').includes(c.key)).map((it) => it.code).join(', ')));
+    put(wbr, 'I' + r, S(items.filter((it) => brcMatch(it, c.key)).map((it) => it.code).join(', ')));
   });
   const brcLast = 4 + Math.max(1, brc.length);
   wbr['!ref'] = `A1:I${brcLast}`;

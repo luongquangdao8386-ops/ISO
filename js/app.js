@@ -170,8 +170,9 @@ function registerRoutes() {
   route('/record/:id', lazy('./pages/records.js', 'renderRecord'), { nav: 'records' });
   route('/excel', lazy('./pages/excel.js', 'renderExcel'), { nav: 'excel' });
   route('/excel/batch/:id', lazy('./pages/excel.js', 'renderBatch'), { nav: 'excel' });
-  // Màn của phiên/đợt sau: hiện "Sắp có · 即将推出"
-  ['coverage', 'reports', 'capa', 'audits', 'links'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
+  route('/coverage', lazy('./pages/coverage.js', 'renderCoverage'), { nav: 'coverage' });
+  // Màn của đợt sau: hiện "Sắp có · 即将推出"
+  ['reports', 'capa', 'audits', 'links'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
   route('/account', lazy('./pages/account.js', 'renderAccount'), { nav: 'account' });
   route('/account/drafts', lazy('./pages/drafts.js', 'renderDrafts'), { nav: 'account' });
   route('/account/conflict/:op', lazy('./pages/drafts.js', 'renderConflict'), { nav: 'account' });
@@ -233,7 +234,7 @@ window.addEventListener('resize', () => {
 
 // Màn xem (trang chủ, danh mục, chi tiết biểu, hồ sơ, tài khoản) vẽ lại sau khi tự gửi nháp xong.
 // Không vẽ lại màn nhập (sửa biểu, Excel), khi đang mở hộp thoại hoặc đang gõ.
-const VIEW_PAGE = /^\/(catalog|item\/[^/]+|versions|records|record\/(?!new)[^/]+|account(\/drafts)?)?$/;
+const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|account(\/drafts)?)?$/;
 export function refreshAfterSend(r) {
   if (!app.shell) return;
   const path = currentPath();

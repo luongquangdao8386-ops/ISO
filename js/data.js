@@ -2,7 +2,7 @@
 // phạm vi bộ phận, ngày theo máy chủ, tiện ích danh mục (tình trạng ○ ◐ ● ✕, nơi làm, kỳ hồ sơ)
 import { session, todayVN, nameText } from './core.js';
 import { getRecords, getMeta, KEY, queueItems } from './sync.js';
-import { itemRecordStatus, periodTypeFromDays } from './periods.js';
+import { itemRecordStatus, periodTypeFromDays, weekAgenda, mondayOf } from './periods.js';
 
 export { KEY };
 
@@ -247,18 +247,9 @@ export async function recordsOf(itemId) {
  */
 export async function recordStatusMap(list) {
   if (!memo.__rs) {
-    const st = session.settings || {};
-    const byItem = new Map();
-    for (const r of await recs('RECORD')) {
-      if (r.status !== 'SUBMITTED') continue;
-      const a = byItem.get(r.item_id) || [];
-      a.push(r);
-      byItem.set(r.item_id, a);
-    }
-    const q = await queuedRecords();
-    const opts = { today: today(), grace: Number(st.record_grace_days ?? 3), startSetting: st.records_start_date || '' };
+    const { byItem, queued, opts } = await recordInputs();
     const m = new Map();
-    for (const it of await items()) m.set(it.item_id, itemRecordStatus(it, byItem.get(it.item_id) || [], { ...opts, pending: q.get(it.item_id) || [] }));
+    for (const it of await items()) m.set(it.item_id, itemRecordStatus(it, byItem.get(it.item_id) || [], { ...opts, pending: queued.get(it.item_id) || [] }));
     memo.__rs = m;
   }
   if (!list) return memo.__rs;
@@ -267,4 +258,27 @@ export async function recordStatusMap(list) {
   return out;
 }
 /** Xóa bộ nhớ tạm tình trạng hồ sơ (vừa lưu hồ sơ vào hàng chờ) */
-export function invalidateRecordStatus() { delete memo.__rs; }
+export function invalidateRecordStatus() { delete memo.__rs; delete memo.__ri; }
+
+/** Đầu vào tính tình trạng hồ sơ (bảng kỳ, lịch tuần): hồ sơ SUBMITTED theo biểu, hồ sơ chờ gửi, {today, grace, startSetting} */
+async function recordInputs() {
+  if (!memo.__ri) {
+    const st = session.settings || {};
+    const byItem = new Map();
+    for (const r of await recs('RECORD')) {
+      if (r.status !== 'SUBMITTED') continue;
+      const a = byItem.get(r.item_id) || [];
+      a.push(r);
+      byItem.set(r.item_id, a);
+    }
+    memo.__ri = { byItem, queued: await queuedRecords(), opts: { today: today(), grace: Number(st.record_grace_days ?? 3), startSetting: st.records_start_date || '' } };
+  }
+  return memo.__ri;
+}
+
+/** Lịch tuần hồ sơ đến hạn (trang chủ): tuần lệch `off` tuần so với tuần hiện tại (js/periods.js weekAgenda) */
+export async function recordWeek(off = 0) {
+  const { byItem, queued, opts } = await recordInputs();
+  const entries = (await items()).map((it) => ({ it, recs: byItem.get(it.item_id) || [], pending: queued.get(it.item_id) || [] }));
+  return weekAgenda(entries, { ...opts, mon: addDaysIso(mondayOf(opts.today), 7 * off) });
+}

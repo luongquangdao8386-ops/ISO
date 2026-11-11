@@ -198,6 +198,9 @@ function healthRows_() {
   var cls = readRows_('Clauses').filter(function (c) { return c.active; });
   var iso = cls.filter(function (c) { return c.std === 'ISO9001'; }).length, brc = cls.length - iso;
   add('clauses', iso > 0 && brc > 0, 'ISO 9001: ' + iso + ' · BRCGS: ' + brc, iso && brc ? '' : 'Nhập file Excel tổng (sheet Phủ ISO 9001, Phủ BRCGS)');
+  var cov = coverageCounts_(items, cls);
+  add('coverage', !cov.missing, 'ISO 9001: ' + cov.iso_covered + '/' + iso + ' điều khoản có biểu · bắt buộc chưa có biểu ' + cov.missing + ' · BRCGS: ' + cov.brc_covered + '/' + brc + ' chủ đề có biểu',
+    cov.missing ? 'Phủ điều khoản → Thiếu biểu – bắt buộc: ' + cov.missing_keys.join(', ') : '');
   var heads = readRows_('Depts').filter(function (d) { return d.active; });
   var noHead = heads.filter(function (d) { return !d.head_user_id; }).map(function (d) { return d.dept_code; });
   // Không có trưởng bộ phận thì Quản trị (cấp 4) duyệt thay — không coi là lỗi khi có Quản trị đang hoạt động
@@ -255,6 +258,29 @@ function healthRows_() {
 }
 
 /** Chạy từ trình soạn: in kết quả kiểm tra */
+/**
+ * Phủ điều khoản (như js/coverage.js và hai trang Phủ của file Excel tổng): ISO 9001 — mã ở cột G (iso9001) bắt đầu bằng điều khoản;
+ * BRCGS — cột K (brc_topics) chứa khóa chủ đề, không phân biệt hoa thường. Trả {iso_covered, missing, missing_keys, brc_covered}.
+ */
+function coverageCounts_(items, clauses) {
+  var keys = items.map(function (it) { return ';' + String(it.iso9001 || '').split(' ').join('') + ';'; });
+  var topics = items.map(function (it) { return String(it.brc_topics || '').toLowerCase(); });
+  var out = { iso_covered: 0, missing: 0, missing_keys: [], brc_covered: 0 };
+  clauses.forEach(function (c) {
+    if (c.active === false) return;
+    var k = String(c.key);
+    if (c.std === 'ISO9001') {
+      var hit = keys.some(function (x) { return x.indexOf(';' + k) >= 0; });
+      if (hit) out.iso_covered++;
+      else if (c.mandatory_record) { out.missing++; out.missing_keys.push(k); }
+    } else if (c.std === 'BRC') {
+      var kl = k.toLowerCase();
+      if (topics.some(function (x) { return x.indexOf(kl) >= 0; })) out.brc_covered++;
+    }
+  });
+  return out;
+}
+
 function healthCheck() {
   var rows = healthRows_();
   rows.forEach(function (r) { log_((r.status === 'OK' ? 'ĐẠT     ' : 'CẢNH BÁO') + '  ' + r.key + ': ' + r.value + (r.note ? ' (' + r.note + ')' : '')); });

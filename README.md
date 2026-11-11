@@ -5,9 +5,10 @@ quá hạn, phủ điều khoản. Thay danh mục Excel DM-ISO-01 bằng hệ t
 GitHub Pages (iPhone và máy tính). Cùng lõi với M&E và Checksheet (chép từ repo `CS`): PIN 6 số, phiên, ghi có xác nhận, đồng bộ,
 hàng chờ khi mất mạng. Giao diện luôn song ngữ Việt · 中文.
 
-**Trạng thái:** bản `1.0.0-d1.3` — Đợt 1, phiên 1c (hồ sơ). **Đã phát hành THẬT** ở `/ISO/` (từ 11/11/2026, không qua THỬ: máy chủ
-đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang `/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ.
-Cập nhật máy chủ lên 1c: dán `Code.gs` → chạy `migrateSchema` → Phiên bản mới (Hướng dẫn triển khai, mục "CẬP NHẬT LÊN BẢN 1c").
+**Trạng thái:** bản `1.0.0-d1.4` — **Đợt 1 xong code** (phiên 1d: phủ điều khoản, trang chủ đầy đủ). **Đã phát hành THẬT** ở `/ISO/`
+(từ 11/11/2026, không qua THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang `/ISO-thu/` (repo `ISO-thu`) tạm
+chưa gắn máy chủ. Cập nhật máy chủ lên 1d: dán `Code.gs` → Phiên bản mới, không cần `migrateSchema` (Hướng dẫn triển khai, mục
+"CẬP NHẬT LÊN BẢN 1d"); chưa lên 1c thì làm mục "CẬP NHẬT LÊN BẢN 1c" (có `migrateSchema`) trước.
 
 ## Phiên 1a có gì
 
@@ -68,8 +69,22 @@ Cập nhật máy chủ lên 1c: dán `Code.gs` → chạy `migrateSchema` → P
 - Máy chủ dán `Code.gs` 1c mà chưa `migrateSchema`: lần nộp hồ sơ đầu tiên tự thêm sheet; app chỉ hiện phần hồ sơ khi máy chủ đã có
   `record.submit`.
 
-Phiên sau: **1d** phủ điều khoản, trang chủ đầy đủ (lịch tuần). Đợt 2 kết nối M&E/Checksheet, Gmail, báo cáo PDF, in tem ·
-Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
+## Phiên 1d có gì
+
+- Màn **Phủ điều khoản** (cấp 2+ trong bộ phận + tài liệu chung, Thư ký ISO / cấp 4 toàn công ty): hai thẻ **ISO 9001** và **BRCGS**,
+  mỗi điều khoản / chủ đề: số biểu, đã ban hành (●), in từ app (M&E, Checksheet), trạng thái (Thiếu biểu – bắt buộc · Chưa có biểu ·
+  Có biểu, chưa ban hành · Đã có), nhóm theo nhóm điều khoản; lọc trạng thái, bộ phận (không ô gõ — không bật bàn phím trên iPhone);
+  bấm một dòng → danh sách biểu → mở chi tiết hoặc **Danh mục đã lọc** theo điều khoản (`/catalog?iso=7.5.3`, `?brc=<khóa>`).
+  Đếm **giống hệt** hai trang Phủ của file Excel tổng (`js/coverage.js`): ISO 9001 — mã ở cột G bắt đầu bằng điều khoản (9.2 gồm
+  9.2.2); BRCGS — cột K chứa khóa chủ đề, không phân biệt hoa thường. Test tính lại công thức COUNTIF của file xuất; đã đối chiếu
+  thêm bằng LibreOffice (221 biểu giả, 72 dòng phủ, 0 lệch). Cột "Biểu liên quan" khi xuất Excel dùng chung hàm này.
+- **Trang chủ đầy đủ**: ô **Chờ bạn xử lý** thêm biểu quá hạn hồ sơ mà bạn nộp được, thao tác gửi không được, tài liệu bạn phụ trách
+  sắp/quá hạn rà soát; ô số "Điều khoản bắt buộc thiếu biểu" mở Phủ điều khoản đã lọc; **lịch tuần hồ sơ đến hạn** (‹ › đổi tuần):
+  biểu hằng ngày 7 ô Thứ Hai … Chủ nhật, kỳ tuần/tháng/quý/năm hiện ở ngày kết thúc kỳ, kỳ tuần trước còn hạn nộp hiện ở ngày hạn chót;
+  bấm ô / dòng → hồ sơ của kỳ hoặc Nộp hồ sơ kỳ này. Ô lưới Phủ điều khoản hết "Sắp có".
+- Trạng thái hệ thống có dòng **Phủ điều khoản** (số điều khoản có biểu, bắt buộc chưa có biểu, chủ đề BRCGS có biểu).
+
+Sau Đợt 1: Đợt 2 kết nối M&E/Checksheet, Gmail, báo cáo PDF, in tem · Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
 
 ## Cấu trúc
 
@@ -81,7 +96,8 @@ Phiên sau: **1d** phủ điều khoản, trang chủ đầy đủ (lịch tuầ
 | `assets/` | Biểu tượng app (tờ tài liệu + dấu tick, navy trên vàng — SVG và PNG 180/192/512), ảnh nền |
 | `vendor/` | jsQR 1.4.0 (quét QR), SheetJS 0.20.3 (Excel) |
 | `server/src/` | Mã máy chủ theo mô-đun (`11_catalog.js` danh mục, `14_import.js` nhập Excel tổng, `16_versions.js` phiên bản, `17_records.js` hồ sơ) |
-| `js/periods.js` | Kỳ hồ sơ và tình trạng ✓ ! – (giống hệt máy chủ, Node chạy thẳng được trong test) |
+| `js/periods.js` | Kỳ hồ sơ và tình trạng ✓ ! – (giống hệt máy chủ, Node chạy thẳng được trong test); lịch tuần trang chủ |
+| `js/coverage.js` | Phủ điều khoản ISO 9001 / BRCGS, đếm giống hệt hai trang Phủ của file Excel tổng |
 | `apps-script/` | `Code.gs` (tạo bằng `npm run build`) và `appsscript.json` để dán vào Apps Script; `SaoLuuPhu.gs` cho tài khoản thứ hai |
 | `i18n/labels.json` | Từ điển nhãn duy nhất [Việt, 中文] → `js/dict.js` và `LABELS` trong `Code.gs` |
 | `tests/` | Giả lập Apps Script cho Node, test máy chủ, test giao diện Playwright |

@@ -5,7 +5,7 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d1.3';
+var SERVER_VERSION = '1.0.0-d1.4';
 var API_CONTRACT_VERSION = '1.0';
 var SCHEMA_VERSION = '1.0.2';
 var TZ = 'Asia/Ho_Chi_Minh';
