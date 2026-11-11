@@ -182,23 +182,39 @@ export async function readImportFile(file, sheetNames) {
  * Sau khi SheetJS ghi tệp, sửa trực tiếp XML trong gói zip: thêm font/nền/viền/căn lề vào styles.xml, gắn s= cho ô (tạo ô trống
  * có kiểu nếu cần), <pane> cố định, <dataValidations>, <conditionalFormatting> (dxf). */
 
+/** Kiểu ô theo file Excel tổng (DM-ISO-01): tiêu đề navy 1F3864, chữ 9, ô nhập nền vàng FFF2CC */
+const NAVY = '1F3864', YELLOW = 'FFF2CC';
 const XSTYLE = {
-  title: { font: { b: 1, sz: 14, color: '17324F' } },
-  note: { font: { i: 1, sz: 10, color: '5B6875' }, wrap: 1 },
-  head: { font: { b: 1, sz: 10 }, fill: 'D6DCE4', border: 1, wrap: 1, h: 'center', v: 'center' },
-  group: { font: { b: 1, sz: 10, color: '17324F' }, fill: 'E6ECF3', border: 1 },
-  cell: { font: { sz: 10 }, border: 1, wrap: 1, v: 'top' },
-  center: { font: { sz: 10 }, border: 1, wrap: 1, v: 'top', h: 'center' },
-  input: { font: { sz: 10 }, fill: 'FFF2CC', border: 1, wrap: 1, v: 'top' },
-  input_center: { font: { sz: 10 }, fill: 'FFF2CC', border: 1, wrap: 1, v: 'top', h: 'center' },
-  calc: { font: { sz: 10, color: '5B6875' }, fill: 'F2F2F2', border: 1, wrap: 1, v: 'top', h: 'center' },
-  pct: { font: { sz: 10, b: 1 }, border: 1, h: 'center', numFmt: 10 }
+  title: { font: { b: 1, sz: 14, color: NAVY }, wrap: 1, h: 'left', v: 'center' },
+  title_c: { font: { b: 1, sz: 14, color: NAVY }, wrap: 1, h: 'center', v: 'center' },
+  note: { font: { sz: 9 }, fill: 'F2F2F2', wrap: 1, h: 'left', v: 'center' },
+  note_plain: { font: { sz: 9 }, wrap: 1, h: 'left', v: 'center' },
+  section: { font: { b: 1, sz: 10, color: NAVY }, h: 'left', v: 'center' },
+  head: { font: { b: 1, sz: 9, color: 'FFFFFF' }, fill: NAVY, border: 1, wrap: 1, h: 'center', v: 'center' },
+  side_head: { font: { b: 1, sz: 9, color: 'FFFFFF' }, fill: NAVY, wrap: 1, h: 'center', v: 'center' },
+  cell: { font: { sz: 9 }, border: 1, wrap: 1, h: 'center', v: 'center' },
+  cell_left: { font: { sz: 9 }, border: 1, wrap: 1, h: 'left', v: 'center' },
+  code: { font: { b: 1, sz: 9 }, border: 1, wrap: 1, h: 'center', v: 'center' },
+  label: { font: { b: 1, sz: 9 }, border: 1, wrap: 1, h: 'left', v: 'center' },
+  plain: { font: { sz: 9 }, wrap: 1, h: 'left', v: 'center' },
+  input: { font: { sz: 9 }, fill: YELLOW, border: 1, wrap: 1, h: 'center', v: 'center' },
+  input_left: { font: { sz: 9 }, fill: YELLOW, border: 1, wrap: 1, h: 'left', v: 'center' },
+  input_t: { font: { sz: 12 }, fill: YELLOW, border: 1, wrap: 1, h: 'center', v: 'center' },
+  input_date: { font: { sz: 9 }, fill: YELLOW, border: 1, wrap: 1, h: 'center', v: 'center', numFmtCode: 'dd/mm/yyyy' },
+  input_bold: { font: { b: 1, sz: 9 }, fill: YELLOW, border: 1, wrap: 1, h: 'center', v: 'center' },
+  big: { font: { b: 1, sz: 18, color: NAVY }, border: 1, wrap: 1, h: 'center', v: 'center', numFmt: 1 },
+  big_pct: { font: { b: 1, sz: 18, color: NAVY }, border: 1, wrap: 1, h: 'center', v: 'center', numFmt: 9 },
+  pct: { font: { sz: 9 }, border: 1, wrap: 1, h: 'center', v: 'center', numFmt: 9 },
+  pct_b: { font: { b: 1, sz: 9 }, border: 1, wrap: 1, h: 'center', v: 'center', numFmt: 9 },
+  total: { font: { b: 1, sz: 9 }, border: 1, wrap: 1, h: 'center', v: 'center' }
 };
+/** Tô màu có điều kiện: nền như file gốc */
 const XDXF = {
-  good: { font: '006100', fill: 'C6EFCE' },
-  warn: { font: '9C5700', fill: 'FFEB9C' },
-  bad: { font: '9C0006', fill: 'FFC7CE' },
-  grey: { font: '595959', fill: 'D9D9D9' }
+  bad: { fill: 'F8CBAD' },
+  good: { fill: 'C6EFCE' },
+  warn: { fill: 'FFE699' },
+  pale: { fill: YELLOW },
+  app: { fill: 'DDEBF7' }
 };
 const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -223,6 +239,14 @@ export function polishXlsx(X, bytes, sheets) {
   const borders = (listOf('borders').match(/<border>[\s\S]*?<\/border>|<border\/>/g) || []);
   const xfs = (listOf('cellXfs').match(/<xf [^>]*\/>|<xf [^>]*>[\s\S]*?<\/xf>/g) || []);
   const dxfs = [];
+  const numFmts = (listOf('numFmts').match(/<numFmt [^>]*\/>/g) || []);
+  const numFmtId = (code) => {
+    const hit = numFmts.find((x) => x.includes(`formatCode="${xmlEsc(code)}"`));
+    if (hit) return Number(/numFmtId="(\d+)"/.exec(hit)[1]);
+    const id = Math.max(163, ...numFmts.map((x) => Number(/numFmtId="(\d+)"/.exec(x)[1]))) + 1;
+    numFmts.push(`<numFmt numFmtId="${id}" formatCode="${xmlEsc(code)}"/>`);
+    return id;
+  };
   const fontId = (f) => {
     const x = `<font>${f.b ? '<b/>' : ''}${f.i ? '<i/>' : ''}<sz val="${f.sz || 10}"/><color rgb="FF${f.color || '000000'}"/><name val="Calibri"/><family val="2"/></font>`;
     let i = fonts.indexOf(x); if (i < 0) { fonts.push(x); i = fonts.length - 1; } return i;
@@ -245,7 +269,7 @@ export function polishXlsx(X, bytes, sheets) {
     const base = xfs[baseS] || xfs[0] || '';
     const nm = /numFmtId="(\d+)"/.exec(base);
     const d = XSTYLE[name];
-    const num = d.numFmt !== undefined ? d.numFmt : (nm ? Number(nm[1]) : 0);
+    const num = d.numFmtCode ? numFmtId(d.numFmtCode) : d.numFmt !== undefined ? d.numFmt : (nm ? Number(nm[1]) : 0);
     const al = d.wrap || d.h || d.v ? `<alignment${d.h ? ` horizontal="${d.h}"` : ''}${d.v ? ` vertical="${d.v}"` : ''}${d.wrap ? ' wrapText="1"' : ''}/>` : '';
     const x = `<xf numFmtId="${num}" fontId="${fontId(d.font || {})}" fillId="${fillId(d.fill)}" borderId="${borderId(d.border)}" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"${al ? ' applyAlignment="1">' + al + '</xf>' : '/>'}`;
     xfs.push(x);
@@ -255,7 +279,7 @@ export function polishXlsx(X, bytes, sheets) {
   };
   const dxfId = (name) => {
     const d = XDXF[name];
-    const x = `<dxf><font><color rgb="FF${d.font}"/></font><fill><patternFill><bgColor rgb="FF${d.fill}"/></patternFill></fill></dxf>`;
+    const x = `<dxf>${d.font ? `<font><color rgb="FF${d.font}"/></font>` : ''}<fill><patternFill><bgColor rgb="FF${d.fill}"/></patternFill></fill></dxf>`;
     let i = dxfs.indexOf(x); if (i < 0) { dxfs.push(x); i = dxfs.length - 1; } return i;
   };
   for (const [idx, spec] of Object.entries(sheets)) {
@@ -315,12 +339,19 @@ export function polishXlsx(X, bytes, sheets) {
       let prio = 1;
       tail += spec.conditional.map((cf) => `<conditionalFormatting sqref="${cf.sqref}">${cf.rules.map((ru) => {
         const first = cf.sqref.split(/[\s:]/)[0];
+        if (ru.op === 'expr') return `<cfRule type="expression" dxfId="${dxfId(ru.style)}" priority="${prio++}"><formula>${xmlEsc(ru.formula)}</formula></cfRule>`;
         if (ru.op === 'beginsWith') return `<cfRule type="beginsWith" dxfId="${dxfId(ru.style)}" priority="${prio++}" operator="beginsWith" text="${xmlEsc(ru.value)}"><formula>LEFT(${first},${ru.value.length})="${xmlEsc(ru.value)}"</formula></cfRule>`;
         return `<cfRule type="cellIs" dxfId="${dxfId(ru.style)}" priority="${prio++}" operator="equal"><formula>"${xmlEsc(ru.value)}"</formula></cfRule>`;
       }).join('')}</conditionalFormatting>`).join('');
     }
     if (spec.validations && spec.validations.length) {
-      tail += `<dataValidations count="${spec.validations.length}">${spec.validations.map((v) => `<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="${v.sqref}"><formula1>"${xmlEsc(v.list.join(','))}"</formula1></dataValidation>`).join('')}</dataValidations>`;
+      // Danh sách chọn (list hoặc listRef — vùng ô ở sheet khác), ngày từ min, số nguyên ≥ min
+      const dv = (v) => {
+        if (v.list) return `<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="${v.sqref}"><formula1>"${xmlEsc(v.list.join(','))}"</formula1></dataValidation>`;
+        if (v.listRef) return `<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="${v.sqref}"><formula1>${xmlEsc(v.listRef)}</formula1></dataValidation>`;
+        return `<dataValidation type="${v.type}" operator="greaterThanOrEqual" allowBlank="1" showErrorMessage="1" sqref="${v.sqref}"><formula1>${xmlEsc(v.min)}</formula1></dataValidation>`;
+      };
+      tail += `<dataValidations count="${spec.validations.length}">${spec.validations.map(dv).join('')}</dataValidations>`;
     }
     if (tail) {
       // Thứ tự lược đồ: sheetData … mergeCells, phoneticPr, conditionalFormatting, dataValidations, hyperlinks …, ignoredErrors
@@ -328,6 +359,10 @@ export function polishXlsx(X, bytes, sheets) {
       sx = anchor ? sx.slice(0, anchor.index) + tail + sx.slice(anchor.index) : sx.replace('</worksheet>', tail + '</worksheet>');
     }
     put(path, sx);
+  }
+  if (numFmts.length) {
+    const nf = `<numFmts count="${numFmts.length}">${numFmts.join('')}</numFmts>`;
+    st = /<numFmts count="\d+">[\s\S]*?<\/numFmts>/.test(st) ? st.replace(/<numFmts count="\d+">[\s\S]*?<\/numFmts>/, nf) : st.replace(/<fonts /, nf + '<fonts ');
   }
   st = st.replace(/<fonts count="\d+">[\s\S]*?<\/fonts>/, `<fonts count="${fonts.length}">${fonts.join('')}</fonts>`)
     .replace(/<fills count="\d+">[\s\S]*?<\/fills>/, `<fills count="${fills.length}">${fills.join('')}</fills>`)

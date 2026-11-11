@@ -176,23 +176,49 @@ test('dòng lỗi (ký hiệu tình trạng, bộ phận, trùng mã, ngày), s�
   assert.equal(r.errors[0].code, 'TEMPLATE_OLD_EPOCH');
 });
 
-test('xuất Excel giữ định dạng: cố định ô D5, nền vàng ô nhập, danh sách chọn ○ ◐ ● ✕, tô màu, cột AA ẩn, công thức', () => {
+test('xuất Excel đúng khuôn DM-ISO-01: 5 sheet, tiêu đề dòng 4, công thức cột Y/AA, Phủ ISO/BRCGS, Tổng hợp theo bộ phận; cố định D5, nền vàng, danh sách chọn, tô màu, cột ẩn', () => {
   const env = freshServer({ now: NOW });
   const owner = ownerClient(env);
   env.g.dbReset_();
   env.g.seedSample_('SYSTEM');
   const rec = owner.call('sync.bootstrap', {}).data.records;
-  const bytes = workbookBytes({ items: rec.ITEM, groups: rec.GROUP, depts: rec.DEPT, clauses: rec.CLAUSE, grace: 3, epoch: 'e' });
+  const bytes = workbookBytes({ items: rec.ITEM, groups: rec.GROUP, depts: rec.DEPT, clauses: rec.CLAUSE, grace: 3, epoch: 'e', exported_at: '2026-11-11 08:00' });
   const zip = X.CFB.read(new Uint8Array(bytes), { type: 'array' });
   const xml = (p) => new TextDecoder().decode(X.CFB.find(zip, '/' + p).content);
   const s2 = xml('xl/worksheets/sheet2.xml');
   assert.match(s2, /<pane xSplit="3" ySplit="4" topLeftCell="D5" activePane="bottomRight" state="frozen"\/>/);
   assert.match(s2, /<dataValidation type="list"[^>]*sqref="T5:T600"><formula1>"○,◐,●,✕"<\/formula1>/);
-  assert.match(s2, /<conditionalFormatting sqref="T5:T600">/);
-  assert.match(s2, /<col min="27" max="27"[^>]*hidden="1"|<col min="27" max="27"[^>]*hidden="true"/);
-  assert.match(s2, /<f>&quot;;&quot;&amp;SUBSTITUTE\(G5,&quot; &quot;,&quot;&quot;\)&amp;&quot;;&quot;<\/f>/);
-  assert.match(xml('xl/styles.xml'), /FFFFF2CC/);
+  assert.match(s2, /<dataValidation type="list"[^>]*sqref="R5:R600"><formula1>'Hướng dẫn - 说明'!\$F\$5:\$F\$10<\/formula1>/);
+  assert.match(s2, /<dataValidation type="date" operator="greaterThanOrEqual"[^>]*sqref="V5:V600 X5:X600"><formula1>DATE\(2015,1,1\)<\/formula1>/);
+  assert.match(s2, /<conditionalFormatting sqref="Y5:Y600"><cfRule type="expression"[^>]*><formula>LEFT\(Y5,7\)=&quot;Quá hạn&quot;<\/formula>/);
+  assert.match(s2, /<col min="27" max="27"[^>]*hidden="(1|true)"/);
+  const st = xml('xl/styles.xml');
+  assert.match(st, /FFFFF2CC/);
+  assert.match(st, /FF1F3864/);
+  assert.match(st, /formatCode="dd\/mm\/yyyy"/);
   const wb = X.read(bytes, { type: 'array', cellFormula: true });
-  assert.equal(wb.Sheets[SHEET.summary].D4.v, 3);
-  assert.match(wb.Sheets[SHEET.iso].E4.f, /COUNTIF\('Danh mục tổng - 总清单'!\$AA\$5:\$AA\$600,"\*;"&B4&"\*"\)/);
+  const cat = wb.Sheets[SHEET.catalog];
+  assert.equal(cat.B4.v, 'Mã biểu mẫu\n表单编号');
+  assert.equal(cat.R4.v, 'Nơi làm\n完成方式');
+  assert.equal(cat.Y5.f, `IF(B5="","",IF(T5="✕","Không áp dụng · 不适用",IF(W5="","Khi phát sinh · 发生时记录",IF(X5="","Chưa có hồ sơ · 暂无记录",IF(TODAY()-X5<=W5+'Tổng hợp - 汇总'!$D$4,"Đúng hạn · 按期","Quá hạn · 逾期")))))`);
+  assert.equal(cat.AA600.f, '";"&SUBSTITUTE(G600," ","")&";"', 'công thức tới dòng 600');
+  const sum = wb.Sheets[SHEET.summary];
+  assert.equal(sum.D4.v, 3);
+  assert.equal(sum.B7.f, "COUNTA('Danh mục tổng - 总清单'!$B$5:$B$600)");
+  assert.equal(sum.B10.v, 'Ban ISO · 体系办');
+  assert.equal(sum.C10.f, "COUNTIF('Danh mục tổng - 总清单'!$E$5:$E$600,$B10)");
+  assert.equal(sum.B20.v, 'Tổng · 合计', '10 bộ phận ở dòng 10–19, dòng tổng 20');
+  const iso = wb.Sheets[SHEET.iso];
+  assert.equal(iso.A4.v, 'Điều khoản\n条款');
+  assert.equal(iso.D5.f, `COUNTIF('Danh mục tổng - 总清单'!$AA$5:$AA$600,"*;"&$A5&"*")`);
+  assert.equal(iso.G5.f, 'IF(D5=0,IF(LEFT(C5,2)="Có","Thiếu biểu – bắt buộc · 缺表单（强制）","Chưa có biểu · 无表单"),IF(E5=0,"Có biểu, chưa ban hành · 有表单未发布","Đã có · 已覆盖"))');
+  const brc = wb.Sheets[SHEET.brc];
+  assert.equal(brc.H4.v, 'Khóa chủ đề\n主题关键字');
+  assert.equal(brc.D5.f, `COUNTIF('Danh mục tổng - 总清单'!$K$5:$K$600,"*"&$H5&"*")`);
+  assert.equal(wb.Sheets[SHEET.guide].F10.v, 'Làm tay → App ISO · 手工→ISO App');
+  // Điều khoản bắt buộc: "Có · 是" đọc lại được
+  const back = parseCatalogWorkbook(X, X.read(bytes, { type: 'array', cellDates: true }));
+  const m0 = rec.CLAUSE.filter((c) => c.std === 'ISO9001' && c.mandatory_record).length;
+  assert.ok(m0 > 0);
+  assert.equal(back.clauses.filter((c) => c.std === 'ISO9001' && c.mandatory_record).length, m0);
 });
