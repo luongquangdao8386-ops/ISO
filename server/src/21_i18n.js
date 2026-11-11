@@ -74,7 +74,7 @@ function translateText_(text, src, tgt) {
 
 /** Bảng có dịch máy (dịch bù) — trường gốc */
 var MT_SHEETS_ = {
-  Items: ['name', 'purpose', 'freq'], Groups: ['name'], Depts: ['name'], Clauses: ['name', 'group']
+  Items: ['name', 'purpose', 'freq'], Groups: ['name'], Depts: ['name'], Clauses: ['name', 'group'], Versions: ['change_summary']
 };
 
 /**
@@ -117,10 +117,11 @@ function runBackgroundJobs() {
   if (prop_('MAINTENANCE_MODE') === 'true') return;
   var t0 = Date.now();
   dbReset_();
+  autoMigrate_();
   if (!mtEnabled_()) { recordTriggerRun_('runBackgroundJobs', t0); return; }
   var done = 0;
   Object.keys(MT_SHEETS_).forEach(function (sheet) {
-    if (Date.now() - t0 > 150000) return;
+    if (Date.now() - t0 > 150000 || !sheetExists_(sheet)) return;
     readRows_(sheet).forEach(function (r) {
       if (Date.now() - t0 > 150000 || !r.i18n_meta || !mtEnabled_()) return;
       MT_SHEETS_[sheet].forEach(function (f) {

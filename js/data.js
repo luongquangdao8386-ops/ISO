@@ -145,3 +145,51 @@ export function catalogSummary(list) {
     p1_open: list.filter((x) => Number(x.priority) === 1 && x.status !== 'ISSUED' && x.status !== 'NA').length,
     from_app: list.filter((x) => x.where === 'ME' || x.where === 'CS').length };
 }
+
+/* ---------------- Phiên bản (phiên 1b) — quyền phía client chỉ để ẩn/hiện nút, máy chủ kiểm lại ---------------- */
+
+export const VERSION_STATES = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'ISSUED', 'SUPERSEDED', 'CANCELLED'];
+export const VERSION_OPEN = new Set(['DRAFT', 'IN_REVIEW', 'APPROVED']);
+
+function myId() { return session.user && session.user.user_id; }
+/** Ghi được trong bộ phận này (cấp 1–3: chỉ bộ phận mình; Thư ký ISO, cấp 4, không giới hạn: mọi bộ phận) */
+export function deptWritable(dept) { return seesAll() || myDepts().includes(dept); }
+
+export function canCreateVersion(it, vtype = 'REVISION') {
+  if (!it || it.status === 'NA') return false;
+  if (vtype === 'ATTACH') return isSecretary() && it.status === 'ISSUED' && !it.current_version_id;
+  return isSecretary() || (roleLevel() >= 2 && deptWritable(it.dept_code));
+}
+export function versionEditable(it, v) {
+  if (isSecretary()) return true;
+  if (!it || !deptWritable(it.dept_code)) return false;
+  if (v && v.author_id === myId()) return roleLevel() >= 2;
+  return roleLevel() >= 3;
+}
+export function canApprove(it, v) {
+  const lvl = roleLevel();
+  if (lvl >= 4) return v.author_id !== myId() || (session.settings || {}).admin_self_approval !== false;
+  if (v.author_id === myId() || !it || it.level === 'COMPANY') return false;
+  return lvl === 3 && deptWritable(it.dept_code);
+}
+export function canReturnVersion(it, v) {
+  if (v.state === 'APPROVED' && isSecretary()) return true;
+  return canApprove(it, v);
+}
+export function canCancelVersion(it, v) {
+  if (v.state === 'APPROVED') return isSecretary();
+  return versionEditable(it, v);
+}
+
+/** Phiên bản theo biểu (mới nhất trước) */
+export async function versionsOf(itemId) {
+  return (await recs('VERSION')).filter((v) => v.item_id === itemId)
+    .sort((a, b) => (Number(b.rev) || 0) - (Number(a.rev) || 0) || String(b.created_at).localeCompare(String(a.created_at)));
+}
+
+/** Biểu đang hiệu lực mà hạn rà soát trong review_warn_days ngày tới hoặc đã qua */
+export function reviewSoon(it, t = today()) {
+  if (!it || it.status !== 'ISSUED' || !it.review_due) return false;
+  const warn = Number((session.settings || {}).review_warn_days || 30);
+  return daysBetween(t, it.review_due) <= warn;
+}

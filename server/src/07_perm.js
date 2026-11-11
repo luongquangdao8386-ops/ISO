@@ -35,14 +35,15 @@ var ACTION_TABLE_ = [
   'import.commit|X|pin|W',
   'import.cancel|X|net|W',
   'i18n.suggest|2|net|R',
-  // Phiên bản & ban hành (phiên 1b)
+  // Phiên bản & ban hành (phiên 1b). Quyền theo bộ phận, cấp công ty, người soạn kiểm thêm ở PRECHECK_ (trước khi hỏi PIN)
   'version.save|2|net|W',
   'version.submit|2|net|W',
   'version.approve|3|pin|W',
-  'version.return|3|pin|W',
+  'version.return|2|pin|W',
   'version.issue|X|pin|W',
   'version.cancel|2|net|W',
   'item.setNa|X|pin|W',
+  'item.review|X|pin|W',
   'doc.upload|2|offline|W',
   'doc.get|1|net|R',
   // Hồ sơ (phiên 1c)

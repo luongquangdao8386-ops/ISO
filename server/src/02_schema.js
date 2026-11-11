@@ -27,7 +27,15 @@ var SHEETS = {
   Items: { book: 'B', dot: 1, key: 'item_id', c: true, i18n: true,
     cols: 'item_id code kind level dept_code group_key name_vi name_zh purpose_vi purpose_zh iso9001 iso14001 iso45001 iso50001 ' +
       'brc_topics law cls freq_vi freq_zh flow keep priority where where_note status current_version_id current_rev issued_at ' +
-      'review_due owner_user_id qr_key note period_days period_type issued_source file_missing na_reason sort_order' },
+      'review_due owner_user_id qr_key note period_days period_type issued_source file_missing na_reason sort_order ' +
+      'na_prev_status reviewed_at reviewed_by' },
+  // Phiên bản của biểu/tài liệu (phiên 1b): DRAFT → IN_REVIEW → APPROVED → ISSUED → SUPERSEDED; trả lại về DRAFT; hủy CANCELLED.
+  // vtype: REVISION (lần ban hành mới, qua duyệt) | ATTACH (gắn tệp cho bản đang hiệu lực nhập từ Excel ●, Thư ký ISO ban hành thẳng)
+  Versions: { book: 'B', dot: 1, key: 'version_id', c: true, i18n: true,
+    cols: 'version_id item_id vtype rev state change_summary_vi change_summary_zh effective_date author_id ' +
+      'pdf_doc_id pdf_file_name pdf_size source_doc_id source_file_name source_size source_mime ' +
+      'submitted_at submitted_by approved_at approved_by approve_note issued_at issued_by superseded_at superseded_by_id ' +
+      'returned_at returned_by return_reason cancelled_at cancelled_by cancel_reason item_status_before' },
   // Điều khoản ISO 9001 và chủ đề BRCGS Packaging (std|key)
   Clauses: { book: 'B', dot: 1, key: 'clause_id', c: true, i18n: true,
     cols: 'clause_id std key group_vi group_zh name_vi name_zh mandatory_record sort_order active' },
@@ -70,7 +78,8 @@ var TYPE_OVERRIDES_ = {
   drive_file_id: 'STRING', managed_folder_id: 'STRING', thumb_drive_file_id: 'STRING', current_version_id: 'STRING',
   employee_code_hash: 'STRING', token_hash: 'STRING', payload_hash: 'STRING', pin_hash: 'STRING', salt: 'STRING', sha256: 'STRING',
   source_sha256: 'STRING', qr_key: 'STRING', origin_key: 'STRING', dept_codes: 'STRING', dept_code: 'STRING', group_key: 'STRING',
-  code: 'STRING', key: 'STRING', current_rev: 'STRING', file_epoch: 'STRING', template_key: 'STRING', template_version: 'STRING',
+  code: 'STRING', key: 'STRING', current_rev: 'STRING', rev: 'STRING', pdf_size: 'INT', source_size: 'INT',
+  submitted_by: 'STRING', approved_by: 'STRING', issued_by: 'STRING', returned_by: 'STRING', cancelled_by: 'STRING', reviewed_by: 'STRING', file_epoch: 'STRING', template_key: 'STRING', template_version: 'STRING',
   record_version: 'INT', sync_revision: 'INT', role_level: 'INT', auth_version: 'INT', failed_attempts: 'INT',
   size_bytes: 'INT', sort_order: 'INT', expected_version: 'INT', priority: 'INT', period_days: 'INT', row_number: 'INT', page_no: 'INT',
   total_rows: 'INT', add_count: 'INT', update_count: 'INT', same_count: 'INT', error_count: 'INT', clause_count: 'INT', committed_rows: 'INT',

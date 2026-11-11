@@ -11,7 +11,7 @@ const files = [];
 for (const dir of ['js', 'js/pages']) for (const f of fs.readdirSync(path.join(ROOT, dir))) if (f.endsWith('.js') && f !== 'dict.js') files.push(path.join(ROOT, dir, f));
 const actions = new Set([...fs.readFileSync(path.join(ROOT, 'server', 'src', '07_perm.js'), 'utf8').matchAll(/'([a-z]+\.[a-zA-Z.]+)\|/g)].map((m) => m[1]));
 // Chuỗi có dấu chấm nhưng không phải nhãn (tên tệp trong gói xlsx, tiền tố ghép khóa)
-const NOT_LABEL = new Set(['drawing_me1.xml', 'label.check', 'details.filters', 'tr.clickable', 'xl/styles.xml', 'pages/home.js', 'pages/catalog.js', 'pages/item.js', 'pages/excel.js', 'pages/soon.js', 'pages/account.js', 'pages/drafts.js', 'pages/admin.js']);
+const NOT_LABEL = new Set(['pages/version.js', 'drawing_me1.xml', 'label.check', 'details.filters', 'tr.clickable', 'xl/styles.xml', 'pages/home.js', 'pages/catalog.js', 'pages/item.js', 'pages/excel.js', 'pages/soon.js', 'pages/account.js', 'pages/drafts.js', 'pages/admin.js']);
 
 test('khóa nhãn viết thẳng trong mã đều có trong từ điển', () => {
   const missing = new Set();
@@ -41,7 +41,10 @@ test('họ khóa ghép động đủ thành viên', () => {
     'op_state.': ['QUEUED', 'SENDING', 'COMMITTED', 'REJECTED', 'CONFLICT', 'UNKNOWN', 'BLOCKED'],
     'user_status.': ['ACTIVE', 'DISABLED', 'MUST_CHANGE_PIN'],
     'backup_status.': ['VERIFIED', 'INCONSISTENT', 'FAILED', 'RUNNING'],
-    'audit_grp.': ['item', 'import', 'dept', 'user', 'settings', 'report', 'backup'],
+    'audit_grp.': ['item', 'version', 'doc', 'import', 'dept', 'user', 'settings', 'report', 'backup'],
+    'vstate.': ['DRAFT', 'IN_REVIEW', 'APPROVED', 'ISSUED', 'SUPERSEDED', 'CANCELLED'],
+    'vtype.': ['REVISION', 'ATTACH'],
+    'ver.tab.': ['review', 'issue', 'returned', 'drafts', 'open'],
     'action.': ['record.submit', 'doc.upload'],
     'mirror_status.': ['OK', 'FAILED', 'OFF'],
     'imp.act.': ['ADD', 'UPDATE', 'SAME', 'ERROR'],

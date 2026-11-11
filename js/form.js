@@ -194,11 +194,12 @@ const UNSURE = new Set(['UNKNOWN_RESULT', 'INTERNAL_ERROR', 'RECOVERY_REQUIRED']
  * Ghi có xác nhận: mất phản hồi → hỏi sync.getOperationStatus → gửi lại đúng operation_id (3.3, PoC P-01).
  * Trả phản hồi cuối (ok + COMMITTED, hoặc lỗi).
  */
-export async function writeOnline(action, payload, { expected_version = 0, reauth = null } = {}) {
+export async function writeOnline(action, payload, { expected_version = 0, reauth = null, timeoutMs = 0 } = {}) {
   const operation_id = uuid();
   // changes_since: máy chủ ghi xong kèm thay đổi từ cursor đang lưu → afterCommit không phải gọi sync.changes thêm một lượt
   const since = await getMeta('cursor').catch(() => null);
   const opts = { write: true, operation_id, expected_version, changes_since: since };
+  if (timeoutMs) opts.timeoutMs = timeoutMs;
   if (reauth) opts.reauth_token = reauth;
   const done = (res) => { if (res && res.ok && res.changes) noteWriteChanges(since, res.changes); return res; };
   let r = done(await api(action, payload, opts));

@@ -6,6 +6,7 @@ import { route, match, currentPath, queryParams, navigate, back, startRouter, re
 import { invalidate, boot as bootData } from './data.js';
 import { toast, dialog, reloadFreshHtml, wireReloadFresh, resetListChunks } from './ui.js';
 import { openScanner, parseScan, resolveScan, qrStateText } from './scan.js';
+import { pendingFor } from './pending.js';
 
 export const app = {
   shell: null,
@@ -67,6 +68,13 @@ export async function updateSyncStatus() {
   const mine = q.filter((o) => o.user_id === (session.user && session.user.user_id) && o.dataset_epoch === session.epoch);
   const problems = mine.filter((o) => o.state === 'CONFLICT' || o.state === 'REJECTED').length;
   app.shell.setSync({ offline: app.offline || !navigator.onLine, maintenance: !!app.maintenance, lastSync: await getMeta('last_sync'), queued: mine.length - problems, problems });
+  // Số đỏ trên Trang chủ (iPhone) và mục Phiên bản (web): việc chờ bạn xử lý
+  try {
+    const p = await pendingFor();
+    if (!app.shell) return;
+    app.shell.setBadge('home', p.total);
+    app.shell.setBadge('versions', p.review.length + p.issue.length + p.returned.length);
+  } catch (e) { /* không chặn */ }
 }
 
 let syncing = null;
@@ -153,6 +161,9 @@ function registerRoutes() {
   route('/item/new', lazy('./pages/item.js', 'renderItemForm'), { nav: 'catalog' });
   route('/item/:id/edit', lazy('./pages/item.js', 'renderItemForm'), { nav: 'catalog' });
   route('/item/:id', lazy('./pages/item.js', 'renderItem'), { nav: 'catalog' });
+  route('/versions', lazy('./pages/version.js', 'renderVersions'), { nav: 'versions' });
+  route('/version/new/:item', lazy('./pages/version.js', 'renderVersionNew'), { nav: 'catalog' });
+  route('/version/:id', lazy('./pages/version.js', 'renderVersion'), { nav: 'catalog' });
   route('/excel', lazy('./pages/excel.js', 'renderExcel'), { nav: 'excel' });
   route('/excel/batch/:id', lazy('./pages/excel.js', 'renderBatch'), { nav: 'excel' });
   // Màn của phiên/đợt sau: hiện "Sắp có · 即将推出"
@@ -218,7 +229,7 @@ window.addEventListener('resize', () => {
 
 // Màn xem (trang chủ, danh mục, chi tiết biểu, tài khoản) vẽ lại sau khi tự gửi nháp xong.
 // Không vẽ lại màn nhập (sửa biểu, Excel), khi đang mở hộp thoại hoặc đang gõ.
-const VIEW_PAGE = /^\/(catalog|item\/[^/]+|account(\/drafts)?)?$/;
+const VIEW_PAGE = /^\/(catalog|item\/[^/]+|versions|account(\/drafts)?)?$/;
 export function refreshAfterSend(r) {
   if (!app.shell) return;
   const path = currentPath();

@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d1.1';
+var SERVER_VERSION = '1.0.0-d1.2';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.0';
+var SCHEMA_VERSION = '1.0.1';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -62,6 +62,8 @@ var SETTINGS_DEFAULTS = [
   ['backup_mirror_email', 'STRING', '', false, 1, 'Tài khoản Google thứ hai nhận bản sao lưu (chia sẻ chỉ xem thư mục Sao lưu và Dữ liệu)', '接收备份的第二个Google账户（备份及数据文件夹仅查看共享）'],
   // ISO (mục 10 đặc tả, chốt 06/11/2026)
   ['doc_review_months', 'INT', 12, true, 1, 'Chu kỳ rà soát tài liệu (tháng)', '文件评审周期（月）'],
+  ['review_warn_days', 'INT', 30, true, 1, 'Báo tài liệu sắp đến hạn rà soát trước (ngày)', '文件评审到期提前提醒（天）'],
+  ['admin_self_approval', 'BOOL', true, true, 1, 'Quản trị (cấp 4) được duyệt phiên bản do chính mình soạn', '管理员（4级）可审批自己编写的版本'],
   ['record_grace_days', 'INT', 3, true, 1, 'Số ngày cho phép trễ khi xét hồ sơ', '记录允许延迟天数'],
   ['records_start_date', 'STRING', '', true, 1, 'Ngày bắt đầu tính hồ sơ cho biểu ● nhập từ Excel (trống = ngày nhập danh mục đầu tiên)', 'Excel导入的●表单开始计算记录的日期（空=首次导入目录日期）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
@@ -98,7 +100,15 @@ var CODE_PATTERNS = {
 };
 
 /** Loại hồ sơ của tệp (Documents.entity_type) — phiên 1b (phiên bản), 1c (hồ sơ) */
-var DOC_ENTITY_SHEETS_ = {};
+var DOC_ENTITY_SHEETS_ = {
+  VERSION: { sheet: 'Versions', key: 'version_id' }
+};
+
+/** Trạng thái phiên bản (mục 6 đặc tả) */
+var VERSION_STATES_ = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'ISSUED', 'SUPERSEDED', 'CANCELLED'];
+/** Phiên bản đang mở (mỗi biểu chỉ một bản đang mở cùng lúc) */
+var VERSION_OPEN_ = { DRAFT: 1, IN_REVIEW: 1, APPROVED: 1 };
+var VERSION_TYPES_ = ['REVISION', 'ATTACH'];
 
 /** Trường không dịch tự động. Tên trường gốc (không hậu tố _vi/_zh). */
 var NO_MT_FIELDS = {

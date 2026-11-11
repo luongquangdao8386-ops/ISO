@@ -69,6 +69,11 @@ var SUB_MSG = {
   LEVEL_INVALID: ['Cấp tài liệu không hợp lệ', '文件级别无效'],
   CLAUSE_INVALID: ['Điều khoản ISO 9001 dạng 4.1, 8.5.2 …', 'ISO 9001条款格式为 4.1、8.5.2 …'],
   OUT_OF_SCOPE: ['Ngoài phạm vi bộ phận của bạn', '超出您的部门范围'],
+  TOO_LONG: ['Quá dài', '内容过长'],
+  VERSION_OPEN: ['Biểu đang có phiên bản soạn/chờ duyệt/chờ ban hành — xử lý bản đó trước', '该表单已有编写中/待审批/待发布的版本，请先处理'],
+  PDF_REQUIRED: ['Cần tải PDF của phiên bản trước', '请先上传该版本的PDF'],
+  ITEM_NA: ['Biểu đang Không áp dụng (✕) — dùng lại trước', '该表单为不适用（✕），请先恢复使用'],
+  FILE_MISSING: ['Tệp không còn trên Drive của máy chủ', '服务器云端硬盘上的文件已不存在'],
   MIRROR_SAME_ACCOUNT: ['Tài khoản thứ hai phải khác tài khoản đang chạy máy chủ', '第二个账户须与运行服务器的账户不同']
 };
 

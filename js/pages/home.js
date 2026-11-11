@@ -1,11 +1,12 @@
 // Trang chủ (cùng khuôn trang chủ M&E, Checksheet): biểu tượng app trên nền nhà máy, ô Chờ bạn xử lý, 4 ô số, lưới ô module.
-// Phiên 1a: tổng biểu, % ban hành, điều khoản bắt buộc thiếu biểu tính từ danh mục trên máy; hồ sơ quá hạn (phiên 1c) và lịch
-// tuần (phiên 1d) hiện "Sắp có". Ô module của phiên/đợt sau mờ "Sắp có · 即将推出".
+// Tổng biểu, % ban hành, điều khoản bắt buộc thiếu biểu tính từ danh mục trên máy; Chờ bạn xử lý phần phiên bản (1b); hồ sơ quá hạn
+// (phiên 1c) và lịch tuần (phiên 1d) hiện "Sắp có". Ô module của phiên/đợt sau mờ "Sắp có · 即将推出".
 import { bi, biText, esc, fmtDate, fmtNumber, session } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
 import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary } from '../data.js';
 import { queueItems } from '../sync.js';
+import { pendingFor } from '../pending.js';
 import { stIcon } from './catalog.js';
 
 /** Điều khoản ISO 9001 bắt buộc lưu hồ sơ mà chưa có biểu (cách đếm như file Excel: mã ở cột G bắt đầu bằng điều khoản) */
@@ -15,14 +16,23 @@ export function missingMandatory(list, clauses) {
     .filter((c) => !keys.some((k) => k.includes(';' + c.key))).length;
 }
 
-/** Ô "Chờ bạn xử lý": phiên 1a chỉ có biểu ● nhập từ Excel chưa có tệp (Thư ký ISO); phiên bản, hồ sơ trả lại ở 1b, 1c */
-async function pendingHtml(list) {
-  if (!isSecretary()) return '';
-  const noFile = list.filter((x) => x.status === 'ISSUED' && x.file_missing).length;
-  if (!noFile) return '';
-  return `<a class="card pend-card" href="#/catalog?f=nofile">
-    <div class="pend-title">${ICON.alert}<strong>${bi('home.pending_me')}</strong>${ICON.chevron}</div>
-    <div class="pend-rows"><span>${bi('home.no_file_n', { N: noFile })}</span></div></a>`;
+/**
+ * Ô "Chờ bạn xử lý" (phiên 1b): phiên bản chờ bạn duyệt, chờ ban hành, bị trả lại, nháp của bạn; biểu ● chưa có tệp và tài liệu
+ * sắp/quá hạn rà soát (Thư ký ISO). Hồ sơ bị trả lại ở phiên 1c.
+ */
+async function pendingHtml() {
+  const p = await pendingFor();
+  const rows = [
+    [p.review.length, 'home.pend_review', '/versions?f=review', 't-red-text'],
+    [p.issue.length, 'home.pend_issue', '/versions?f=issue', 't-red-text'],
+    [p.returned.length, 'home.pend_returned', '/versions?f=returned', 't-red-text'],
+    [p.drafts.length, 'home.pend_drafts', '/versions?f=drafts', ''],
+    [p.nofile.length, 'home.no_file_n', '/catalog?f=nofile', ''],
+    [p.review_due.length, 'home.pend_review_due', '/catalog?f=review', '']
+  ].filter((r) => r[0]);
+  if (!rows.length) return '';
+  return `<section class="card pend-card"><div class="pend-title">${ICON.alert}<strong>${bi('home.pending_me')}</strong></div>
+    <div class="pend-rows">${rows.map(([n, key, href, cls]) => `<a class="pend-row" href="#${href}"><span class="${cls}">${bi(key, { N: n })}</span>${ICON.chevron}</a>`).join('')}</div></section>`;
 }
 
 /** 4 ô số */
@@ -78,7 +88,7 @@ export async function renderHome(view, { shell }) {
   view.innerHTML = `<div class="home">
     <div class="home-hero">${brandHtml()}<div class="home-who">${esc(u.display_name || '')} · ${bi('level.' + roleLevel())}${flags ? ' · ' + flags : ''}<br>${bi('weekday.' + weekday(t))} ${esc(fmtDate(t))}</div></div>
     <div class="home-body${wide ? ' wide' : ''}">
-      <div class="home-left">${await pendingHtml(list)}${await statsHtml(list)}
+      <div class="home-left">${await pendingHtml()}${await statsHtml(list)}
         <section class="card home-week soon-card"><div class="card-head"><h2>${bi('home.week')}</h2><span class="tag soon">${bi('soon.tag')}</span></div><p class="muted small">${bi('home.week_soon')}</p></section></div>
       <div class="home-right">${await gridHtml(list)}</div>
       ${wide ? `<div class="home-bottom">${await deptTableHtml(list)}</div>` : ''}

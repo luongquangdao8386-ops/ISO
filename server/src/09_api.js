@@ -24,6 +24,16 @@ var HANDLERS_ = {
   'import.commit': function (ctx) { return importCommit_(ctx); },
   'import.cancel': function (ctx) { return importCancel_(ctx); },
   'i18n.suggest': function (ctx) { return i18nSuggest_(ctx); },
+  'version.save': function (ctx) { return versionSave_(ctx); },
+  'version.submit': function (ctx) { return versionSubmit_(ctx); },
+  'version.approve': function (ctx) { return versionApprove_(ctx); },
+  'version.return': function (ctx) { return versionReturn_(ctx); },
+  'version.issue': function (ctx) { return versionIssue_(ctx); },
+  'version.cancel': function (ctx) { return versionCancel_(ctx); },
+  'item.setNa': function (ctx) { return itemSetNa_(ctx); },
+  'item.review': function (ctx) { return itemReview_(ctx); },
+  'doc.upload': function (ctx) { return docUpload_(ctx); },
+  'doc.get': function (ctx) { return docGet_(ctx); },
   'report.logo.get': function (ctx) { return reportLogoGet_(ctx); },
   'report.logo.set': function (ctx) { return reportLogoSet_(ctx); },
   'user.pickList': function (ctx) { return userPickList_(ctx); },
@@ -42,6 +52,16 @@ var HANDLERS_ = {
   'settings.edit': function (ctx) { return settingsEdit_(ctx); },
   'system.status': function (ctx) { return systemStatus_(ctx); },
   'sample.seed': function (ctx) { return sampleSeedAction_(ctx); }
+};
+
+/**
+ * Kiểm quyền theo hồ sơ (bộ phận, cấp công ty, người soạn) và trạng thái TRƯỚC khi hỏi PIN: người không có quyền nhận FORBIDDEN
+ * ngay, không bị hỏi PIN cho việc sẽ bị từ chối (mục 4 quy tắc 4).
+ */
+var PRECHECK_ = {
+  'version.approve': function (ctx) { precheckApprove_(ctx); },
+  'version.return': function (ctx) { precheckReturn_(ctx); },
+  'version.issue': function (ctx) { precheckIssue_(ctx); }
 };
 
 /** Action không cần phiên */
@@ -172,6 +192,7 @@ function dispatchInner_(req, viaPush) {
   var ctx = requireSession_(req, req.action);
   if (def.write && !isUuidV4_(req.operation_id)) throw validationError_([fieldError_('operation_id', 'ID_INVALID')]);
   ctx.auth = authorize_(ctx, req.action);
+  if (PRECHECK_[req.action]) PRECHECK_[req.action](ctx);
   // Hỏi lại PIN sau khi đã biết người dùng có quyền (không hỏi PIN người không có quyền)
   if (def.net === 'pin' && !verifyReauth_(ctx, req.reauth_token)) throw apiError_('REAUTH_REQUIRED');
   ctx.viaPush = !!viaPush;

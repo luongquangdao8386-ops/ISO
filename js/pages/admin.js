@@ -325,7 +325,7 @@ function wireMirror(view, again) {
 /* ====================== Nhật ký thao tác ====================== */
 
 const auditFilt = { action: '', from: '', to: '' };
-const AUDIT_ACTIONS = ['item.', 'import.', 'dept.', 'user.', 'settings.', 'report.', 'backup.'];
+const AUDIT_ACTIONS = ['item.', 'version.', 'doc.', 'import.', 'dept.', 'user.', 'settings.', 'report.', 'backup.'];
 
 function jsonLines(o) {
   if (!o || typeof o !== 'object') return '';

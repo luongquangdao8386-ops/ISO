@@ -5,11 +5,33 @@ var SYNC_ENTITIES_ = [
   { type: 'DEPT', sheet: 'Depts' },
   { type: 'GROUP', sheet: 'Groups' },
   { type: 'ITEM', sheet: 'Items', scoped: true },
-  { type: 'CLAUSE', sheet: 'Clauses' }
+  { type: 'CLAUSE', sheet: 'Clauses' },
+  // Phiên bản (1b): theo phạm vi của biểu; cấp 1 (Tra cứu) chỉ nhận bản đang hiệu lực và lỗi thời
+  { type: 'VERSION', sheet: 'Versions', scoped: 'item' }
 ];
+
+/** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */
+function syncEntities_() {
+  return SYNC_ENTITIES_.filter(function (e) { return sheetExists_(e.sheet); });
+}
+
+/** Biểu theo item_id (đọc một lần cho mỗi lượt đồng bộ) */
+function syncItemMap_(aux) {
+  if (!aux.items) {
+    aux.items = {};
+    aux.tc.rows('Items').forEach(function (r) { aux.items[r.item_id] = r; });
+  }
+  return aux.items;
+}
 
 /** Dòng → bản ghi gửi client; null nếu không gửi (ngoài phạm vi bộ phận) */
 function syncProject_(ctx, ent, row, aux) {
+  if (ent.scoped === 'item') {
+    var it = syncItemMap_(aux)[row.item_id];
+    if (!it || !itemVisible_(ctx.user, it)) return null;
+    if (Number(ctx.user.role_level) < 2 && !isSecretary_(ctx.user) && row.state !== 'ISSUED' && row.state !== 'SUPERSEDED') return null;
+    return projectRow_(ctx, row);
+  }
   if (ent.scoped && !itemVisible_(ctx.user, row)) return null;
   return projectRow_(ctx, row);
 }
@@ -21,7 +43,7 @@ function syncBootstrap_(ctx) {
   var ei = Number(tok[0]) || 0, off = Number(tok[1]) || 0;
   var st = readState_();
   var cursor = p.page_token && p.sync_cursor ? Number(p.sync_cursor) : Number(stateGet_(st, 'sync_revision', 0));
-  var ents = SYNC_ENTITIES_;
+  var ents = syncEntities_();
   var tc = tableCache_(ents.slice(ei).map(function (e) { return e.sheet; }), st);
   var aux = { tc: tc };
   var records = {};
@@ -79,7 +101,7 @@ function syncChanges_(ctx) {
   var st = readState_();
   var head = Number(stateGet_(st, 'sync_revision', 0));
   var changes = [];
-  var ents = SYNC_ENTITIES_.filter(function (ent) { return Number(stateGet_(st, 'table_rev.' + ent.sheet, 0)) > cursor; });
+  var ents = syncEntities_().filter(function (ent) { return Number(stateGet_(st, 'table_rev.' + ent.sheet, 0)) > cursor; });
   var tc = ents.length ? tableCache_(ents.map(function (e) { return e.sheet; }), st) : null;
   var aux = { tc: tc };
   ents.forEach(function (ent) {

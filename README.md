@@ -5,8 +5,9 @@ quá hạn, phủ điều khoản. Thay danh mục Excel DM-ISO-01 bằng hệ t
 GitHub Pages (iPhone và máy tính). Cùng lõi với M&E và Checksheet (chép từ repo `CS`): PIN 6 số, phiên, ghi có xác nhận, đồng bộ,
 hàng chờ khi mất mạng. Giao diện luôn song ngữ Việt · 中文.
 
-**Trạng thái:** bản `1.0.0-d1.1` — Đợt 1, phiên 1a (lõi + danh mục). **Đã phát hành THẬT** ở `/ISO/` (11/11/2026, không qua
+**Trạng thái:** bản `1.0.0-d1.2` — Đợt 1, phiên 1b (phiên bản & ban hành). **Đã phát hành THẬT** ở `/ISO/` (11/11/2026, không qua
 THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang `/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ.
+Cập nhật máy chủ lên 1b: dán `Code.gs` → chạy `migrateSchema` → Phiên bản mới (Hướng dẫn triển khai, mục "CẬP NHẬT LÊN BẢN 1b").
 
 ## Phiên 1a có gì
 
@@ -26,7 +27,24 @@ THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT
 - Nav iPhone 5 nút: Trang chủ · Danh mục · Quét · Hồ sơ · Tài khoản; web menu trái. Màn của phiên/đợt sau hiện mờ
   "Sắp có · 即将推出", máy chủ trả `FEATURE_NOT_ENABLED`.
 
-Phiên sau: **1b** phiên bản & ban hành · **1c** hồ sơ (nộp, bảng kỳ ✓ ! –, tem QR) · **1d** phủ điều khoản, trang chủ đầy đủ,
+## Phiên 1b có gì
+
+- **Phiên bản** (sheet `Versions`): Nháp → Gửi duyệt → Duyệt / Trả lại (lý do) → Ban hành → bản cũ **Lỗi thời**; hủy bản đang soạn.
+  Mỗi biểu một bản đang hiệu lực và một bản đang mở; lần ban hành do máy chủ cấp (01, 02…).
+- **Quyền**: soạn — cấp 2+ trong bộ phận, Thư ký ISO; duyệt tài liệu cấp bộ phận — trưởng bộ phận hoặc cấp 4; cấp công ty (sổ tay,
+  chính sách, BM-ISO, BM-BRC) — cấp 4; người soạn không tự duyệt (cấp 4 được, `admin_self_approval`); ban hành — Thư ký ISO, cấp 4.
+  Duyệt, trả lại, ban hành, ✕, đã rà soát hỏi lại PIN (5 phút); quyền kiểm trước khi hỏi PIN (`PRECHECK_`).
+- **Tệp**: PDF (bắt buộc) + tệp gốc xlsx/docx lưu riêng tư trên Drive của máy chủ (`doc.upload`), tải về qua máy chủ theo quyền
+  (`doc.get`); máy tính mở PDF tab mới, iPhone tải về rồi Mở / Lưu.
+- **Biểu ● nhập từ Excel chưa có tệp**: Thư ký ISO gắn PDF cho đúng lần đang hiệu lực, ban hành thẳng (không đổi lần, ngày ban hành).
+- **Ban hành** cập nhật danh mục: lần ban hành, ngày ban hành, hạn rà soát = +`doc_review_months`; **Đã rà soát** gia hạn; **✕** kèm lý
+  do (dùng lại về tình trạng cũ). Nhập lại Excel không đè lần/ngày ban hành và hạn rà soát của biểu đã ban hành trong app.
+- **Chờ bạn xử lý** + số đỏ trên nút: phiên bản chờ tôi duyệt, chờ ban hành, bị trả lại, nháp; biểu ● chưa có tệp; tài liệu sắp/quá hạn
+  rà soát. Màn **Phiên bản** liệt kê theo ngăn.
+- Máy chủ dán `Code.gs` mới mà chưa `migrateSchema`: đăng nhập/đồng bộ vẫn chạy, trigger nền tự thêm sheet. `adminNoiLaiTep` nối lại ID
+  tệp theo `file_map.json` khi khôi phục từ tài khoản thứ hai.
+
+Phiên sau: **1c** hồ sơ (nộp, bảng kỳ ✓ ! –, tem QR) · **1d** phủ điều khoản, trang chủ đầy đủ,
 phát hành THẬT. Đợt 2 kết nối M&E/Checksheet, Gmail, báo cáo PDF, in tem · Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
 
 ## Cấu trúc

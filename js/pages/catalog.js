@@ -4,7 +4,7 @@
 import { bi, biText, esc, nameText } from '../core.js';
 import { ICON, setViewHtml, wireSearch, listChunk, wireMore, freshFilters } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, depts, recs, isSecretary, seesAll, myDepts, groupText, itemHay, foldVi, STATUS_SYMBOL, STATUSES, KINDS, WHERES, catalogSummary } from '../data.js';
+import { items, depts, recs, isSecretary, seesAll, myDepts, groupText, itemHay, foldVi, STATUS_SYMBOL, STATUSES, KINDS, WHERES, catalogSummary, reviewSoon, today } from '../data.js';
 
 const INIT = { q: '', dept: '', group: '', kind: '', where: '', status: '', prio: '', f: '', open: false };
 const state = { ...INIT };
@@ -37,6 +37,7 @@ function filterList(list) {
     if (state.status && it.status !== state.status) return false;
     if (state.prio && String(it.priority || '') !== (state.prio === '-' ? '' : state.prio)) return false;
     if (state.f === 'nofile' && !(it.status === 'ISSUED' && it.file_missing)) return false;
+    if (state.f === 'review' && !reviewSoon(it, today())) return false;
     if (words.length) { const hay = itemHay(it); if (!words.every((w) => hay.includes(w))) return false; }
     return true;
   });
@@ -79,7 +80,7 @@ export async function renderCatalog(view, ctx) {
         <label class="fld"><span>${bi('cat.kind')}</span><select class="inp sel" id="cf-kind">${opt('', biText('cat.all'), state.kind)}${KINDS.map((k) => opt(k, esc(biText('kind.' + k)), state.kind)).join('')}</select></label>
         <label class="fld"><span>${bi('cat.where')}</span><select class="inp sel" id="cf-where">${opt('', biText('cat.all'), state.where)}${WHERES.map((k) => opt(k, esc(biText('where.' + k)), state.where)).join('')}</select></label>
         <label class="fld"><span>${bi('cat.priority')}</span><select class="inp sel" id="cf-prio">${opt('', biText('cat.all'), state.prio)}${['1', '2', '3'].map((k) => opt(k, esc(biText('cat.prio_n', { N: k })), state.prio)).join('')}${opt('-', esc(biText('cat.prio_none')), state.prio)}</select></label>
-        ${sec ? `<label class="fld"><span>${bi('cat.special')}</span><select class="inp sel" id="cf-f">${opt('', biText('cat.all'), state.f)}${opt('nofile', esc(biText('cat.no_file')), state.f)}</select></label>` : ''}
+        ${sec ? `<label class="fld"><span>${bi('cat.special')}</span><select class="inp sel" id="cf-f">${opt('', biText('cat.all'), state.f)}${opt('nofile', esc(biText('cat.no_file')), state.f)}${opt('review', esc(biText('cat.review_soon')), state.f)}</select></label>` : ''}
       </div>
       ${nFilt ? `<button type="button" class="btn small" id="cf-clear">${ICON.x}<span>${bi('cat.clear')}</span></button>` : ''}</details>`;
     const s = catalogSummary(list);

@@ -1,12 +1,49 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d1.1 (Đợt 1, phiên 1a)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d1.2 (Đợt 1, phiên 1b)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
 trên GitHub Pages.
 
 Phiên 1a có: đăng nhập PIN, người dùng (bộ phận, Thư ký ISO, Đánh giá viên), bộ phận, danh mục biểu mẫu & tài liệu (lọc, tìm Việt/Trung,
-chi tiết biểu), nhập/xuất file Excel tổng, quản trị. Phiên bản & ban hành (1b), hồ sơ (1c), phủ điều khoản + trang chủ đầy đủ (1d) hiện
-mờ "Sắp có · 即将推出".
+chi tiết biểu), nhập/xuất file Excel tổng, quản trị. Phiên 1b thêm: **phiên bản & ban hành** (soạn → gửi duyệt → duyệt / trả lại →
+ban hành, bản cũ tự lỗi thời, PDF + tệp gốc lưu riêng tư trên Drive của máy chủ), **gắn tệp** cho biểu ● nhập từ Excel, đặt **Không áp
+dụng ✕**, **Đã rà soát** (gia hạn rà soát), ô **Chờ bạn xử lý** và số đỏ trên nút. Hồ sơ (1c), phủ điều khoản + trang chủ đầy đủ (1d)
+hiện mờ "Sắp có · 即将推出".
+
+## CẬP NHẬT LÊN BẢN 1b (1.0.0-d1.2) — làm một lần, trên máy tính
+
+Bản 1b **thêm sheet `Versions` và 3 cột ở `Items`** (`na_prev_status`, `reviewed_at`, `reviewed_by`) nên phải chạy `migrateSchema`.
+Không xóa hay sửa dữ liệu đã có.
+
+1. <https://script.google.com> → dự án máy chủ ISO đang chạy (`ISO_MayChu_THAT`) → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Ô chọn hàm → **`migrateSchema`** → **Chạy**. Nhật ký: `migrateSchema xong. Thêm: Versions; Items(na_prev_status,reviewed_at,reviewed_by)
+   … schema_version=1.0.1`. (Quên bước này thì app vẫn mở được; trigger nền chạy mỗi 3 giờ tự thêm sheet, nhưng nút phiên bản báo lỗi
+   tới lúc đó.)
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d1.2 phiên bản & ban hành` →
+   **Triển khai**. Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` trên máy tính và iPhone → app tự tải bản mới (góc **Tài khoản → Thông tin** ghi `1.0.0-d1.2`; nếu màn báo lỗi bấm
+   **Tải lại bản mới**). **Tài khoản → Quản trị → Trạng thái hệ thống**: dòng `schema_version` = `1.0.1`, dòng **Phiên bản** hiện số
+   nháp/chờ duyệt/đang hiệu lực.
+
+### Dùng phiên bản & ban hành (app chỉ có owner + Thư ký ISO)
+
+Hai tài khoản đều **cấp 4 (Quản trị)** thì làm thay trưởng bộ phận: tự soạn, tự duyệt, ban hành. Mỗi việc duyệt / trả lại / ban hành /
+✕ / đã rà soát hỏi lại PIN (nhập một lần dùng được 5 phút).
+
+- **Biểu ● nhập từ Excel chưa có tệp** (trang chủ: "N biểu ● chưa có tệp"): mở biểu → **Gắn tệp bản hiện hành** → chọn PDF của đúng
+  lần đang dùng (+ tệp gốc Excel/Word nếu có) → **Lưu và ban hành** → PIN. Không đổi lần và ngày ban hành; cờ "chưa có tệp" tắt.
+- **Ban hành lần mới** (biểu ○ ◐, hoặc sửa biểu ●): mở biểu → **Soạn phiên bản mới** → tóm tắt thay đổi, ngày hiệu lực, PDF (bắt buộc),
+  tệp gốc → **Lưu và gửi duyệt** → **Duyệt** (PIN) → **Ban hành**. Bản cũ tự thành **Lỗi thời**; danh mục cập nhật lần ban hành, ngày
+  ban hành = hôm nay, hạn rà soát = +12 tháng; trang chủ cập nhật % ban hành.
+- **Trả lại** (kèm lý do) đưa bản về Nháp để sửa; **Hủy phiên bản** bỏ bản đang soạn.
+- **Ngừng dùng biểu**: mở biểu → **Đặt Không áp dụng (✕)** → lý do → PIN; hồ sơ cũ giữ nguyên. **Dùng lại biểu** đưa về tình trạng cũ.
+- **Rà soát định kỳ**: trang chủ báo "tài liệu sắp/quá hạn rà soát" (30 ngày trước). Tài liệu vẫn đúng → **Đã rà soát, giữ nguyên** →
+  hạn mới = hôm nay + 12 tháng; cần sửa thì soạn phiên bản mới.
+- **Xem PDF / Tải tệp gốc**: máy tính mở PDF ở tab mới; iPhone chạm **Xem PDF** (tải về) rồi chạm **Mở / Lưu** (bảng Chia sẻ → mở
+  bằng Sách/Tệp hoặc in). Tệp lớn nhất 10 MB trên máy tính, 5 MB trên điện thoại.
+- Màn **Phiên bản** (menu trái trên web; iPhone: Tài khoản → Phiên bản, hoặc bấm dòng trong ô Chờ bạn xử lý) liệt kê bản chờ duyệt,
+  chờ ban hành, bị trả lại, nháp.
 
 ## BẮT ĐẦU Ở ĐÂY — đưa lên THẬT ngay (chốt 11/11/2026, không qua THỬ)
 
@@ -178,7 +215,9 @@ vàng ô nhập, danh sách chọn ○ ◐ ● ✕, tô màu theo tình trạng,
    ("dao tao") hoặc tiếng Trung ("培训") — ô tìm giữ nguyên, bàn phím không nhảy.
 4. **Phạm vi bộ phận**: đăng nhập `MAU-SX2` (hoặc một Nhân viên bộ phận SX) → chỉ thấy biểu SX và tài liệu chung của Ban ISO; không
    có Excel, không có nút sửa. Người không có quyền làm thao tác cần PIN → báo **Không có quyền** ngay, không hỏi PIN.
-5. Gửi Claude **ảnh màn hình** chỗ lỗi (không cần dán log dài).
+5. **Phiên bản (mục 4)**: soạn phiên bản cho một biểu → gửi duyệt → người soạn (cấp 1–3) **không thấy nút Duyệt**; trưởng bộ phận
+   (hoặc Quản trị) duyệt → Thư ký ISO ban hành → bản cũ thành **Lỗi thời**; trang chủ cập nhật **% ban hành**.
+6. Gửi Claude **ảnh màn hình** chỗ lỗi (không cần dán log dài).
 
 ## Phần H — Cập nhật máy chủ khi có bản mới (phiên 1b, 1c, 1d…)
 
@@ -258,8 +297,9 @@ Bản chép ở tài khoản thứ hai chứa dữ liệu tới lần sao lưu h
    `DATASET_EPOCH` = giá trị `dataset_epoch` trong `manifest.json`; `MAINTENANCE_MODE` = `false`; `PIN_PEPPER_V1`, `TOKEN_SECRET_V1`
    từ I.4.
 3. Chạy `installTriggers`, `healthCheck` → triển khai web app → gửi Claude link `/exec` mới để cố định trong `config.js`.
-4. Tệp trên Drive (PDF, ảnh, logo) ở bản chép có ID mới; bảng nối ID cũ → mới nằm ở `file_map.json` trong thư mục dữ liệu của bản chép.
-   Phiên 1a chỉ có logo (tải lại logo là xong); từ phiên 1b Claude viết thêm bước nối lại ID tệp.
+4. Tệp trên Drive (PDF, tệp gốc, ảnh, logo) ở bản chép có ID mới; bảng nối ID cũ → mới nằm ở `file_map.json` trong thư mục dữ liệu
+   của bản chép. Với `DRIVE_ROOT_FOLDER_ID` = thư mục đó, chạy hàm **`adminNoiLaiTep`**: đổi ID tệp của mọi phiên bản (và logo báo cáo)
+   sang ID mới. Nhật ký: `đổi ID n tệp …`; chạy lại không đổi thêm.
 
 M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyện của từng app).
 
@@ -275,7 +315,8 @@ M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyệ
 | `setup` | Lần đầu dựng máy chủ (đã có thì không làm gì) |
 | `adminSetupOwner` | Tạo owner đầu tiên từ 3 thuộc tính `SETUP_OWNER_*` |
 | `adminResetOwnerPin` | Owner quên PIN: đặt `OWNER_RESET_TEMP_PIN` (6 số) rồi chạy |
-| `migrateSchema` | Bản mới thêm sheet/cột |
+| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`) |
+| `adminNoiLaiTep` | Khôi phục từ bản chép ở tài khoản thứ hai: nối lại ID tệp theo `file_map.json` (Phần I.5) |
 | `healthCheck` | Xem nhanh tình trạng máy chủ |
 | `installTriggers` | Trigger bị xóa nhầm |
 | `adminSeedSample` | Dữ liệu mẫu (chỉ THỬ) — PIN tạm in trong nhật ký |
@@ -291,3 +332,7 @@ M&E và Checksheet khôi phục theo cùng cách (làm trong cuộc trò chuyệ
 - **Nhập Excel báo "Tệp không đúng khuôn"**: tệp thiếu sheet `Danh mục tổng - 总清单` hoặc dòng tiêu đề có cột "Mã biểu mẫu".
 - **Nhập Excel báo "Tệp xuất từ dữ liệu trước lần đặt lại"**: xuất lại từ app rồi sửa trên tệp mới.
 - **Ghi lô báo "người ghi phải khác người nhập"**: nhờ Thư ký ISO khác hoặc Quản trị ghi (Excel → Lô nhập gần đây).
+- **Nút phiên bản báo "Máy chủ chưa được cài đặt"**: chưa chạy `migrateSchema` sau khi dán `Code.gs` bản 1b.
+- **Gửi duyệt báo "Cần tải PDF"**: mở phiên bản → **Tải PDF lên** rồi gửi lại.
+- **"Biểu đang có phiên bản soạn/chờ duyệt"**: mỗi biểu chỉ một bản đang mở — mở bản đó (nút **Mở phiên bản đang soạn**) để làm tiếp hoặc hủy.
+- **Xem PDF báo "Tệp không còn trên Drive"**: tệp bị xóa tay trong thư mục `ISO_Data` — lấy lại từ Thùng rác của Drive.

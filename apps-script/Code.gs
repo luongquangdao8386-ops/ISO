@@ -1,5 +1,5 @@
 /**
- * ISO · 体系管理 — Code.gs 1.0.0-d1.1
+ * ISO · 体系管理 — Code.gs 1.0.0-d1.2
  * TỆP TẠO TỰ ĐỘNG từ server/src/*.js bằng "npm run build". Không sửa tay.
  * Dán toàn bộ nội dung vào tệp Code.gs của dự án Apps Script ISO (ISO_MayChu_THU / ISO_MayChu_THAT).
  * Không chứa ID, khóa bí mật hay dữ liệu: các giá trị đó nằm trong Thuộc tính tập lệnh.
@@ -13,14 +13,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d1.1';
+var SERVER_VERSION = '1.0.0-d1.2';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.0';
+var SCHEMA_VERSION = '1.0.1';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -70,6 +70,8 @@ var SETTINGS_DEFAULTS = [
   ['backup_mirror_email', 'STRING', '', false, 1, 'Tài khoản Google thứ hai nhận bản sao lưu (chia sẻ chỉ xem thư mục Sao lưu và Dữ liệu)', '接收备份的第二个Google账户（备份及数据文件夹仅查看共享）'],
   // ISO (mục 10 đặc tả, chốt 06/11/2026)
   ['doc_review_months', 'INT', 12, true, 1, 'Chu kỳ rà soát tài liệu (tháng)', '文件评审周期（月）'],
+  ['review_warn_days', 'INT', 30, true, 1, 'Báo tài liệu sắp đến hạn rà soát trước (ngày)', '文件评审到期提前提醒（天）'],
+  ['admin_self_approval', 'BOOL', true, true, 1, 'Quản trị (cấp 4) được duyệt phiên bản do chính mình soạn', '管理员（4级）可审批自己编写的版本'],
   ['record_grace_days', 'INT', 3, true, 1, 'Số ngày cho phép trễ khi xét hồ sơ', '记录允许延迟天数'],
   ['records_start_date', 'STRING', '', true, 1, 'Ngày bắt đầu tính hồ sơ cho biểu ● nhập từ Excel (trống = ngày nhập danh mục đầu tiên)', 'Excel导入的●表单开始计算记录的日期（空=首次导入目录日期）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
@@ -106,7 +108,15 @@ var CODE_PATTERNS = {
 };
 
 /** Loại hồ sơ của tệp (Documents.entity_type) — phiên 1b (phiên bản), 1c (hồ sơ) */
-var DOC_ENTITY_SHEETS_ = {};
+var DOC_ENTITY_SHEETS_ = {
+  VERSION: { sheet: 'Versions', key: 'version_id' }
+};
+
+/** Trạng thái phiên bản (mục 6 đặc tả) */
+var VERSION_STATES_ = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'ISSUED', 'SUPERSEDED', 'CANCELLED'];
+/** Phiên bản đang mở (mỗi biểu chỉ một bản đang mở cùng lúc) */
+var VERSION_OPEN_ = { DRAFT: 1, IN_REVIEW: 1, APPROVED: 1 };
+var VERSION_TYPES_ = ['REVISION', 'ATTACH'];
 
 /** Trường không dịch tự động. Tên trường gốc (không hậu tố _vi/_zh). */
 var NO_MT_FIELDS = {
@@ -432,7 +442,15 @@ var SHEETS = {
   Items: { book: 'B', dot: 1, key: 'item_id', c: true, i18n: true,
     cols: 'item_id code kind level dept_code group_key name_vi name_zh purpose_vi purpose_zh iso9001 iso14001 iso45001 iso50001 ' +
       'brc_topics law cls freq_vi freq_zh flow keep priority where where_note status current_version_id current_rev issued_at ' +
-      'review_due owner_user_id qr_key note period_days period_type issued_source file_missing na_reason sort_order' },
+      'review_due owner_user_id qr_key note period_days period_type issued_source file_missing na_reason sort_order ' +
+      'na_prev_status reviewed_at reviewed_by' },
+  // Phiên bản của biểu/tài liệu (phiên 1b): DRAFT → IN_REVIEW → APPROVED → ISSUED → SUPERSEDED; trả lại về DRAFT; hủy CANCELLED.
+  // vtype: REVISION (lần ban hành mới, qua duyệt) | ATTACH (gắn tệp cho bản đang hiệu lực nhập từ Excel ●, Thư ký ISO ban hành thẳng)
+  Versions: { book: 'B', dot: 1, key: 'version_id', c: true, i18n: true,
+    cols: 'version_id item_id vtype rev state change_summary_vi change_summary_zh effective_date author_id ' +
+      'pdf_doc_id pdf_file_name pdf_size source_doc_id source_file_name source_size source_mime ' +
+      'submitted_at submitted_by approved_at approved_by approve_note issued_at issued_by superseded_at superseded_by_id ' +
+      'returned_at returned_by return_reason cancelled_at cancelled_by cancel_reason item_status_before' },
   // Điều khoản ISO 9001 và chủ đề BRCGS Packaging (std|key)
   Clauses: { book: 'B', dot: 1, key: 'clause_id', c: true, i18n: true,
     cols: 'clause_id std key group_vi group_zh name_vi name_zh mandatory_record sort_order active' },
@@ -475,7 +493,8 @@ var TYPE_OVERRIDES_ = {
   drive_file_id: 'STRING', managed_folder_id: 'STRING', thumb_drive_file_id: 'STRING', current_version_id: 'STRING',
   employee_code_hash: 'STRING', token_hash: 'STRING', payload_hash: 'STRING', pin_hash: 'STRING', salt: 'STRING', sha256: 'STRING',
   source_sha256: 'STRING', qr_key: 'STRING', origin_key: 'STRING', dept_codes: 'STRING', dept_code: 'STRING', group_key: 'STRING',
-  code: 'STRING', key: 'STRING', current_rev: 'STRING', file_epoch: 'STRING', template_key: 'STRING', template_version: 'STRING',
+  code: 'STRING', key: 'STRING', current_rev: 'STRING', rev: 'STRING', pdf_size: 'INT', source_size: 'INT',
+  submitted_by: 'STRING', approved_by: 'STRING', issued_by: 'STRING', returned_by: 'STRING', cancelled_by: 'STRING', reviewed_by: 'STRING', file_epoch: 'STRING', template_key: 'STRING', template_version: 'STRING',
   record_version: 'INT', sync_revision: 'INT', role_level: 'INT', auth_version: 'INT', failed_attempts: 'INT',
   size_bytes: 'INT', sort_order: 'INT', expected_version: 'INT', priority: 'INT', period_days: 'INT', row_number: 'INT', page_no: 'INT',
   total_rows: 'INT', add_count: 'INT', update_count: 'INT', same_count: 'INT', error_count: 'INT', clause_count: 'INT', committed_rows: 'INT',
@@ -1020,6 +1039,11 @@ var SUB_MSG = {
   LEVEL_INVALID: ['Cấp tài liệu không hợp lệ', '文件级别无效'],
   CLAUSE_INVALID: ['Điều khoản ISO 9001 dạng 4.1, 8.5.2 …', 'ISO 9001条款格式为 4.1、8.5.2 …'],
   OUT_OF_SCOPE: ['Ngoài phạm vi bộ phận của bạn', '超出您的部门范围'],
+  TOO_LONG: ['Quá dài', '内容过长'],
+  VERSION_OPEN: ['Biểu đang có phiên bản soạn/chờ duyệt/chờ ban hành — xử lý bản đó trước', '该表单已有编写中/待审批/待发布的版本，请先处理'],
+  PDF_REQUIRED: ['Cần tải PDF của phiên bản trước', '请先上传该版本的PDF'],
+  ITEM_NA: ['Biểu đang Không áp dụng (✕) — dùng lại trước', '该表单为不适用（✕），请先恢复使用'],
+  FILE_MISSING: ['Tệp không còn trên Drive của máy chủ', '服务器云端硬盘上的文件已不存在'],
   MIRROR_SAME_ACCOUNT: ['Tài khoản thứ hai phải khác tài khoản đang chạy máy chủ', '第二个账户须与运行服务器的账户不同']
 };
 
@@ -1741,14 +1765,15 @@ var ACTION_TABLE_ = [
   'import.commit|X|pin|W',
   'import.cancel|X|net|W',
   'i18n.suggest|2|net|R',
-  // Phiên bản & ban hành (phiên 1b)
+  // Phiên bản & ban hành (phiên 1b). Quyền theo bộ phận, cấp công ty, người soạn kiểm thêm ở PRECHECK_ (trước khi hỏi PIN)
   'version.save|2|net|W',
   'version.submit|2|net|W',
   'version.approve|3|pin|W',
-  'version.return|3|pin|W',
+  'version.return|2|pin|W',
   'version.issue|X|pin|W',
   'version.cancel|2|net|W',
   'item.setNa|X|pin|W',
+  'item.review|X|pin|W',
   'doc.upload|2|offline|W',
   'doc.get|1|net|R',
   // Hồ sơ (phiên 1c)
@@ -2293,6 +2318,16 @@ var HANDLERS_ = {
   'import.commit': function (ctx) { return importCommit_(ctx); },
   'import.cancel': function (ctx) { return importCancel_(ctx); },
   'i18n.suggest': function (ctx) { return i18nSuggest_(ctx); },
+  'version.save': function (ctx) { return versionSave_(ctx); },
+  'version.submit': function (ctx) { return versionSubmit_(ctx); },
+  'version.approve': function (ctx) { return versionApprove_(ctx); },
+  'version.return': function (ctx) { return versionReturn_(ctx); },
+  'version.issue': function (ctx) { return versionIssue_(ctx); },
+  'version.cancel': function (ctx) { return versionCancel_(ctx); },
+  'item.setNa': function (ctx) { return itemSetNa_(ctx); },
+  'item.review': function (ctx) { return itemReview_(ctx); },
+  'doc.upload': function (ctx) { return docUpload_(ctx); },
+  'doc.get': function (ctx) { return docGet_(ctx); },
   'report.logo.get': function (ctx) { return reportLogoGet_(ctx); },
   'report.logo.set': function (ctx) { return reportLogoSet_(ctx); },
   'user.pickList': function (ctx) { return userPickList_(ctx); },
@@ -2311,6 +2346,16 @@ var HANDLERS_ = {
   'settings.edit': function (ctx) { return settingsEdit_(ctx); },
   'system.status': function (ctx) { return systemStatus_(ctx); },
   'sample.seed': function (ctx) { return sampleSeedAction_(ctx); }
+};
+
+/**
+ * Kiểm quyền theo hồ sơ (bộ phận, cấp công ty, người soạn) và trạng thái TRƯỚC khi hỏi PIN: người không có quyền nhận FORBIDDEN
+ * ngay, không bị hỏi PIN cho việc sẽ bị từ chối (mục 4 quy tắc 4).
+ */
+var PRECHECK_ = {
+  'version.approve': function (ctx) { precheckApprove_(ctx); },
+  'version.return': function (ctx) { precheckReturn_(ctx); },
+  'version.issue': function (ctx) { precheckIssue_(ctx); }
 };
 
 /** Action không cần phiên */
@@ -2441,6 +2486,7 @@ function dispatchInner_(req, viaPush) {
   var ctx = requireSession_(req, req.action);
   if (def.write && !isUuidV4_(req.operation_id)) throw validationError_([fieldError_('operation_id', 'ID_INVALID')]);
   ctx.auth = authorize_(ctx, req.action);
+  if (PRECHECK_[req.action]) PRECHECK_[req.action](ctx);
   // Hỏi lại PIN sau khi đã biết người dùng có quyền (không hỏi PIN người không có quyền)
   if (def.net === 'pin' && !verifyReauth_(ctx, req.reauth_token)) throw apiError_('REAUTH_REQUIRED');
   ctx.viaPush = !!viaPush;
@@ -2819,7 +2865,9 @@ function itemRowFromImport_(ctx, cur, code, f, nowIso) {
   if (!row.current_version_id) {
     if (row.status === 'ISSUED') { row.issued_source = 'IMPORT'; row.file_missing = true; } else { row.issued_source = ''; row.file_missing = false; }
   }
-  row.review_due = row.status === 'ISSUED' && row.issued_at ? addMonthsIso_(row.issued_at, Number(setting_('doc_review_months') || 12)) : '';
+  // Hạn rà soát: tính từ ngày ban hành; giữ hạn đã có khi biểu vẫn ● cùng ngày ban hành (ban hành trong app, đã bấm "Đã rà soát")
+  var keepDue = cur && cur.review_due && cur.status === 'ISSUED' && row.status === 'ISSUED' && cmpVal_(cur.issued_at) === cmpVal_(row.issued_at);
+  row.review_due = keepDue ? cur.review_due : (row.status === 'ISSUED' && row.issued_at ? addMonthsIso_(row.issued_at, Number(setting_('doc_review_months') || 12)) : '');
   if (!cur) cNew_(ctx, row); else cUpdate_(ctx, row);
   return row;
 }
@@ -2962,12 +3010,29 @@ function seedDepts_() {
 }
 
 // ===== 12_docs.js =====
-/* 12_docs: tệp trên Drive của tài khoản máy chủ ISO (thư mục dữ liệu riêng tư).
- * Phiên 1a chỉ dùng cho logo báo cáo; doc.upload (PDF/tệp gốc phiên bản, ảnh hồ sơ) làm ở phiên 1b/1c — tệp tải qua máy chủ. */
+/* 12_docs: tệp trên Drive của tài khoản máy chủ ISO (thư mục dữ liệu riêng tư, không chia sẻ link).
+ * Logo báo cáo (1a); PDF + tệp gốc của phiên bản (1b, entity VERSION); ảnh/tệp hồ sơ (1c, entity RECORD).
+ * Tải lên và tải về đều qua máy chủ (doc.upload, doc.get) sau khi kiểm quyền; không bao giờ trả link Drive. */
+
+var XLSX_MIME_ = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+var DOCX_MIME_ = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+var ZIP_MAGIC_ = [0x50, 0x4B, 0x03, 0x04];
+var OLE_MAGIC_ = [0xD0, 0xCF, 0x11, 0xE0];
 
 var DOC_MIME_ = {
   'image/jpeg': { magic: [0xFF, 0xD8, 0xFF], ext: 'jpg' },
-  'image/png': { magic: [0x89, 0x50, 0x4E, 0x47], ext: 'png' }
+  'image/png': { magic: [0x89, 0x50, 0x4E, 0x47], ext: 'png' },
+  'application/pdf': { magic: [0x25, 0x50, 0x44, 0x46], ext: 'pdf' },
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { magic: ZIP_MAGIC_, ext: 'xlsx' },
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { magic: ZIP_MAGIC_, ext: 'docx' },
+  'application/vnd.ms-excel': { magic: OLE_MAGIC_, ext: 'xls' },
+  'application/msword': { magic: OLE_MAGIC_, ext: 'doc' }
+};
+
+/** Loại tệp theo việc: PDF bản ban hành (bắt buộc), tệp gốc để sửa lần sau (xlsx/docx) */
+var DOC_KIND_MIMES_ = {
+  PDF: ['application/pdf'],
+  SOURCE: [XLSX_MIME_, DOCX_MIME_, 'application/vnd.ms-excel', 'application/msword']
 };
 
 function magicOk_(bytes, mime) {
@@ -2988,6 +3053,182 @@ function trashQuietly_(f) {
   try { f.setTrashed(true); } catch (e) { /* bỏ qua */ }
 }
 
+/** Tên tệp người dùng gửi: bỏ đường dẫn và ký tự điều khiển, tối đa 120 ký tự */
+function cleanFileName_(s) {
+  var t = String(s || '').replace(/^.*[\\\/]/, '').replace(/[\u0000-\u001f<>:"|?*]/g, '').trim();
+  return t.slice(0, 120);
+}
+
+/* ---------------- doc.upload ---------------- */
+
+/**
+ * doc.upload {document_id, entity_type: VERSION, entity_id: version_id, kind: PDF | SOURCE, mime_type, file_name, content_b64}
+ * Phiên bản phải đang là Nháp và người gửi sửa được nháp đó (versionEditable_). Tải lại cùng loại → tệp cũ thôi dùng.
+ * Trả {document_id, entity_type: VERSION, record: phiên bản sau khi gắn tệp, record_version của phiên bản}.
+ */
+function docUpload_(ctx) {
+  var p = ctx.req.payload || {};
+  var errs = [];
+  if (!isUuidV4_(p.document_id)) errs.push(fieldError_('document_id', 'ID_INVALID'));
+  var et = DOC_ENTITY_SHEETS_[p.entity_type];
+  if (!et) errs.push(fieldError_('entity_type', 'INVALID_VALUE'));
+  if (!isUuidV4_(p.entity_id)) errs.push(fieldError_('entity_id', 'ID_INVALID'));
+  var kinds = DOC_KIND_MIMES_[p.kind];
+  if (!kinds) errs.push(fieldError_('kind', 'INVALID_VALUE'));
+  else if (kinds.indexOf(p.mime_type) < 0) errs.push(fieldError_('mime_type', 'FILE_TYPE'));
+  if (typeof p.content_b64 !== 'string' || !p.content_b64) errs.push(fieldError_('content_b64', 'REQUIRED'));
+  if (Number(ctx.req.expected_version || 0) !== 0) errs.push(fieldError_('expected_version', 'INVALID_VALUE'));
+  if (errs.length) throw validationError_(errs);
+  var entity = findOne_(et.sheet, et.key, p.entity_id);
+  if (!entity || entity.archived_at) throw validationError_([fieldError_('entity_id', 'NOT_FOUND')]);
+  var it = findOne_('Items', 'item_id', entity.item_id);
+  if (!it || !itemVisible_(ctx.user, it) || !versionEditable_(ctx.user, it, entity)) throw apiError_('FORBIDDEN');
+  if (entity.state !== 'DRAFT') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+
+  // Đã có thao tác này → không tạo thêm tệp
+  var ex = findOne_('Operations', 'operation_id', ctx.req.operation_id);
+  if (ex) return withWriteLock_(function () { return existingOpResponse_(ctx, ex, payloadHash_(ctx)); });
+  if (findRowNums_('Documents', 'document_id', p.document_id).length) throw validationError_([fieldError_('document_id', 'ID_EXISTS')]);
+
+  var bytes;
+  try { bytes = b64d_(p.content_b64); } catch (e) { throw validationError_([fieldError_('content_b64', 'INVALID_VALUE')]); }
+  if (!bytes.length) throw validationError_([fieldError_('content_b64', 'REQUIRED')]);
+  if (bytes.length > Number(setting_('doc_max_bytes'))) throw validationError_([fieldError_('content_b64', 'FILE_TOO_LARGE')]);
+  if (!magicOk_(bytes, p.mime_type)) throw validationError_([fieldError_('mime_type', 'FILE_TYPE')]);
+  var ext = DOC_MIME_[p.mime_type].ext;
+  var shown = cleanFileName_(p.file_name) || (it.code + '.' + ext);
+  // Tên trên Drive dễ tìm khi mở thư mục: <mã biểu>_L<lần>[_goc]_<8 ký tự>.<đuôi>
+  var driveName = String(it.code).replace(/[\/\\]/g, '-') + '_L' + entity.rev + (p.kind === 'SOURCE' ? '_goc' : '') + '_' + p.document_id.slice(0, 8) + '.' + ext;
+  // Drive: ngoài khóa ghi
+  var folder = appFolder_();
+  var file = folder.createFile(Utilities.newBlob(bytes, p.mime_type, driveName));
+  var sha = b64url_(sha256_(bytes));
+  var oldDriveId = '';
+  var res;
+  try {
+    res = executeWrite_(ctx, {
+      entity_type: 'DOCUMENT', entity_id: p.document_id,
+      build: function () {
+        if (findRowNums_('Documents', 'document_id', p.document_id).length) throw validationError_([fieldError_('document_id', 'ID_EXISTS')]);
+        var vRow = findOne_(et.sheet, et.key, p.entity_id);
+        if (!vRow || vRow.state !== 'DRAFT') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+        var v = clone_(vRow); delete v.__row;
+        var col = p.kind === 'PDF' ? 'pdf' : 'source';
+        var writes = [];
+        var oldDocId = v[col + '_doc_id'];
+        if (oldDocId) {
+          var od = findOne_('Documents', 'document_id', oldDocId);
+          if (od && od.active) {
+            oldDriveId = od.drive_file_id;
+            var odRow = clone_(od); delete odRow.__row;
+            odRow.active = false;
+            cUpdate_(ctx, odRow);
+            writes.push({ sheet: 'Documents', mode: 'update', row: odRow });
+          }
+        }
+        var doc = cNew_(ctx, {
+          document_id: p.document_id, entity_type: p.entity_type, entity_id: p.entity_id, kind: p.kind, drive_file_id: file.getId(),
+          mime_type: p.mime_type, file_name: shown, access_scope: 'PRIVATE', active: true, managed_folder_id: folder.getId(),
+          owned_by_app: true, size_bytes: bytes.length, thumb_drive_file_id: '', sha256: sha, page_no: null
+        });
+        writes.unshift({ sheet: 'Documents', mode: 'insert', row: doc });
+        v[col + '_doc_id'] = p.document_id;
+        v[col + '_file_name'] = shown;
+        v[col + '_size'] = bytes.length;
+        if (col === 'source') v.source_mime = p.mime_type;
+        cUpdate_(ctx, v);
+        writes.push({ sheet: et.sheet, mode: 'update', row: v });
+        return {
+          writes: writes,
+          result: { document_id: p.document_id, entity_type: 'VERSION', entity_id: v.version_id, record_version: v.record_version, record: projectRow_(ctx, v) },
+          record_version: v.record_version,
+          audit: { entity_type: 'DOCUMENT', entity_id: p.document_id, before_json: oldDocId ? { replaced: oldDocId } : null,
+            after_json: { kind: p.kind, entity_type: p.entity_type, entity_id: p.entity_id, size_bytes: bytes.length, file_name: shown } }
+        };
+      }
+    });
+  } catch (e) {
+    trashQuietly_(file);
+    throw e;
+  }
+  if (res.code === 'DUPLICATE_OPERATION') trashQuietly_(file);
+  else if (oldDriveId) { try { trashQuietly_(DriveApp.getFileById(oldDriveId)); } catch (e2) { /* bỏ qua */ } }
+  return res;
+}
+
+/* ---------------- doc.get ---------------- */
+
+/**
+ * doc.get {document_id}: nội dung tệp (base64) cho người xem được hồ sơ chứa tệp.
+ * Phiên bản đang hiệu lực: ai thấy biểu đều tải được (bản in). Nháp, chờ duyệt, lỗi thời: cấp 2 trở lên trong bộ phận, Thư ký ISO.
+ */
+function docGet_(ctx) {
+  var p = ctx.req.payload || {};
+  if (!isUuidV4_(p.document_id)) throw validationError_([fieldError_('document_id', 'ID_INVALID')]);
+  var d = findOne_('Documents', 'document_id', p.document_id);
+  if (!d || d.archived_at) throw apiError_('NOT_FOUND');
+  if (d.entity_type === 'VERSION') {
+    var v = findOne_('Versions', 'version_id', d.entity_id);
+    var it = v ? findOne_('Items', 'item_id', v.item_id) : null;
+    if (!v || !it) throw apiError_('NOT_FOUND');
+    if (!itemVisible_(ctx.user, it)) throw apiError_('FORBIDDEN');
+    if (v.state !== 'ISSUED' && !isSecretary_(ctx.user) && !(Number(ctx.user.role_level) >= 2 && deptWritable_(ctx.user, it.dept_code))) throw apiError_('FORBIDDEN');
+  } else {
+    throw apiError_('FORBIDDEN');
+  }
+  if (Number(d.size_bytes) > Number(setting_('doc_max_bytes'))) throw validationError_([fieldError_('document_id', 'FILE_TOO_LARGE')]);
+  var blob;
+  try {
+    var f = DriveApp.getFileById(String(d.drive_file_id));
+    if (f.isTrashed()) throw new Error('trashed');
+    blob = f.getBlob();
+  } catch (e) {
+    throw validationError_([fieldError_('document_id', 'FILE_MISSING')]);
+  }
+  return {
+    document_id: d.document_id, kind: d.kind, file_name: d.file_name, mime_type: d.mime_type, size_bytes: d.size_bytes,
+    sha256: d.sha256, content_b64: b64_(blob.getBytes())
+  };
+}
+
+/* ---------------- Khôi phục từ bản chép ở tài khoản thứ hai ---------------- */
+
+/**
+ * Chạy tay sau khi dựng lại máy chủ từ bản chép (Hướng dẫn I.5 bước 4): tệp trên Drive ở bản chép có ID mới.
+ * Đọc file_map.json trong thư mục DRIVE_ROOT_FOLDER_ID ({id cũ: {id: id mới, …}}) rồi đổi Documents.drive_file_id,
+ * thumb_drive_file_id và logo báo cáo sang ID mới. Chạy nhiều lần vẫn đúng (ID đã đổi thì bỏ qua).
+ */
+function adminNoiLaiTep() {
+  dbReset_();
+  var folder = appFolder_();
+  var it = folder.getFilesByName('file_map.json');
+  if (!it.hasNext()) throw new Error('Không thấy file_map.json trong thư mục DRIVE_ROOT_FOLDER_ID — đặt thuộc tính này là thư mục dữ liệu của bản chép (SaoLuu_Phu/ISO_Data…).');
+  var map = JSON.parse(it.next().getBlob().getDataAsString()) || {};
+  var newId = function (old) { var m = map[old]; return m ? (typeof m === 'string' ? m : m.id) : ''; };
+  var changed = 0, missing = 0, same = 0;
+  var writes = [];
+  readRows_('Documents').forEach(function (d) {
+    var row = clone_(d); delete row.__row;
+    var dirty = false;
+    ['drive_file_id', 'thumb_drive_file_id'].forEach(function (k) {
+      if (!row[k]) return;
+      var n = newId(row[k]);
+      if (n) { row[k] = n; dirty = true; } else if (k === 'drive_file_id') {
+        var ok = false;
+        try { ok = !DriveApp.getFileById(String(row[k])).isTrashed(); } catch (e) { ok = false; }
+        if (ok) same++; else missing++;
+      }
+    });
+    if (dirty) { row.managed_folder_id = folder.getId(); writes.push({ sheet: 'Documents', mode: 'update', row: row, rowNum: d.__row }); changed++; }
+  });
+  if (writes.length) systemWrite_(writes, { action: 'admin.noiLaiTep', entity_type: 'DOCUMENT', after_json: { changed: changed } });
+  var logo = String(setting_('report_logo_file_id') || '');
+  var logoNew = logo ? newId(logo) : '';
+  if (logoNew) withWriteLock_(function () { writeSetting_('report_logo_file_id', logoNew, SYSTEM_USER); });
+  log_('adminNoiLaiTep: đổi ID ' + changed + ' tệp' + (logoNew ? ' + logo báo cáo' : '') + '; ' + same + ' tệp đã đúng; ' + missing + ' tệp không có trong file_map.json và không mở được.');
+  return { changed: changed, same: same, missing: missing, logo: !!logoNew };
+}
+
 // ===== 13_sync.js =====
 /* 13_sync: sync.bootstrap, sync.changes, sync.push, sync.getOperationStatus (cùng giao thức như M&E, Checksheet)
  * Biểu/tài liệu chỉ gửi xuống trong phạm vi bộ phận của người dùng (itemVisible_); bộ phận, nhóm, điều khoản gửi đủ. */
@@ -2996,11 +3237,33 @@ var SYNC_ENTITIES_ = [
   { type: 'DEPT', sheet: 'Depts' },
   { type: 'GROUP', sheet: 'Groups' },
   { type: 'ITEM', sheet: 'Items', scoped: true },
-  { type: 'CLAUSE', sheet: 'Clauses' }
+  { type: 'CLAUSE', sheet: 'Clauses' },
+  // Phiên bản (1b): theo phạm vi của biểu; cấp 1 (Tra cứu) chỉ nhận bản đang hiệu lực và lỗi thời
+  { type: 'VERSION', sheet: 'Versions', scoped: 'item' }
 ];
+
+/** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */
+function syncEntities_() {
+  return SYNC_ENTITIES_.filter(function (e) { return sheetExists_(e.sheet); });
+}
+
+/** Biểu theo item_id (đọc một lần cho mỗi lượt đồng bộ) */
+function syncItemMap_(aux) {
+  if (!aux.items) {
+    aux.items = {};
+    aux.tc.rows('Items').forEach(function (r) { aux.items[r.item_id] = r; });
+  }
+  return aux.items;
+}
 
 /** Dòng → bản ghi gửi client; null nếu không gửi (ngoài phạm vi bộ phận) */
 function syncProject_(ctx, ent, row, aux) {
+  if (ent.scoped === 'item') {
+    var it = syncItemMap_(aux)[row.item_id];
+    if (!it || !itemVisible_(ctx.user, it)) return null;
+    if (Number(ctx.user.role_level) < 2 && !isSecretary_(ctx.user) && row.state !== 'ISSUED' && row.state !== 'SUPERSEDED') return null;
+    return projectRow_(ctx, row);
+  }
   if (ent.scoped && !itemVisible_(ctx.user, row)) return null;
   return projectRow_(ctx, row);
 }
@@ -3012,7 +3275,7 @@ function syncBootstrap_(ctx) {
   var ei = Number(tok[0]) || 0, off = Number(tok[1]) || 0;
   var st = readState_();
   var cursor = p.page_token && p.sync_cursor ? Number(p.sync_cursor) : Number(stateGet_(st, 'sync_revision', 0));
-  var ents = SYNC_ENTITIES_;
+  var ents = syncEntities_();
   var tc = tableCache_(ents.slice(ei).map(function (e) { return e.sheet; }), st);
   var aux = { tc: tc };
   var records = {};
@@ -3070,7 +3333,7 @@ function syncChanges_(ctx) {
   var st = readState_();
   var head = Number(stateGet_(st, 'sync_revision', 0));
   var changes = [];
-  var ents = SYNC_ENTITIES_.filter(function (ent) { return Number(stateGet_(st, 'table_rev.' + ent.sheet, 0)) > cursor; });
+  var ents = syncEntities_().filter(function (ent) { return Number(stateGet_(st, 'table_rev.' + ent.sheet, 0)) > cursor; });
   var tc = ents.length ? tableCache_(ents.map(function (e) { return e.sheet; }), st) : null;
   var aux = { tc: tc };
   ents.forEach(function (ent) {
@@ -3646,6 +3909,28 @@ function migrateSchema() {
   log_('migrateSchema xong. Thêm: ' + (added.length ? added.join('; ') : 'không có') + '. schema_version=' + SCHEMA_VERSION);
 }
 
+/**
+ * Dán Code.gs mới mà quên chạy migrateSchema: trigger nền tự chạy migrateSchema khi schema_version của bảng tính khác mã
+ * (thêm sheet/cột còn thiếu, không xóa gì). Lỗi thì để healthCheck báo, không chặn trigger.
+ */
+function autoMigrate_() {
+  try {
+    if (String(stateGet_(readState_(), 'schema_version', '')) === SCHEMA_VERSION) return false;
+    migrateSchema();
+    dbReset_();
+    return true;
+  } catch (e) {
+    log_('autoMigrate_: ' + (e && e.message));
+    return false;
+  }
+}
+
+/** Sheet đã có trong bảng tính chưa (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema) */
+function sheetExists_(name) {
+  if (DB_.sheets[name]) return true;
+  try { sh_(name); return true; } catch (e) { return false; }
+}
+
 function clearSysCaches_() {
   cache_().removeAll(['sys:props', 'sys:state', 'cfg:settings']);
 }
@@ -3852,6 +4137,464 @@ function adminChuyenSangTHAT() {
     w.ImportBatches + ' lô nhập; tài khoản mẫu: ' + (out.users_removed.join(', ') || 'không có') + '. Đổi tên: ' + (renamed.join(', ') || 'không có') +
     '. Bước tiếp: Triển khai → Quản lý → sửa → Phiên bản mới (giữ link), mở ' + THAT_BASE_URL_ + ', đăng nhập owner, Excel → Nhập lô file Excel tổng.');
   return { wiped: w, users_removed: out.users_removed, renamed: renamed };
+}
+
+// ===== 16_versions.js =====
+/* 16_versions: phiên bản & ban hành (phiên 1b, mục 6.1 đặc tả).
+ * Nháp DRAFT → (Gửi duyệt) IN_REVIEW → (Duyệt) APPROVED → (Ban hành) ISSUED → (bản mới ban hành) SUPERSEDED.
+ * Trả lại: IN_REVIEW/APPROVED → DRAFT kèm lý do. Hủy: bản đang mở → CANCELLED. Mỗi biểu một bản đang hiệu lực, một bản đang mở.
+ * ATTACH: biểu ● nhập từ Excel chưa có tệp → Thư ký ISO gắn PDF cho đúng lần ban hành đang hiệu lực rồi ban hành thẳng (không duyệt lại,
+ * vì bản giấy đã ban hành), cờ "chưa có tệp" tắt.
+ * Quyền: soạn — cấp 2+ trong bộ phận, Thư ký ISO; duyệt cấp bộ phận — trưởng bộ phận (cấp 3 trong bộ phận) hoặc cấp 4; cấp công ty —
+ * cấp 4; người soạn không tự duyệt (cấp 4 được, admin_self_approval); ban hành — Thư ký ISO hoặc cấp 4. Quyền kiểm trước khi hỏi PIN
+ * (PRECHECK_ trong 09_api). App có thể chỉ có owner + Thư ký ISO (cấp 4): hai người này làm thay trưởng bộ phận. */
+
+/* ---------------- Quyền ---------------- */
+
+/** Tạo phiên bản cho biểu */
+function canCreateVersion_(u, it, vtype) {
+  if (vtype === 'ATTACH') return isSecretary_(u);
+  return isSecretary_(u) || (Number(u.role_level) >= 2 && deptWritable_(u, it.dept_code));
+}
+
+/** Sửa nháp, tải tệp, gửi duyệt, hủy: người soạn (cấp 2+ trong bộ phận), trưởng bộ phận, Thư ký ISO */
+function versionEditable_(u, it, v) {
+  if (isSecretary_(u)) return true;
+  if (!deptWritable_(u, it.dept_code)) return false;
+  if (v && v.author_id === u.user_id) return Number(u.role_level) >= 2;
+  return Number(u.role_level) >= 3;
+}
+
+/** Duyệt (và trả lại bản chờ duyệt): cấp 4 mọi tài liệu (kể cả bản mình soạn khi admin_self_approval);
+ *  cấp 3 tài liệu cấp bộ phận trong bộ phận mình, không phải bản mình soạn */
+function canApprove_(u, it, v) {
+  var lvl = Number(u.role_level);
+  if (lvl >= 4) return v.author_id !== u.user_id || !!setting_('admin_self_approval');
+  if (v.author_id === u.user_id) return false;
+  if (it.level === 'COMPANY') return false;
+  return lvl === 3 && deptWritable_(u, it.dept_code);
+}
+
+/** Trả lại: bản chờ duyệt — người duyệt được; bản đã duyệt — người duyệt hoặc người ban hành (Thư ký ISO, cấp 4) */
+function canReturn_(u, it, v) {
+  if (v.state === 'APPROVED' && isSecretary_(u)) return true;
+  return canApprove_(u, it, v);
+}
+
+/** Hủy: người sửa được nháp (bản nháp, chờ duyệt); bản đã duyệt chỉ Thư ký ISO, cấp 4 */
+function canCancelVersion_(u, it, v) {
+  if (v.state === 'APPROVED') return isSecretary_(u);
+  return versionEditable_(u, it, v);
+}
+
+/* ---------------- Tiện ích ---------------- */
+
+function padRev_(n) {
+  n = Number(n) || 0;
+  return n < 10 ? '0' + n : String(n);
+}
+
+/** Lần ban hành kế tiếp: lớn nhất trong các bản đã ban hành / lỗi thời và lần ban hành của danh mục, cộng 1.
+ *  Biểu ● nhập từ Excel không ghi lần ban hành coi như đang ở lần 01. */
+function nextRev_(it, versions) {
+  var base = Number(it.current_rev) || (it.status === 'ISSUED' ? 1 : 0);
+  versions.forEach(function (v) {
+    if (v.state === 'ISSUED' || v.state === 'SUPERSEDED') base = Math.max(base, Number(v.rev) || 0);
+  });
+  return padRev_(base + 1);
+}
+
+function versionsOf_(itemId) {
+  return readRows_('Versions').filter(function (v) { return v.item_id === itemId && !v.archived_at; });
+}
+
+function openVersionOf_(versions, exceptId) {
+  for (var i = 0; i < versions.length; i++) if (VERSION_OPEN_[versions[i].state] && versions[i].version_id !== exceptId) return versions[i];
+  return null;
+}
+
+/** Phiên bản + biểu (ngoài khóa) cho kiểm quyền; NOT_FOUND khi không có, FORBIDDEN khi ngoài phạm vi */
+function loadVersion_(ctx, id) {
+  if (!isUuidV4_(id)) throw validationError_([fieldError_('version_id', 'ID_INVALID')]);
+  var v = findOne_('Versions', 'version_id', id);
+  if (!v || v.archived_at) throw apiError_('NOT_FOUND');
+  var it = findOne_('Items', 'item_id', v.item_id);
+  if (!it) throw apiError_('NOT_FOUND');
+  if (!itemVisible_(ctx.user, it)) throw apiError_('FORBIDDEN');
+  return { v: v, it: it };
+}
+
+function stateInvalid_() {
+  return validationError_([fieldError_('state', 'STATUS_INVALID')]);
+}
+
+/** Đọc lại dưới khóa ghi, so expected_version; trả bản sao để sửa (không có __row) */
+function lockedVersion_(ctx, id) {
+  var cur = findOne_('Versions', 'version_id', id);
+  if (!cur) throw apiError_('NOT_FOUND');
+  assertVersion_(ctx, cur, 'VERSION', 'Versions');
+  var row = clone_(cur); delete row.__row;
+  return row;
+}
+
+function lockedItem_(id) {
+  var cur = findOne_('Items', 'item_id', id);
+  if (!cur) throw apiError_('NOT_FOUND');
+  var row = clone_(cur); delete row.__row;
+  return row;
+}
+
+function versionResult_(ctx, v, item) {
+  var out = { entity_type: 'VERSION', entity_id: v.version_id, record_version: v.record_version, record: projectRow_(ctx, v) };
+  if (item) out.item = projectRow_(ctx, item);
+  return out;
+}
+
+function reasonText_(p, field, required, max) {
+  var t = trimStr_(p[field]);
+  if (required && !t) throw validationError_([fieldError_(field, 'REQUIRED')]);
+  if (t.length > (max || 500)) throw validationError_([fieldError_(field, 'TOO_LONG')]);
+  return t;
+}
+
+/* ---------------- Kiểm trước khi hỏi PIN (09_api PRECHECK_) ---------------- */
+
+function precheckApprove_(ctx) {
+  var x = loadVersion_(ctx, (ctx.req.payload || {}).version_id);
+  if (!canApprove_(ctx.user, x.it, x.v)) throw apiError_('FORBIDDEN');
+  if (x.v.state !== 'IN_REVIEW') throw stateInvalid_();
+}
+
+function precheckReturn_(ctx) {
+  var x = loadVersion_(ctx, (ctx.req.payload || {}).version_id);
+  if (!canReturn_(ctx.user, x.it, x.v)) throw apiError_('FORBIDDEN');
+  if (x.v.state !== 'IN_REVIEW' && x.v.state !== 'APPROVED') throw stateInvalid_();
+}
+
+function precheckIssue_(ctx) {
+  var x = loadVersion_(ctx, (ctx.req.payload || {}).version_id);
+  if (!isSecretary_(ctx.user)) throw apiError_('FORBIDDEN');
+  var ok = x.v.vtype === 'ATTACH' ? x.v.state === 'DRAFT' : x.v.state === 'APPROVED';
+  if (!ok) throw stateInvalid_();
+  if (!x.v.pdf_doc_id) throw validationError_([fieldError_('pdf', 'PDF_REQUIRED')]);
+}
+
+/* ---------------- version.save ---------------- */
+
+/**
+ * version.save {version_id, item_id (khi tạo), vtype: REVISION | ATTACH, change_summary_vi/zh, effective_date}
+ * expected_version 0 = tạo nháp mới (lần ban hành do máy chủ cấp); khác 0 = sửa nháp. Biểu ○ có nháp đầu tiên → ◐ đang soạn.
+ */
+function versionSave_(ctx) {
+  var p = ctx.req.payload || {};
+  var isNew = Number(ctx.req.expected_version || 0) === 0;
+  var errs = [];
+  if (!isUuidV4_(p.version_id)) errs.push(fieldError_('version_id', 'ID_INVALID'));
+  var vtype = p.vtype === undefined || p.vtype === '' ? 'REVISION' : String(p.vtype);
+  if (VERSION_TYPES_.indexOf(vtype) < 0) errs.push(fieldError_('vtype', 'INVALID_VALUE'));
+  if (isNew && !isUuidV4_(p.item_id)) errs.push(fieldError_('item_id', 'ID_INVALID'));
+  var eff = p.effective_date === undefined ? undefined : trimStr_(p.effective_date);
+  if (eff && !isDateStr_(eff)) errs.push(fieldError_('effective_date', 'INVALID_DATE'));
+  if (errs.length) throw validationError_(errs);
+  var cur = null, it;
+  if (isNew) {
+    it = findOne_('Items', 'item_id', p.item_id);
+    if (!it) throw apiError_('NOT_FOUND');
+    if (!itemVisible_(ctx.user, it) || !canCreateVersion_(ctx.user, it, vtype)) throw apiError_('FORBIDDEN');
+  } else {
+    var x = loadVersion_(ctx, p.version_id);
+    cur = x.v; it = x.it; vtype = cur.vtype || 'REVISION';
+    if (!versionEditable_(ctx.user, it, cur)) throw apiError_('FORBIDDEN');
+    if (cur.state !== 'DRAFT') throw stateInvalid_();
+  }
+  var input = clone_(p);
+  if (vtype === 'ATTACH' && !trimStr_(input.change_summary_vi) && !trimStr_(input.change_summary_zh) && !cur) {
+    input.change_summary_vi = 'Gắn tệp cho bản đang hiệu lực (nhập từ danh mục Excel)';
+    input.change_summary_zh = '为现行版本附加文件（从Excel目录导入）';
+  }
+  if (vtype === 'REVISION') requireOneLang_(errs, input, cur, 'change_summary');
+  if (errs.length) throw validationError_(errs);
+  var tr = applyTranslations_('Versions', ['change_summary'], input, cur); // dịch ngoài khóa ghi
+  return executeWrite_(ctx, {
+    entity_type: 'VERSION', entity_id: p.version_id,
+    build: function () {
+      var row, item = null, writes = [];
+      if (isNew) {
+        assertNewId_('Versions', 'version_id', p.version_id);
+        item = lockedItem_(p.item_id);
+        var versions = versionsOf_(item.item_id);
+        if (item.status === 'NA') throw validationError_([fieldError_('item_id', 'ITEM_NA')]);
+        if (openVersionOf_(versions)) throw validationError_([fieldError_('item_id', 'VERSION_OPEN')]);
+        var rev;
+        if (vtype === 'ATTACH') {
+          if (item.status !== 'ISSUED' || item.current_version_id) throw stateInvalid_();
+          rev = padRev_(Number(item.current_rev) || 1);
+        } else {
+          rev = nextRev_(item, versions);
+        }
+        row = cNew_(ctx, {
+          version_id: p.version_id, item_id: item.item_id, vtype: vtype, rev: rev, state: 'DRAFT', effective_date: eff || '',
+          author_id: ctx.user.user_id, pdf_doc_id: '', pdf_file_name: '', pdf_size: null, source_doc_id: '', source_file_name: '',
+          source_size: null, source_mime: '', submitted_at: '', submitted_by: '', approved_at: '', approved_by: '', approve_note: '',
+          issued_at: '', issued_by: '', superseded_at: '', superseded_by_id: '', returned_at: '', returned_by: '', return_reason: '',
+          cancelled_at: '', cancelled_by: '', cancel_reason: '', item_status_before: item.status
+        });
+        if (vtype === 'REVISION' && item.status === 'NONE') {
+          item.status = 'DRAFTING';
+          cUpdate_(ctx, item);
+          writes.push({ sheet: 'Items', mode: 'update', row: item });
+        } else item = null;
+      } else {
+        row = lockedVersion_(ctx, p.version_id);
+        if (row.state !== 'DRAFT') throw stateInvalid_();
+        cUpdate_(ctx, row);
+        if (eff !== undefined) row.effective_date = eff;
+      }
+      Object.keys(tr.values).forEach(function (k) { row[k] = tr.values[k]; });
+      row.i18n_meta = tr.meta;
+      writes.unshift({ sheet: 'Versions', mode: isNew ? 'insert' : 'update', row: row });
+      return {
+        writes: writes, result: versionResult_(ctx, row, item), record_version: row.record_version,
+        audit: { entity_type: 'VERSION', entity_id: row.version_id, before_json: null,
+          after_json: { item_id: row.item_id, rev: row.rev, vtype: row.vtype, state: row.state, created: isNew } }
+      };
+    }
+  });
+}
+
+/* ---------------- Chuyển trạng thái ---------------- */
+
+/**
+ * Khung chung: kiểm quyền + trạng thái (ngoài khóa), đọc lại dưới khóa, so expected_version, gọi apply(row, ctx2) để đổi.
+ * apply trả {item?: dòng Items đã sửa, extra?: writes thêm, audit_after}.
+ */
+function versionTransition_(ctx, opts) {
+  var p = ctx.req.payload || {};
+  var x = loadVersion_(ctx, p.version_id);
+  if (opts.allowed && !opts.allowed(ctx.user, x.it, x.v)) throw apiError_('FORBIDDEN');
+  if (opts.from.indexOf(x.v.state) < 0 || (opts.check && !opts.check(x.v))) throw stateInvalid_();
+  var pre = opts.prepare ? opts.prepare(p, x) : null;
+  return executeWrite_(ctx, {
+    entity_type: 'VERSION', entity_id: p.version_id,
+    build: function () {
+      var row = lockedVersion_(ctx, p.version_id);
+      if (opts.from.indexOf(row.state) < 0 || (opts.check && !opts.check(row))) throw stateInvalid_();
+      var before = row.state;
+      cUpdate_(ctx, row);
+      var out = opts.apply(row, pre) || {};
+      var writes = [{ sheet: 'Versions', mode: 'update', row: row }].concat(out.extra || []);
+      if (out.item) writes.push({ sheet: 'Items', mode: 'update', row: out.item });
+      return {
+        writes: writes, result: versionResult_(ctx, row, out.item), record_version: row.record_version,
+        audit: { entity_type: 'VERSION', entity_id: row.version_id, before_json: { state: before },
+          after_json: Object.assign({ state: row.state, rev: row.rev, item_id: row.item_id }, out.audit_after || {}), reason: out.reason || '' }
+      };
+    }
+  });
+}
+
+function hasPdf_(v) { return !!v.pdf_doc_id; }
+
+/** version.submit {version_id}: Nháp → Chờ duyệt (cần PDF). Bản ATTACH không qua duyệt. */
+function versionSubmit_(ctx) {
+  var x0 = loadVersion_(ctx, (ctx.req.payload || {}).version_id);
+  if (versionEditable_(ctx.user, x0.it, x0.v) && x0.v.state === 'DRAFT' && x0.v.vtype !== 'ATTACH' && !hasPdf_(x0.v)) {
+    throw validationError_([fieldError_('pdf', 'PDF_REQUIRED')]);
+  }
+  return versionTransition_(ctx, {
+    allowed: versionEditable_, from: ['DRAFT'],
+    check: function (v) { return v.vtype !== 'ATTACH' && hasPdf_(v); },
+    apply: function (row) {
+      row.state = 'IN_REVIEW';
+      row.submitted_at = isoVN_(now_());
+      row.submitted_by = ctx.user.user_id;
+    }
+  });
+}
+
+/** version.approve {version_id, note}: Chờ duyệt → Đã duyệt (PIN) */
+function versionApprove_(ctx) {
+  return versionTransition_(ctx, {
+    allowed: canApprove_, from: ['IN_REVIEW'],
+    prepare: function (p) { return { note: reasonText_(p, 'note', false, 500) }; },
+    apply: function (row, pre) {
+      row.state = 'APPROVED';
+      row.approved_at = isoVN_(now_());
+      row.approved_by = ctx.user.user_id;
+      row.approve_note = pre.note;
+      return { audit_after: { self: row.author_id === ctx.user.user_id } };
+    }
+  });
+}
+
+/** version.return {version_id, reason}: Chờ duyệt / Đã duyệt → Nháp kèm lý do (PIN) */
+function versionReturn_(ctx) {
+  return versionTransition_(ctx, {
+    allowed: canReturn_, from: ['IN_REVIEW', 'APPROVED'],
+    prepare: function (p) { return { reason: reasonText_(p, 'reason', true, 500) }; },
+    apply: function (row, pre) {
+      row.state = 'DRAFT';
+      row.returned_at = isoVN_(now_());
+      row.returned_by = ctx.user.user_id;
+      row.return_reason = pre.reason;
+      row.approved_at = ''; row.approved_by = ''; row.approve_note = '';
+      return { reason: pre.reason };
+    }
+  });
+}
+
+/** version.cancel {version_id, reason}: hủy bản đang mở. Biểu ○ thành ◐ vì bản nháp này thì trả về ○. */
+function versionCancel_(ctx) {
+  return versionTransition_(ctx, {
+    allowed: canCancelVersion_, from: ['DRAFT', 'IN_REVIEW', 'APPROVED'],
+    prepare: function (p) { return { reason: reasonText_(p, 'reason', false, 500) }; },
+    apply: function (row, pre) {
+      row.state = 'CANCELLED';
+      row.cancelled_at = isoVN_(now_());
+      row.cancelled_by = ctx.user.user_id;
+      row.cancel_reason = pre.reason;
+      var item = lockedItem_(row.item_id);
+      if (row.item_status_before === 'NONE' && item.status === 'DRAFTING' && !item.current_version_id &&
+        !openVersionOf_(versionsOf_(item.item_id), row.version_id)) {
+        item.status = 'NONE';
+        cUpdate_(ctx, item);
+        return { item: item, reason: pre.reason };
+      }
+      return { reason: pre.reason };
+    }
+  });
+}
+
+/**
+ * version.issue {version_id}: Thư ký ISO / cấp 4 ban hành (PIN).
+ * REVISION: Đã duyệt → Đang hiệu lực; bản đang hiệu lực trước → Lỗi thời; danh mục: lần ban hành, ngày ban hành = hôm nay,
+ * hạn rà soát = ngày ban hành + doc_review_months, tình trạng ●, tắt cờ chưa có tệp.
+ * ATTACH: Nháp (có PDF) → Đang hiệu lực, giữ lần và ngày ban hành của danh mục.
+ */
+function versionIssue_(ctx) {
+  return versionTransition_(ctx, {
+    allowed: function (u) { return isSecretary_(u); },
+    from: ['APPROVED', 'DRAFT'],
+    check: function (v) { return hasPdf_(v) && (v.vtype === 'ATTACH' ? v.state === 'DRAFT' : v.state === 'APPROVED'); },
+    apply: function (row) {
+      var today = todayVN_();
+      var nowIso = isoVN_(now_());
+      var item = lockedItem_(row.item_id);
+      if (item.status === 'NA') throw validationError_([fieldError_('item_id', 'ITEM_NA')]);
+      var extra = [];
+      var superseded = [];
+      versionsOf_(item.item_id).forEach(function (o) {
+        if (o.version_id === row.version_id || o.state !== 'ISSUED') return;
+        var r = clone_(o); delete r.__row;
+        r.state = 'SUPERSEDED';
+        r.superseded_at = nowIso;
+        r.superseded_by_id = row.version_id;
+        cUpdate_(ctx, r);
+        extra.push({ sheet: 'Versions', mode: 'update', row: r });
+        superseded.push(r.rev);
+      });
+      var months = Number(setting_('doc_review_months') || 12);
+      if (row.vtype === 'ATTACH') {
+        row.issued_at = item.issued_at || today;
+        if (!item.issued_at) item.issued_at = row.issued_at;
+        if (!item.review_due) item.review_due = addMonthsIso_(item.issued_at, months);
+        if (!item.current_rev) item.current_rev = row.rev;
+        item.issued_source = item.issued_source || 'IMPORT';
+      } else {
+        row.issued_at = today;
+        item.issued_at = today;
+        item.current_rev = row.rev;
+        item.review_due = addMonthsIso_(today, months);
+        item.issued_source = 'APP';
+      }
+      if (!row.effective_date) row.effective_date = row.issued_at;
+      row.state = 'ISSUED';
+      row.issued_by = ctx.user.user_id;
+      item.current_version_id = row.version_id;
+      item.status = 'ISSUED';
+      item.file_missing = false;
+      item.na_reason = '';
+      item.na_prev_status = '';
+      cUpdate_(ctx, item);
+      return { item: item, extra: extra, audit_after: { superseded: superseded, review_due: item.review_due, vtype: row.vtype } };
+    }
+  });
+}
+
+/* ---------------- item.setNa, item.review (Thư ký ISO, cấp 4, PIN) ---------------- */
+
+/**
+ * item.setNa {item_id, na: true, reason} — ngừng dùng biểu (✕), hồ sơ cũ giữ nguyên; {na: false} — dùng lại (về tình trạng trước).
+ * Không đặt ✕ khi biểu còn phiên bản đang mở (hủy hoặc ban hành trước).
+ */
+function itemSetNa_(ctx) {
+  var p = ctx.req.payload || {};
+  if (!isUuidV4_(p.item_id)) throw validationError_([fieldError_('item_id', 'ID_INVALID')]);
+  var na = p.na !== false;
+  var reason = na ? reasonText_(p, 'reason', true, 300) : '';
+  var it0 = findOne_('Items', 'item_id', p.item_id);
+  if (!it0) throw apiError_('NOT_FOUND');
+  return executeWrite_(ctx, {
+    entity_type: 'ITEM', entity_id: p.item_id,
+    build: function () {
+      var cur = findOne_('Items', 'item_id', p.item_id);
+      if (!cur) throw apiError_('NOT_FOUND');
+      assertVersion_(ctx, cur, 'ITEM', 'Items');
+      var row = clone_(cur); delete row.__row;
+      var before = row.status;
+      if (na) {
+        if (row.status === 'NA') throw stateInvalid_();
+        if (openVersionOf_(versionsOf_(row.item_id))) throw validationError_([fieldError_('item_id', 'VERSION_OPEN')]);
+        row.na_prev_status = row.status;
+        row.status = 'NA';
+        row.na_reason = reason;
+      } else {
+        if (row.status !== 'NA') throw stateInvalid_();
+        var back = ITEM_STATUS_.indexOf(row.na_prev_status) >= 0 && row.na_prev_status !== 'NA' ? row.na_prev_status : '';
+        row.status = back || (row.current_version_id || (row.issued_source === 'IMPORT' && row.issued_at) ? 'ISSUED' : 'NONE');
+        row.na_reason = '';
+        row.na_prev_status = '';
+      }
+      cUpdate_(ctx, row);
+      return {
+        writes: [{ sheet: 'Items', mode: 'update', row: row }],
+        result: { entity_type: 'ITEM', entity_id: row.item_id, record_version: row.record_version, record: projectRow_(ctx, row) },
+        record_version: row.record_version,
+        audit: { entity_type: 'ITEM', entity_id: row.item_id, before_json: { status: before }, after_json: { status: row.status }, reason: reason }
+      };
+    }
+  });
+}
+
+/**
+ * item.review {item_id, note}: đã rà soát định kỳ, tài liệu giữ nguyên — hạn rà soát mới = hôm nay + doc_review_months.
+ * Chỉ biểu đang hiệu lực (●). Sửa nội dung thì soạn phiên bản mới thay vì bấm nút này.
+ */
+function itemReview_(ctx) {
+  var p = ctx.req.payload || {};
+  if (!isUuidV4_(p.item_id)) throw validationError_([fieldError_('item_id', 'ID_INVALID')]);
+  var note = reasonText_(p, 'note', false, 300);
+  return executeWrite_(ctx, {
+    entity_type: 'ITEM', entity_id: p.item_id,
+    build: function () {
+      var cur = findOne_('Items', 'item_id', p.item_id);
+      if (!cur) throw apiError_('NOT_FOUND');
+      assertVersion_(ctx, cur, 'ITEM', 'Items');
+      if (cur.status !== 'ISSUED') throw stateInvalid_();
+      var row = clone_(cur); delete row.__row;
+      var before = row.review_due;
+      row.review_due = addMonthsIso_(todayVN_(), Number(setting_('doc_review_months') || 12));
+      row.reviewed_at = isoVN_(now_());
+      row.reviewed_by = ctx.user.user_id;
+      cUpdate_(ctx, row);
+      return {
+        writes: [{ sheet: 'Items', mode: 'update', row: row }],
+        result: { entity_type: 'ITEM', entity_id: row.item_id, record_version: row.record_version, record: projectRow_(ctx, row) },
+        record_version: row.record_version,
+        audit: { entity_type: 'ITEM', entity_id: row.item_id, before_json: { review_due: before }, after_json: { review_due: row.review_due }, reason: note }
+      };
+    }
+  });
 }
 
 // ===== 20_users.js =====
@@ -4190,7 +4933,7 @@ function translateText_(text, src, tgt) {
 
 /** Bảng có dịch máy (dịch bù) — trường gốc */
 var MT_SHEETS_ = {
-  Items: ['name', 'purpose', 'freq'], Groups: ['name'], Depts: ['name'], Clauses: ['name', 'group']
+  Items: ['name', 'purpose', 'freq'], Groups: ['name'], Depts: ['name'], Clauses: ['name', 'group'], Versions: ['change_summary']
 };
 
 /**
@@ -4233,10 +4976,11 @@ function runBackgroundJobs() {
   if (prop_('MAINTENANCE_MODE') === 'true') return;
   var t0 = Date.now();
   dbReset_();
+  autoMigrate_();
   if (!mtEnabled_()) { recordTriggerRun_('runBackgroundJobs', t0); return; }
   var done = 0;
   Object.keys(MT_SHEETS_).forEach(function (sheet) {
-    if (Date.now() - t0 > 150000) return;
+    if (Date.now() - t0 > 150000 || !sheetExists_(sheet)) return;
     readRows_(sheet).forEach(function (r) {
       if (Date.now() - t0 > 150000 || !r.i18n_meta || !mtEnabled_()) return;
       MT_SHEETS_[sheet].forEach(function (f) {
@@ -4759,7 +5503,22 @@ function healthRows_() {
   add('clauses', iso > 0 && brc > 0, 'ISO 9001: ' + iso + ' · BRCGS: ' + brc, iso && brc ? '' : 'Nhập file Excel tổng (sheet Phủ ISO 9001, Phủ BRCGS)');
   var heads = readRows_('Depts').filter(function (d) { return d.active; });
   var noHead = heads.filter(function (d) { return !d.head_user_id; }).map(function (d) { return d.dept_code; });
-  add('dept_heads', !noHead.length, (heads.length - noHead.length) + ' / ' + heads.length, noHead.length ? 'Chưa có trưởng bộ phận: ' + noHead.join(', ') : '');
+  // Không có trưởng bộ phận thì Quản trị (cấp 4) duyệt thay — không coi là lỗi khi có Quản trị đang hoạt động
+  var admins = readRows_('Users').filter(function (u) { return u.active && Number(u.role_level) === 4; }).length;
+  add('dept_heads', !noHead.length || admins > 0, (heads.length - noHead.length) + ' / ' + heads.length,
+    noHead.length ? 'Chưa có trưởng bộ phận: ' + noHead.join(', ') + (admins ? ' — Quản trị duyệt thay' : '') : '');
+  if (sheetExists_('Versions')) {
+    var vs = readRows_('Versions');
+    var cnt = function (st) { return vs.filter(function (v) { return v.state === st; }).length; };
+    add('versions', true, 'Nháp ' + cnt('DRAFT') + ' · Chờ duyệt ' + cnt('IN_REVIEW') + ' · Chờ ban hành ' + cnt('APPROVED') + ' · Đang hiệu lực ' + cnt('ISSUED'));
+  } else {
+    add('versions', false, 'Thiếu sheet Versions', 'Chạy migrateSchema');
+  }
+  var nofile = items.filter(function (it) { return it.status === 'ISSUED' && it.file_missing; }).length;
+  add('file_missing', true, nofile, nofile ? 'Biểu ● chưa có tệp: Danh mục → lọc Chưa có tệp → Gắn tệp' : '');
+  var today = todayVN_();
+  var overdue = items.filter(function (it) { return it.status === 'ISSUED' && it.review_due && it.review_due < today; }).length;
+  add('review_overdue', !overdue, overdue, overdue ? 'Tài liệu quá hạn rà soát: rà soát rồi bấm Đã rà soát, hoặc soạn phiên bản mới' : '');
   var owners = readRows_('Users').filter(function (u) { return u.active && (u.iso_secretary || Number(u.role_level) === 4); });
   var hasSec = readRows_('Users').some(function (u) { return u.active && u.iso_secretary; });
   add('iso_secretary', hasSec, owners.length, hasSec ? '' : 'Chưa có Thư ký ISO: Tài khoản → Quản trị → Người dùng → cờ Thư ký ISO');
@@ -5053,4 +5812,4 @@ function sampleSeedAction_(ctx) {
 
 // ===== i18n/labels.json =====
 /** Bản chép từ điển nhãn của app (5.3) cho email, Excel, lời báo */
-var LABELS = {"account.add_home":["Thêm app vào Màn hình chính: trong Safari bấm Chia sẻ → Thêm vào MH chính","将应用添加到主屏幕：在Safari中点击分享→添加到主屏幕"],"account.admin":["Quản trị","管理"],"account.api_version":["Phiên bản API","API版本"],"account.app_version":["Phiên bản app","应用版本"],"account.display_name":["Tên hiển thị","显示名称"],"account.expires":["Hết hạn","到期"],"account.guide":["Hướng dẫn","使用指南"],"account.info":["Thông tin","信息"],"account.issued":["Đăng nhập lúc","登录时间"],"account.last_seen":["Hoạt động gần nhất","最近活动"],"account.level":["Cấp","级别"],"account.profile":["Hồ sơ","个人资料"],"account.security":["Bảo mật","安全"],"account.server_version":["Phiên bản máy chủ","服务器版本"],"account.sessions":["Phiên đăng nhập","登录会话"],"account.sync":["Đồng bộ","同步"],"account.this_device":["Máy này","本机"],"adm.audit.after":["Sau","修改后"],"adm.audit.before":["Trước","修改前"],"adm.audit.from":["Từ ngày","从"],"adm.audit.more":["Còn nữa — thu hẹp bộ lọc để xem thêm","还有更多——请缩小筛选范围"],"adm.audit.to":["Đến ngày","至"],"adm.audit.user":["Người làm","操作人"],"adm.backup.docs":["Tài liệu","文件"],"adm.backup.last":["Lần sao lưu gần nhất","最近一次备份"],"adm.backup.no_manifest":["Không có manifest.json: lần chạy bị dừng giữa chừng, xem Lần thực thi trong Apps Script","缺少manifest.json：运行中途停止，请查看Apps Script执行记录"],"adm.backup.none":["Chưa có bản sao lưu","暂无备份"],"adm.backup.note":["Tự động hằng tuần ({D}, {H}:00), giữ {N} bản đã kiểm chứng. Khôi phục làm thủ công theo hướng dẫn","每周自动备份（{D} {H}:00），保留{N}份已校验备份。恢复需按指南手动操作"],"adm.backup.queued":["Đang chờ sao lưu, màn tự cập nhật…","等待备份中，页面自动刷新…"],"adm.backup.retry":["Chạy lại sau ghi đồng thời","因同时写入而重跑"],"adm.backup.rows":["Số dòng","行数"],"adm.backup.running":["Đang sao lưu (thường 1–3 phút), màn tự cập nhật…","正在备份（通常1–3分钟），页面自动刷新…"],"adm.status.base_mismatch":["Khác địa chỉ app đang dùng ({U})","与当前应用地址不同（{U}）"],"adm.status.checked_at":["Kiểm lúc {T}","检查于{T}"],"adm.status.default":["Mặc định","默认"],"adm.status.edit_setting":["Sửa cấu hình","修改设置"],"adm.status.ok":["Đạt","正常","green"],"adm.status.readonly":["Chỉ đọc","只读","grey"],"adm.status.settings":["Cấu hình","系统设置"],"adm.status.warn":["Cảnh báo","警告","amber"],"adm.user.add":["Thêm người dùng","新增用户"],"adm.user.code":["Mã nhân viên","员工编号"],"adm.user.confirm_reset":["Cấp PIN tạm mới? PIN cũ hết dùng, mọi phiên bị thu hồi","发放新的临时PIN？旧PIN失效，所有会话将被撤销"],"adm.user.confirm_revoke":["Thu hồi mọi phiên của người này? Họ phải đăng nhập lại","撤销该用户的所有会话？该用户需重新登录"],"adm.user.email":["Email (không bắt buộc)","邮箱（可选）"],"adm.user.hide_locked":["Ẩn tài khoản đã khóa","隐藏已锁定的账号"],"adm.user.last_login":["Đăng nhập cuối","最近登录"],"adm.user.owner_note":["Chủ hệ thống: chỉ chủ hệ thống thao tác được","系统所有者：仅系统所有者可操作"],"adm.user.pin_locked":["Đang khóa do nhập sai PIN","因输错PIN被锁定","amber"],"adm.user.role_note":["Đổi cấp, bộ phận hoặc cờ làm mọi phiên của người này hết hiệu lực","修改级别、部门或标记后，该用户所有会话失效"],"adm.user.self_note":["Tài khoản của bạn: đổi PIN ở trang Tài khoản","这是您的账号：请在账户页修改PIN"],"adm.user.sessions":["Phiên đang mở","在线会话"],"adm.user.show_locked":["Hiện tài khoản đã khóa ({N})","显示已锁定的账号（{N}）"],"adm.user.temp_pin_once":["PIN tạm chỉ hiện một lần. Ghi lại và đưa tận tay người dùng; hạn {H} giờ, đăng nhập xong phải đổi PIN","临时PIN只显示一次。请记下并当面交给用户；有效期{H}小时，登录后必须修改PIN"],"adm.user.temp_pin_title":["PIN tạm","临时PIN"],"adm.user.temp_pin_until":["Hạn PIN tạm","临时PIN到期"],"adm.user.total":["{N} tài khoản","共{N}个账号"],"admin.audit":["Nhật ký thao tác","操作日志"],"admin.backup":["Sao lưu","备份"],"admin.report_logo":["Logo trên báo cáo","报表标志"],"admin.status":["Trạng thái hệ thống","系统状态"],"admin.users":["Người dùng và PIN tạm","用户与临时PIN"],"attempts_left":["Còn {N} lần thử","还可尝试 {N} 次"],"auth.checking_pin":["Đang kiểm tra PIN…","正在验证PIN…"],"auth.expired_offline":["Phiên đã hết hạn: chỉ xem nháp và xuất dự phòng","会话已过期：只能查看草稿和导出备份"],"auth.hello":["Xin chào","你好"],"auth.loading_data":["Đang tải dữ liệu…","正在加载数据…"],"auth.loading_page":["Đang tải dữ liệu (phần {N})…","正在加载数据（第 {N} 部分）…"],"auth.logout_all_confirm":["Mọi phiên, kể cả máy đang dùng, sẽ hết hiệu lực. Dùng khi mất điện thoại.","所有会话（包括本机）将失效。用于手机丢失时。"],"auth.logout_has_drafts":["Còn {N} mục chưa gửi lên máy chủ. Chọn cách xử lý trước khi đăng xuất.","仍有 {N} 条未同步到服务器。退出前请选择处理方式。"],"auth.open_with_pin":["Mở bằng PIN","用PIN打开"],"auth.others_relogin":["Các thiết bị khác phải đăng nhập lại","其他设备需重新登录"],"auth.pin_skip_wait":["Không chờ mạng — mở bằng dữ liệu trên máy","不等网络 — 使用本机数据打开"],"auth.revoked":["Phiên đã bị thu hồi hoặc quyền đã thay đổi","会话已撤销或权限已变更"],"auth.seconds":["{N} giây","{N} 秒"],"auth.server_changed":["App đã chuyển sang máy chủ khác — đăng nhập lại. Nháp chưa gửi của máy chủ cũ nằm ở mục Nháp thế hệ dữ liệu cũ","应用已切换到其他服务器——请重新登录。旧服务器未发送的草稿在“旧数据草稿”中"],"auth.server_slow":["Máy chủ đang phản hồi chậm…","服务器响应较慢…"],"auth.session_warn":["Phiên sắp hết hạn — {D}","会话即将到期 — {D}"],"auth.step_connect":["Kết nối máy chủ","连接服务器"],"auth.step_data":["Cập nhật dữ liệu","更新数据"],"auth.step_open":["Mở trang chủ","打开首页"],"auth.temp_pin_stale":["PIN tạm này không còn dùng được (đã có PIN tạm mới hơn, hoặc quá hạn đổi PIN). Đăng nhập lại bằng PIN tạm mới nhất","此临时PIN已失效（已发放更新的临时PIN或超过修改时限）。请用最新的临时PIN重新登录"],"back":["Quay lại","返回"],"btn.back":["Quay lại","返回"],"btn.backup_now":["Sao lưu ngay","立即备份"],"btn.cancel":["Hủy","取消"],"btn.change_pin":["Đổi PIN","修改PIN"],"btn.close":["Đóng","关闭"],"btn.confirm":["Đúng","确认"],"btn.delete_draft":["Xóa nháp","删除草稿"],"btn.delete_drafts":["Xóa nháp","删除草稿"],"btn.edit":["Sửa","编辑"],"btn.export_backup":["Xuất dự phòng","导出备份"],"btn.filter":["Lọc","筛选"],"btn.keep_drafts":["Giữ nháp trên máy","保留本机草稿"],"btn.lock":["Khóa","锁定"],"btn.logout":["Đăng xuất","退出登录"],"btn.logout_all":["Đăng xuất mọi thiết bị","退出所有设备"],"btn.relogin":["Đăng nhập lại","重新登录"],"btn.reset_pin":["Cấp PIN tạm","发放临时PIN"],"btn.retry":["Thử lại","重试"],"btn.revoke":["Thu hồi","撤销"],"btn.revoke_sessions":["Thu hồi phiên","撤销会话"],"btn.save":["Lưu","保存"],"btn.set_role":["Đổi cấp/vai trò","修改级别/岗位"],"btn.sync_now":["Đồng bộ ngay","立即同步"],"btn.unlock":["Mở khóa","解锁"],"btn.use_server":["Dùng bản máy chủ","采用服务器版本"],"cancel":["Hủy","取消"],"change_pin":["Đổi PIN","修改PIN"],"col.actions":["Thao tác","操作"],"col.status":["Tình trạng biểu","表单状态"],"conflict.rebased":["Đã gửi lại thay đổi của bạn trên bản máy chủ mới nhất","已在服务器最新版本上重新发送您的修改"],"conflict.title":["Xử lý xung đột","处理冲突"],"conflict.use_server_confirm":["Bỏ thay đổi của bạn và dùng bản máy chủ? Có thể xuất dự phòng trước.","放弃您的修改并采用服务器版本？可先导出备份。"],"current_pin":["PIN hiện tại","当前PIN"],"draft.auto_delete":["Tự xóa sau {N} ngày","{N} 天后自动删除"],"draft.blocked_hint":["Mục trước của cùng hồ sơ bị từ chối/xung đột; xử lý mục đó trước","同一记录的前一项被拒绝/冲突，请先处理该项"],"draft.created":["Tạo lúc","创建时间"],"draft.delete_all_confirm":["Xóa hẳn {N} nháp chưa gửi? Không lấy lại được.","确定删除 {N} 份未同步草稿？删除后无法恢复。"],"draft.delete_confirm":["Xóa hẳn nháp này? Không lấy lại được.","确定删除此草稿？删除后无法恢复。"],"draft.empty":["Không có mục nào","没有项目"],"draft.error_code":["Mã lỗi","错误代码"],"draft.old_epoch":["Nháp thế hệ dữ liệu cũ","旧数据草稿"],"draft.other_user":["Máy còn {N} nháp của người dùng khác","本机有 {N} 份其他用户的草稿"],"draft.photos":["{N} ảnh","{N} 张照片"],"draft.recent_sent":["Đã gửi lên máy chủ (7 ngày gần nhất)","已同步（最近7天）"],"draft.rejected":["Nháp bị từ chối","被拒草稿"],"draft.sent_at":["Gửi lúc","同步时间"],"draft.size":["Dung lượng","大小"],"draft.title":["Nháp chờ đồng bộ","待同步草稿"],"employee_code":["Mã nhân viên","员工编号"],"env_test":["THỬ","测试"],"err.client":["Lỗi trên máy","本机错误"],"err.forbidden":["Không có quyền","无权限"],"err.not_found":["Không tìm thấy","未找到"],"err.reload_hint":["Nếu vừa có bản mới: bấm để tải lại toàn bộ app. Nháp chưa gửi vẫn giữ trên máy.","如刚更新版本：点击重新加载整个应用。未发送的草稿仍保留在本机。"],"err.reload_new":["Tải lại bản mới","重新加载最新版本"],"field.choose":["— Chọn —","— 请选择 —"],"field.invalid_date":["Ngày không hợp lệ","日期无效"],"field.name":["Tên","名称"],"field.number_ambiguous":["Đã hiểu là {A}. Nếu là số hàng nghìn, gõ liền không dấu (vd 12350)","已识别为 {A}；如为千位数，请连续输入（如 12350）"],"field.number_bad_sep":["Không dùng dấu chấm/phẩy để tách hàng nghìn; gõ 1234567","请勿使用千位分隔符，请输入 1234567"],"field.one_lang":["Chỉ cần nhập một thứ tiếng, máy chủ tự dịch bên kia","只需填写一种语言，服务器自动翻译另一种"],"field.reason":["Lý do","原因"],"field.reason_required":["Bắt buộc nhập lý do","必须填写原因"],"field.required":["Bắt buộc nhập","必填"],"forgot_pin":["Quên PIN","忘记PIN"],"forgot_pin_help":["Liên hệ quản trị để đặt lại PIN","请联系管理员重置密码"],"form.saved":["Đã lưu máy chủ","已同步"],"i18n.check_required":["Tick \"Đã kiểm tra bản dịch\" trước khi lưu","保存前请勾选\"已核对译文\""],"i18n.checked":["Đã kiểm tra bản dịch","已核对译文"],"i18n.lang_vi":["Tiếng Việt","越南语"],"i18n.lang_zh":["Tiếng Trung","中文"],"i18n.suggest":["Gợi ý dịch","翻译建议"],"i18n.suggest_need_one":["Nhập một bên rồi bấm Gợi ý dịch","先填写一种语言再点翻译建议"],"level.owner":["Chủ hệ thống","系统所有者"],"list.more":["Hiện thêm {N} (còn {R})","再显示{N}条（剩余{R}条）"],"locked":["Tạm khóa do nhập sai PIN nhiều lần, thử lại sau {N} phút","因多次输错PIN已暂时锁定，请 {N} 分钟后重试"],"login":["Đăng nhập","登录"],"logo.bad_type":["Chỉ nhận ảnh PNG hoặc JPEG","仅支持PNG或JPEG图片"],"logo.current":["Logo đang dùng","当前标志"],"logo.hint":["Nên dùng ảnh PNG nền trong suốt; app tự thu nhỏ còn tối đa 800 px trước khi gửi","建议使用透明背景PNG；应用发送前自动缩小至最长800像素"],"logo.none":["Chưa có logo — báo cáo in ra không có logo","尚未设置标志——报表不显示标志"],"logo.preview_note":["Xem trước ở cỡ đầu trang PDF","按PDF页眉大小预览"],"logo.remove":["Gỡ logo","移除标志"],"logo.remove_confirm":["Gỡ logo khỏi báo cáo? Báo cáo in sau đó sẽ không có logo.","从报表移除标志？之后打印的报表将不显示标志。"],"logo.removed":["Đã gỡ logo","已移除标志"],"logo.replace":["Đổi logo","更换标志"],"logo.saved":["Đã lưu logo — báo cáo in từ giờ có logo mới","标志已保存——此后打印的报表使用新标志"],"logo.upload":["Chọn ảnh logo","选择标志图片"],"logo.where":["Logo công ty chỉ hiện trên báo cáo PDF và Excel (Đợt 2), không hiện trong app","公司标志仅显示在PDF和Excel报表上（第2期），不在应用内显示"],"manual_code":["Mở theo mã","按编号打开"],"menu.title":["ISO","体系管理"],"nav.account":["Tài khoản","账户"],"nav.home":["Trang chủ","首页"],"nav.scan":["Quét","扫码"],"need_network":["Cần kết nối mạng","需要网络连接"],"network_error":["Không kết nối được máy chủ","无法连接服务器"],"new_pin":["PIN mới","新PIN"],"new_pin_again":["Nhập lại PIN mới","确认新PIN"],"no_reuse_pin":["Không dùng lại PIN của app khác","请勿重复使用其他应用的PIN"],"offline":["Ngoại tuyến","离线"],"offline_unlock":["Mở khóa ngoại tuyến","离线解锁"],"op_state.COMMITTED":["Đã lưu máy chủ","已同步","green"],"open_with_pin":["Mở bằng PIN","用PIN打开"],"pin6":["PIN 6 số","六位数字密码"],"pin_format":["PIN phải gồm đúng 6 chữ số","PIN必须为6位数字"],"pin_mismatch":["Hai lần nhập PIN mới không khớp","两次输入的新PIN不一致"],"safari_tab":["Đang chạy trong Safari: nháp có thể bị xóa sau 7 ngày không mở","在Safari中运行：7天未打开草稿可能被清除"],"same_account":["Dùng cùng tài khoản với iPhone","与iPhone使用同一账户"],"save":["Lưu","保存"],"scan":["Quét tem QR của biểu","扫描表单二维码"],"scan_hint":["Đưa tem QR của biểu vào khung, hoặc nhập mã biểu (vd BM-CĐ-03-03)","将表单二维码标签对准框内，或输入表单编号（如BM-CĐ-03-03）"],"server_url":["Địa chỉ máy chủ (/exec)","服务器地址 (/exec)"],"server_url_bad":["Link phải có dạng https://script.google.com/macros/s/…/exec","链接格式应为 https://script.google.com/macros/s/…/exec"],"server_url_missing":["Chưa có địa chỉ máy chủ","尚未设置服务器地址"],"shared_device":["Máy dùng chung","公用设备"],"show_pin":["Hiện PIN","显示PIN"],"sync.committed":["Đã lưu máy chủ","已同步"],"sync.committed_n":["Đã lưu máy chủ: {N} mục","已同步：{N} 条"],"sync.conflict":["Xung đột, cần xử lý","冲突，需处理"],"sync.dataset_reset":["Dữ liệu đã được đặt lại, cần tải lại","数据已重置，需重新加载"],"sync.done":["Đã đồng bộ","同步完成"],"sync.failed":["Lỗi gửi","同步失败"],"sync.last":["Lần đồng bộ cuối","上次同步"],"sync.maintenance":["Bảo trì","维护中"],"sync.need_network":["Cần kết nối mạng","需要网络连接"],"sync.never":["Chưa đồng bộ","尚未同步"],"sync.offline":["Ngoại tuyến","离线"],"sync.online":["Trực tuyến","在线"],"sync.queued":["Chờ gửi","待同步"],"sync.queued_count":["{N} mục chờ gửi","待同步数据 {N} 条"],"sync.safari_tab":["Đang chạy trong Safari: nháp có thể bị xóa sau 7 ngày không mở","在Safari中运行：7天未打开草稿可能被清除"],"sys.maintenance":["Hệ thống đang bảo trì","系统维护中"],"sys.maintenance_over":["Hệ thống đã hết bảo trì","系统维护已结束"],"sys.maintenance_strip":["Hệ thống đang bảo trì — chỉ xem dữ liệu trên máy","系统维护中 — 仅可查看本机数据"],"sys.maintenance_unlock":["Hệ thống đang bảo trì (ví dụ đang Xóa sạch dữ liệu). Chỉ mở được dữ liệu đã có trên máy; bảo trì xong app tự kiểm tra lại.","系统维护中（例如正在清空数据）。仅可打开本机已有数据；维护结束后应用会自动重新检查。"],"tab.calendar":["Lịch","日程"],"tag.env_test":["THỬ","测试"],"tag.machine_translated":["dịch máy","机器翻译"],"tag.no_translation":["Chưa có bản dịch","暂无译文"],"temp_pin":["Bạn đang dùng PIN tạm, hãy đặt PIN mới","您正在使用临时PIN，请设置新PIN"],"unknown_result":["Chưa rõ kết quả, đang hỏi lại máy chủ","结果未知，正在向服务器确认"],"user_status.ACTIVE":["Đang hoạt động","正常","green"],"user_status.DISABLED":["Ngừng dùng","已停用","grey"],"user_status.MUST_CHANGE_PIN":["Phải đổi PIN","需修改PIN","amber"],"op_state.QUEUED":["Chờ gửi","待同步","amber"],"op_state.PREPARED":["Đang gửi","同步中","navy"],"op_state.SENDING":["Đang gửi","同步中","navy"],"op_state.FAILED":["Lỗi gửi","同步失败","red"],"op_state.REJECTED":["Bị từ chối","被拒","red"],"op_state.CONFLICT":["Xung đột","冲突","red"],"op_state.UNKNOWN":["Chưa rõ kết quả","结果未知","amber"],"op_state.UNKNOWN_RESULT":["Chưa rõ kết quả","结果未知","amber"],"user_status.LOCKED":["Tạm khóa","已锁定","red"],"backup_status.VERIFIED":["Đã kiểm chứng","已校验","green"],"backup_status.INCONSISTENT":["Không nhất quán","不一致","amber"],"backup_status.FAILED":["Thất bại","失败","red"],"backup_status.RUNNING":["Đang sao lưu","备份中","amber"],"op_state.BLOCKED":["Chờ mục trước","等待前项","amber"],"health.schema_version":["Phiên bản schema","架构版本"],"health.server_version":["Phiên bản máy chủ","服务器版本"],"health.dataset_epoch":["Thế hệ dữ liệu","数据批次"],"health.env":["Môi trường","环境"],"health.temp_props":["Khóa tạm còn sót trong Thuộc tính tập lệnh","脚本属性中残留的临时键"],"health.maintenance":["Bảo trì","维护模式"],"health.triggers":["Trigger đã cài","已安装触发器"],"health.trigger_minutes_24h":["Phút chạy trigger trong 24 giờ","24小时触发器运行分钟数"],"health.last_backup":["Sao lưu gần nhất","最近备份"],"health.mt_paused_until":["Tạm dừng dịch máy đến","机器翻译暂停至"],"health.login_paused_until":["Tạm dừng đăng nhập đến","登录暂停至"],"health.spreadsheet_cells":["Số ô bảng tính (giới hạn 5 triệu)","表格单元格数（上限500万）"],"brand.sub":["Hệ thống quản lý","体系管理"],"nav.scan_qr":["Quét tem QR","扫描二维码"],"nav.reports":["Báo cáo","报表"],"qr_foreign":["Mã này không phải tem biểu của app ISO (tem M&E là tem thiết bị)","此码不是ISO系统的表单标签（M&E标签为设备标签）"],"qr_unavailable":["Không tìm thấy biểu này (hoặc không thuộc bộ phận của bạn). Thử Đồng bộ ngay.","未找到该表单（或不属于您的部门）。请尝试立即同步。"],"level.1":["Tra cứu","查询"],"level.2":["Nhân viên","员工"],"level.3":["Trưởng bộ phận","部门主管"],"level.4":["Quản trị","管理员"],"account.scan_hint":["Quét tem QR dán trên sổ biểu, bìa hồ sơ để mở đúng biểu và xem lần ban hành đang hiệu lực","扫描表单册或档案封面上的二维码，打开对应表单并查看现行版本"],"account.work":["Công việc","工作"],"action.doc.upload":["Tệp / ảnh hồ sơ","记录文件/照片"],"conflict.help_run":["Bản ghi này đã được người khác sửa trên máy chủ trước khi bản của bạn gửi lên. Chọn giữ bản máy chủ (bỏ bản của bạn) hoặc gửi bản của bạn đè lên bản mới nhất.","该记录在您的版本上传前已被他人在服务器上修改。请选择保留服务器版本（放弃您的版本），或用您的版本覆盖最新版本。"],"conflict.mine_on_top":["Gửi bản của tôi lên bản mới nhất","用我的版本覆盖最新版本"],"weekday.1":["Thứ Hai","星期一"],"weekday.2":["Thứ Ba","星期二"],"weekday.3":["Thứ Tư","星期三"],"weekday.4":["Thứ Năm","星期四"],"weekday.5":["Thứ Sáu","星期五"],"weekday.6":["Thứ Bảy","星期六"],"weekday.7":["Chủ nhật","星期日"],"period.week":["Tuần {N}","第{N}周"],"period.month":["Tháng {M}","{M}月"],"home.pending_me":["Chờ bạn xử lý","待您处理"],"home.items_n":["{N} biểu","{N}个表单"],"home.none_filter":["Không có mục nào","没有项目"],"pend.count":["{N} việc chờ xử lý","{N}项待处理"],"admin.sample":["Dữ liệu mẫu","示例数据"],"adm.user.level_hint":["Tra cứu: xem · Nhân viên: nộp hồ sơ, soạn phiên bản · Trưởng bộ phận: duyệt tài liệu bộ phận, trả lại hồ sơ · Quản trị: duyệt cấp công ty, người dùng, cài đặt","查询：查看 · 员工：提交记录、编写版本 · 部门主管：审批部门文件、退回记录 · 管理员：审批公司级文件、用户、设置"],"adm.user.levels_note":["Cấp 1–3 chỉ thấy và ghi trong bộ phận của mình; tài liệu chung của Ban ISO ai cũng xem. Thư ký ISO và Quản trị thấy tất cả.","1–3级仅可查看和操作本部门；体系办通用文件所有人可见。ISO秘书和管理员可见全部。"],"adm.audit.all":["Mọi thao tác","全部操作"],"audit_grp.abnormal":["Xử lý Không đạt","不合格处理"],"audit_grp.missed":["Lý do bỏ sót","漏检原因"],"audit_grp.day":["Xác nhận ngày","日确认"],"audit_grp.library":["Thư viện hạng mục","项目库"],"audit_grp.user":["Người dùng","用户"],"audit_grp.settings":["Cấu hình","配置"],"audit_grp.report":["Logo báo cáo","报表标志"],"audit_grp.backup":["Sao lưu","备份"],"health.report_logo":["Logo trên báo cáo","报表标志"],"health.app_base_url":["Địa chỉ app","应用地址"],"sample.what":["Tạo khoảng 25 biểu giả ở 10 bộ phận, điều khoản ISO 9001 / chủ đề BRCGS mẫu và 4 tài khoản mẫu (Thư ký ISO, Trưởng QA, Nhân viên SX, Tra cứu KD) để thử app.","创建约25个示例表单（10个部门）、示例ISO 9001条款/BRCGS主题及4个示例账户（ISO秘书、质量主管、生产员工、销售查询），用于试用。"],"sample.note":["Chỉ có ở máy chủ THỬ. Không phải danh mục thật — nhập file Excel tổng để có danh mục thật.","仅测试服务器可用。非真实目录——导入Excel总表以获得真实目录。"],"sample.run":["Tạo dữ liệu mẫu","创建示例数据"],"sample.done":["Đã tạo {M} biểu, {T} điều khoản mẫu","已创建{M}个表单、{T}个示例条款"],"sample.already":["Đã có dữ liệu mẫu","示例数据已存在"],"sample.pins":["PIN tạm của tài khoản mẫu (đổi khi đăng nhập lần đầu, chỉ hiện một lần):","示例账户临时PIN（首次登录时修改，仅显示一次）："],"auth.reauth":["Nhập lại PIN để tiếp tục","请重新输入PIN以继续"],"tile.month":["Bảng tháng","月表"],"tile.pending":["Chờ xử lý","待处理"],"tile.library":["Thư viện hạng mục","项目库"],"tile.reports":["Báo cáo","报表"],"tile.drafts":["Nháp chờ gửi","待同步"],"home.week":["Tuần này","本周"],"home.none_drafts":["Không có nháp","无草稿"],"nav.catalog":["Danh mục","目录"],"nav.records":["Hồ sơ","记录"],"nav.coverage":["Phủ điều khoản","条款覆盖"],"nav.excel":["Excel","表格导入导出"],"nav.capa":["Khắc phục","纠正措施"],"nav.audits":["Đánh giá nội bộ","内部审核"],"nav.links":["Kết nối M&E / Checksheet","连接M&E/点检表"],"tile.catalog":["Danh mục","目录"],"tile.records":["Hồ sơ","记录"],"tile.coverage":["Phủ điều khoản","条款覆盖"],"tile.excel":["Excel","表格导入导出"],"tile.capa":["Khắc phục","纠正措施"],"tile.audits":["Đánh giá nội bộ","内部审核"],"tile.links":["Kết nối","连接"],"soon.tag":["Sắp có","即将推出"],"soon.what.records":["Bảng kỳ hồ sơ theo bộ phận (✓ đúng hạn, ! quá hạn, – chưa tới hạn), nộp hồ sơ bằng ảnh hoặc tệp, kể cả khi mất mạng.","按部门的记录周期表（✓按时、!逾期、–未到期），以照片或文件提交记录，离线也可提交。"],"soon.what.coverage":["Phủ điều khoản ISO 9001 và chủ đề BRCGS: số biểu, đã ban hành, in từ app, điều khoản bắt buộc còn thiếu biểu.","ISO 9001条款及BRCGS主题覆盖：表单数、已发布、系统打印、缺少表单的必须条款。"],"soon.what.reports":["Báo cáo PDF có logo + Excel: danh mục tài liệu hiện hành, tình trạng hồ sơ, phủ điều khoản, lịch sử phiên bản.","带标志的PDF及Excel报表：现行文件清单、记录状态、条款覆盖、版本历史。"],"soon.what.capa":["Sổ khắc phục, phiếu khắc phục, 8D khiếu nại, sản phẩm không phù hợp, SCAR nhà cung cấp.","纠正措施台账、纠正措施单、客诉8D、不合格品、供应商SCAR。"],"soon.what.audits":["Chương trình đánh giá nội bộ năm, kế hoạch đợt, checklist, phát hiện → phiếu khắc phục, báo cáo.","年度内审方案、审核计划、检查表、发现项→纠正措施单、报告。"],"soon.what.links":["Đọc ngày có hồ sơ từ M&E và Checksheet mỗi giờ để 33 biểu in từ app có ô ✓ mà không ai phải nộp lại.","每小时从M&E和点检表读取记录日期，33个系统打印表单自动显示✓，无需重复提交。"],"soon.when_1c":["Làm ở phiên 1c của Đợt 1","第1期1c阶段完成"],"soon.when_1d":["Làm ở phiên 1d của Đợt 1","第1期1d阶段完成"],"soon.when_d2":["Làm ở Đợt 2","第2期完成"],"soon.when_d3":["Làm ở Đợt 3","第3期完成"],"soon.when_d4":["Làm ở Đợt 4","第4期完成"],"role.secretary":["Thư ký ISO","ISO秘书","navy"],"role.auditor":["Đánh giá viên","审核员","navy"],"account.depts":["Bộ phận","部门"],"account.all_depts":["Mọi bộ phận","全部部门"],"account.flags":["Vai trò thêm","附加角色"],"admin.depts":["Bộ phận và trưởng bộ phận","部门与部门主管"],"adm.user.depts_hint":["Không chọn bộ phận nào = mọi bộ phận","不选择部门 = 全部部门"],"adm.user.secretary_hint":["Quản lý danh mục toàn công ty, ban hành, thu hồi, nhập Excel, lập chương trình đánh giá","管理全公司目录、发布、收回、导入Excel、制定审核方案"],"adm.user.auditor_hint":["Ghi phát hiện đánh giá nội bộ (Đợt 4); không đánh giá bộ phận của chính mình","记录内审发现（第4期）；不审核本部门"],"adm.dept.add":["Thêm bộ phận","添加部门"],"adm.dept.code":["Mã bộ phận","部门代码"],"adm.dept.name":["Tên bộ phận","部门名称"],"adm.dept.head":["Trưởng bộ phận","部门主管"],"adm.dept.no_head":["Chưa có trưởng bộ phận","未设部门主管"],"adm.dept.head_hint":["Trưởng bộ phận duyệt tài liệu cấp bộ phận và trả lại hồ sơ nộp sai (phiên 1b, 1c)","部门主管审批部门级文件并退回错误记录（1b、1c阶段）"],"adm.dept.active":["Đang dùng","使用中"],"adm.dept.total":["{N} bộ phận","{N}个部门"],"adm.dept.note":["Tên bộ phận phải khớp cột Bộ phận của file Excel tổng (dạng \"Việt · 中文\") để nhập đúng","部门名称须与Excel总表“部门”列一致（格式“越文 · 中文”）才能正确导入"],"cat.add":["Thêm biểu / tài liệu","添加表单/文件"],"cat.all":["Tất cả","全部"],"cat.clear":["Bỏ lọc","清除筛选"],"cat.code":["Mã","编号"],"cat.name":["Tên","名称"],"cat.count":["{N} biểu","{N}个表单"],"cat.dept":["Bộ phận","部门"],"cat.group":["Nhóm","分组"],"cat.kind":["Loại","类型"],"cat.where":["Nơi làm","执行位置"],"cat.status":["Tình trạng biểu","表单状态"],"cat.priority":["Ưu tiên","优先级"],"cat.priority_short":["ƯT","优先"],"cat.prio_n":["Ưu tiên {N}","优先级{N}","red"],"cat.prio_none":["Không ghi ưu tiên","未设优先级"],"cat.special":["Khác","其他"],"cat.no_file":["Đã ban hành, chưa có tệp","已发布，无文件","amber"],"cat.no_file_short":["chưa có tệp","无文件"],"cat.filters":["Bộ lọc","筛选"],"cat.rev":["Lần ban hành","发布次数"],"cat.rev_n":["Lần {N}","第{N}版"],"cat.search_ph":["Tìm mã, tên Việt hoặc 中文","搜索编号、越文或中文名称"],"cat.scope_note":["Bạn thấy biểu của bộ phận {D} và tài liệu chung của Ban ISO","您可查看{D}部门的表单及体系办通用文件"],"cat.none_filter":["Không có biểu nào khớp bộ lọc","没有符合筛选条件的表单"],"cat.empty":["Chưa có biểu nào trong danh mục","目录中暂无表单"],"cat.empty_sec":["Danh mục còn trống — nhập file Excel tổng để bắt đầu","目录为空——请导入Excel总表开始"],"status.NONE":["Chưa có","未编写","grey"],"status.DRAFTING":["Đang soạn","编写中","amber"],"status.ISSUED":["Đã ban hành","已发布","green"],"status.NA":["Không áp dụng","不适用","grey"],"kind.FORM":["Biểu mẫu","表单","navy"],"kind.MANUAL":["Sổ tay","手册","navy"],"kind.POLICY":["Chính sách","方针","navy"],"kind.PROCEDURE":["Quy trình","程序","navy"],"kind.WI":["Hướng dẫn công việc","作业指导书","navy"],"kind.EXTERNAL":["Tài liệu bên ngoài","外来文件","grey"],"level_doc.DEPT":["Cấp bộ phận","部门级","grey"],"level_doc.COMPANY":["Cấp công ty","公司级","navy"],"where.ME":["M&E","机电App"],"where.CS":["Checksheet","点检表"],"where.ME_PART":["Một phần M&E","部分机电App"],"where.CS_PART":["Một phần Checksheet","部分点检表"],"where.CS_PROPOSED":["Đề xuất Checksheet","建议用点检表"],"where.MANUAL":["Làm tay → App ISO","手工→ISO App"],"period.DAY":["Hằng ngày","每天"],"period.WEEK":["Hằng tuần","每周"],"period.MONTH":["Hằng tháng","每月"],"period.QUARTER":["Hằng quý","每季度"],"period.HALF":["Nửa năm","每半年"],"period.YEAR":["Hằng năm","每年"],"period.EVENT":["Khi phát sinh","发生时"],"item.not_found":["Không tìm thấy biểu này (hoặc không thuộc bộ phận của bạn)","未找到该表单（或不属于您的部门）"],"item.stale":["Bản in này đã lỗi thời: tem ghi lần {R}, đang hiệu lực lần {C}","此打印件已过期：标签为第{R}版，现行为第{C}版"],"item.current":["Đang hiệu lực: lần {R}","现行版本：第{R}版"],"item.no_file_note":["Biểu ● nhập từ Excel, chưa có tệp PDF/tệp gốc. Thư ký ISO tải lên ở phiên 1b.","从Excel导入的●表单尚无PDF/源文件，ISO秘书将在1b阶段上传。"],"item.na_reason":["Lý do không áp dụng","不适用原因"],"item.info":["Thông tin","信息"],"item.purpose":["Mục đích & nội dung","用途及内容"],"item.freq":["Tần suất","频次"],"item.period":["Kỳ hồ sơ","记录周期"],"item.period_days":["Chu kỳ hồ sơ (ngày)","记录周期（天）"],"item.period_hint":["1 ngày · 7 tuần · 31 tháng · 92 quý · 183 nửa năm · 366 năm · trống = khi phát sinh","1天·7周·31月·92季·183半年·366年·空=发生时"],"item.days":["ngày","天"],"item.flow":["Lập → Duyệt","填写 → 审核"],"item.keep":["Thời gian lưu","保存期限"],"item.where_note":["In ở đâu / còn thiếu","打印位置/缺项"],"item.law":["Căn cứ pháp luật VN","越南法规依据"],"item.cls":["Phân loại","类别"],"item.owner":["Người phụ trách","负责人"],"item.note":["Ghi chú / liên quan","备注/相关"],"item.standards":["Điều khoản ISO và BRCGS","ISO条款及BRCGS"],"item.no_clause":["Chưa ghi điều khoản ISO","未填写ISO条款"],"item.brc":["BRCGS Packaging (chủ đề)","BRCGS包装（主题）"],"item.issue":["Ban hành","发布"],"item.issued_at":["Ngày ban hành","发布日期"],"item.review_due":["Hạn rà soát","评审期限"],"item.qr":["Mã QR","二维码"],"item.versions":["Phiên bản hiện hành & lịch sử","现行版本及历史"],"item.versions_soon":["Xem PDF, tải tệp gốc, soạn → duyệt → ban hành: phiên 1b","查看PDF、下载源文件、编写→审批→发布：1b阶段"],"item.records":["Hồ sơ 12 kỳ gần nhất","最近12期记录"],"item.records_soon":["Bảng ✓ / ! / – theo kỳ và nộp hồ sơ: phiên 1c","按周期的✓/!/–表及提交记录：1c阶段"],"item.related":["Biểu cùng nhóm","同组表单"],"item.submit_record":["Nộp hồ sơ","提交记录"],"item.new_version":["Soạn phiên bản mới","编写新版本"],"item.qr_label":["Tem QR","二维码标签"],"item.code_hint":["BM-<bộ phận>-xx-yy cho biểu mẫu; QT- quy trình; HD- hướng dẫn; ST- sổ tay; CS- chính sách","表单BM-<部门>-xx-yy；程序QT-；作业指导HD-；手册ST-；方针CS-"],"item.level":["Cấp duyệt","审批级别"],"item.group_auto":["Theo mã biểu","按表单编号"],"item.iso9001":["ISO 9001","ISO 9001"],"item.iso14001":["ISO 14001","ISO 14001"],"item.iso45001":["ISO 45001","ISO 45001"],"item.iso50001":["ISO 50001","ISO 50001"],"item.status_note":["Tình trạng, lần ban hành, ngày ban hành đổi qua luồng phiên bản (phiên 1b) hoặc nhập Excel","状态、发布次数、发布日期通过版本流程（1b阶段）或导入Excel修改"],"field.invalid":["Giá trị không hợp lệ","值无效"],"home.stats":["Số liệu danh mục","目录数据"],"home.stat_total":["Tổng biểu","表单总数"],"home.stat_pct":["% ban hành","发布率"],"home.stat_overdue":["Hồ sơ quá hạn","逾期记录"],"home.stat_missing":["Điều khoản bắt buộc thiếu biểu","缺少表单的必须条款"],"home.stat_missing_sub":["Điều khoản ISO 9001","ISO 9001条款"],"home.no_file_n":["{N} biểu ● chưa có tệp","{N}个●表单无文件"],"home.by_dept":["Biểu theo bộ phận","各部门表单"],"home.week_soon":["Lịch tuần các hồ sơ đến hạn: phiên 1d","本周到期记录日程：1d阶段"],"xl.export":["Xuất danh mục","导出目录"],"xl.export_note":["Đúng khuôn file Excel tổng (5 sheet, tiêu đề dòng 4, dữ liệu từ dòng 5, công thức): xuất → sửa → nhập lại được.","与Excel总表格式一致（5个工作表、第4行标题、第5行起数据、公式）：导出→修改→可重新导入。"],"xl.scope_note":["Bạn xuất các biểu thuộc bộ phận của mình","您导出本部门的表单"],"xl.export_btn":["Xuất {N} biểu","导出{N}个表单"],"xl.template":["Tải mẫu","下载模板"],"xl.format_note":["Giữ được: tên sheet, công thức, cố định ô D5, nền vàng ô nhập, danh sách chọn ○ ◐ ● ✕, tô màu theo tình trạng, cột khóa ẩn AA.","保留：工作表名称、公式、冻结D5、输入格黄色底、○◐●✕下拉列表、按状态着色、隐藏AA列。"],"xl.export_fail":["Không tạo được tệp Excel","无法生成Excel文件"],"xl.import":["Nhập lô","批量导入"],"xl.import_note":["Chọn file Excel tổng. App so theo Mã biểu: chưa có → thêm, có rồi → sửa, giống hệt → Không đổi. Xem trước rồi mới ghi; người ghi phải khác người nhập (trừ Quản trị).","选择Excel总表。按表单编号比对：无→新增，有→修改，相同→不变。先预览后写入；写入人须与导入人不同（管理员除外）。"],"xl.choose":["Chọn file Excel tổng","选择Excel总表"],"xl.batches":["Lô nhập gần đây","最近导入批次"],"xl.batch":["Lô nhập","导入批次"],"imp.reading":["Đang đọc tệp…","正在读取文件…"],"imp.read_fail":["Không đọc được tệp","无法读取文件"],"imp.template_unknown":["Tệp không đúng khuôn file Excel tổng (cần sheet \"Danh mục tổng - 总清单\", tiêu đề có cột \"Mã biểu mẫu\")","文件不符合Excel总表格式（需要“Danh mục tổng - 总清单”工作表及“Mã biểu mẫu”列）"],"imp.checking":["Máy chủ đang kiểm tra phần {A}/{B}…","服务器正在检查第{A}/{B}部分…"],"imp.preview":["Xem trước","预览"],"imp.total":["{N} dòng","{N}行"],"imp.n_add":["Thêm {N}","新增{N}"],"imp.n_update":["Sửa {N}","修改{N}"],"imp.n_same":["Không đổi {N}","不变{N}"],"imp.n_error":["Lỗi {N}","错误{N}"],"imp.n_clause":["Điều khoản đổi {N}","条款变更{N}"],"imp.no_change":["Không đổi — tệp giống hệt danh mục hiện có","不变——文件与现有目录完全一致"],"imp.row":["Dòng","行"],"imp.action":["Kết quả","结果"],"imp.detail":["Chi tiết","详情"],"imp.written":["Đã ghi","已写入"],"imp.act.ADD":["Thêm","新增"],"imp.act.UPDATE":["Sửa","修改"],"imp.act.SAME":["Không đổi","不变"],"imp.act.ERROR":["Lỗi","错误"],"imp.errors_skip":["Dòng lỗi không được ghi; sửa trong tệp rồi nhập lại (dòng đã ghi sẽ báo Không đổi).","错误行不会写入；在文件中修改后重新导入（已写入行显示不变）。"],"imp.commit":["Ghi vào danh mục","写入目录"],"imp.commit_confirm":["Ghi các dòng thêm/sửa vào danh mục? Mỗi lượt ghi tối đa 100 dòng, cần nhập PIN.","将新增/修改行写入目录？每次最多写入100行，需要输入PIN。"],"imp.committing":["Đang ghi… đã ghi {N} dòng","正在写入…已写入{N}行"],"imp.committed":["Đã ghi {N} dòng vào danh mục","已写入{N}行到目录"],"imp.row_errors":["Dòng không ghi được (biểu bị sửa sau khi xem trước)","无法写入的行（预览后表单被修改）"],"imp.need_other":["Lô nhạy cảm: cần một Thư ký ISO khác hoặc Quản trị mở Excel → Lô nhập gần đây để ghi","敏感批次：需另一位ISO秘书或管理员在Excel→最近导入批次中写入"],"imp.cancel":["Bỏ lô","放弃批次"],"imp.cancel_confirm":["Bỏ lô nhập này? Các dòng chưa ghi sẽ không được ghi.","放弃此导入批次？未写入的行将不会写入。"],"imp.cancelled":["Đã bỏ lô","已放弃批次"],"imp.none":["Chưa có lô nhập nào","暂无导入批次"],"imp.wait_commit":["Chờ bạn ghi","待您写入"],"imp.by":["Nhập bởi {U} lúc {T}","{U}于{T}导入"],"imp.committed_by":["Ghi bởi {U}","由{U}写入"],"imp.clauses_diff":["Điều khoản: thêm {A} · sửa {U} · ngừng {D}","条款：新增{A}·修改{U}·停用{D}"],"imp.rows":["Các dòng thêm, sửa, lỗi","新增、修改、错误行"],"imp.grace_diff":["Ô D4 (số ngày cho phép trễ) trong tệp là {A}, app đang dùng {B} — đổi ở Trạng thái hệ thống → record_grace_days nếu cần","文件D4（允许延迟天数）为{A}，系统当前为{B}——如需修改请在系统状态→record_grace_days"],"imp.status.STAGING":["Đang gửi","发送中","grey"],"imp.status.PREVIEWED":["Chờ ghi","待写入","amber"],"imp.status.COMMITTING":["Đang ghi dở","写入中","amber"],"imp.status.COMPLETED":["Đã ghi","已写入","green"],"imp.status.CANCELLED":["Đã bỏ","已放弃","grey"],"audit_grp.item":["Sửa biểu","修改表单"],"audit_grp.import":["Nhập Excel","导入Excel"],"audit_grp.dept":["Bộ phận","部门"],"health.items":["Biểu trong danh mục","目录中表单数"],"health.clauses":["Điều khoản / chủ đề (đang dùng)","条款/主题（使用中）"],"health.dept_heads":["Bộ phận có trưởng bộ phận","已设主管的部门"],"health.iso_secretary":["Thư ký ISO + Quản trị","ISO秘书+管理员"],"col.dept_code":["Bộ phận","部门"],"col.group_key":["Nhóm","分组"],"col.name_vi":["Tên (Việt)","名称（越）"],"col.name_zh":["Tên (Trung)","名称（中）"],"col.purpose_vi":["Mục đích (Việt)","用途（越）"],"col.purpose_zh":["Mục đích (Trung)","用途（中）"],"col.iso9001":["ISO 9001","ISO 9001"],"col.iso14001":["ISO 14001","ISO 14001"],"col.iso45001":["ISO 45001","ISO 45001"],"col.iso50001":["ISO 50001","ISO 50001"],"col.brc_topics":["BRCGS","BRCGS"],"col.law":["Căn cứ pháp luật","法规依据"],"col.cls":["Phân loại","类别"],"col.freq_vi":["Tần suất (Việt)","频次（越）"],"col.freq_zh":["Tần suất (Trung)","频次（中）"],"col.flow":["Lập → Duyệt","填写→审核"],"col.keep":["Thời gian lưu","保存期限"],"col.priority":["Ưu tiên","优先级"],"col.where":["Nơi làm","执行位置"],"col.where_note":["In ở đâu","打印位置"],"col.current_rev":["Lần ban hành","发布次数"],"col.issued_at":["Ngày ban hành","发布日期"],"col.period_days":["Chu kỳ hồ sơ","记录周期"],"col.note":["Ghi chú","备注"],"col.group_label":["Tên nhóm","分组名称"],"action.record.submit":["Nộp hồ sơ","提交记录"],"health.backup_mirror":["Bản sao ở tài khoản Google thứ hai","第二个Google账户中的备份"],"adm.mirror.title":["Tài khoản sao lưu thứ hai","第二备份账户"],"adm.mirror.what":["Ba app dùng chung một tài khoản Google: tài khoản bị khóa thì mất cả bản sao lưu. Máy chủ chia sẻ (chỉ xem) thư mục Sao lưu và Dữ liệu cho tài khoản thứ hai; script SaoLuuPhu trong tài khoản đó chép về Drive của nó mỗi ngày.","三个应用共用一个Google账户：账户被锁则备份也会丢失。服务器将备份及数据文件夹（仅查看）共享给第二个账户；该账户中的SaoLuuPhu脚本每天复制到其云端硬盘。"],"adm.mirror.email":["Email tài khoản thứ hai","第二账户邮箱"],"adm.mirror.folders":["Thư mục đã chia sẻ","已共享文件夹"],"adm.mirror.checked":["Kiểm chia sẻ lúc","共享检查时间"],"adm.mirror.save":["Lưu và chia sẻ","保存并共享"],"adm.mirror.off":["Ngừng chia sẻ","停止共享"],"adm.mirror.off_confirm":["Bỏ chia sẻ thư mục Sao lưu và Dữ liệu cho tài khoản thứ hai? Bản đã chép bên đó vẫn giữ.","取消向第二账户共享备份及数据文件夹？已复制的副本仍保留。"],"adm.mirror.next":["Sau khi lưu: đăng nhập tài khoản thứ hai, cài script SaoLuuPhu một lần (Hướng dẫn triển khai, Phần I). Lần chia sẻ đầu Google gửi thư báo tới tài khoản đó.","保存后：登录第二账户，安装一次SaoLuuPhu脚本（部署指南第I部分）。首次共享时Google会向该账户发送通知邮件。"],"adm.mirror.saved":["Đã chia sẻ cho tài khoản thứ hai","已共享给第二账户"],"adm.mirror.stopped":["Đã ngừng chia sẻ","已停止共享"],"adm.mirror.failed":["Lưu email nhưng chia sẻ chưa được — xem lý do trên màn","已保存邮箱但共享失败——请查看原因"],"adm.mirror.bad_email":["Email chưa đúng dạng","邮箱格式不正确"],"mirror_status.OK":["Đang chia sẻ","共享中","green"],"mirror_status.FAILED":["Chia sẻ lỗi","共享失败","red"],"mirror_status.OFF":["Chưa đặt","未设置","grey"]};
+var LABELS = {"account.add_home":["Thêm app vào Màn hình chính: trong Safari bấm Chia sẻ → Thêm vào MH chính","将应用添加到主屏幕：在Safari中点击分享→添加到主屏幕"],"account.admin":["Quản trị","管理"],"account.api_version":["Phiên bản API","API版本"],"account.app_version":["Phiên bản app","应用版本"],"account.display_name":["Tên hiển thị","显示名称"],"account.expires":["Hết hạn","到期"],"account.guide":["Hướng dẫn","使用指南"],"account.info":["Thông tin","信息"],"account.issued":["Đăng nhập lúc","登录时间"],"account.last_seen":["Hoạt động gần nhất","最近活动"],"account.level":["Cấp","级别"],"account.profile":["Hồ sơ","个人资料"],"account.security":["Bảo mật","安全"],"account.server_version":["Phiên bản máy chủ","服务器版本"],"account.sessions":["Phiên đăng nhập","登录会话"],"account.sync":["Đồng bộ","同步"],"account.this_device":["Máy này","本机"],"adm.audit.after":["Sau","修改后"],"adm.audit.before":["Trước","修改前"],"adm.audit.from":["Từ ngày","从"],"adm.audit.more":["Còn nữa — thu hẹp bộ lọc để xem thêm","还有更多——请缩小筛选范围"],"adm.audit.to":["Đến ngày","至"],"adm.audit.user":["Người làm","操作人"],"adm.backup.docs":["Tài liệu","文件"],"adm.backup.last":["Lần sao lưu gần nhất","最近一次备份"],"adm.backup.no_manifest":["Không có manifest.json: lần chạy bị dừng giữa chừng, xem Lần thực thi trong Apps Script","缺少manifest.json：运行中途停止，请查看Apps Script执行记录"],"adm.backup.none":["Chưa có bản sao lưu","暂无备份"],"adm.backup.note":["Tự động hằng tuần ({D}, {H}:00), giữ {N} bản đã kiểm chứng. Khôi phục làm thủ công theo hướng dẫn","每周自动备份（{D} {H}:00），保留{N}份已校验备份。恢复需按指南手动操作"],"adm.backup.queued":["Đang chờ sao lưu, màn tự cập nhật…","等待备份中，页面自动刷新…"],"adm.backup.retry":["Chạy lại sau ghi đồng thời","因同时写入而重跑"],"adm.backup.rows":["Số dòng","行数"],"adm.backup.running":["Đang sao lưu (thường 1–3 phút), màn tự cập nhật…","正在备份（通常1–3分钟），页面自动刷新…"],"adm.status.base_mismatch":["Khác địa chỉ app đang dùng ({U})","与当前应用地址不同（{U}）"],"adm.status.checked_at":["Kiểm lúc {T}","检查于{T}"],"adm.status.default":["Mặc định","默认"],"adm.status.edit_setting":["Sửa cấu hình","修改设置"],"adm.status.ok":["Đạt","正常","green"],"adm.status.readonly":["Chỉ đọc","只读","grey"],"adm.status.settings":["Cấu hình","系统设置"],"adm.status.warn":["Cảnh báo","警告","amber"],"adm.user.add":["Thêm người dùng","新增用户"],"adm.user.code":["Mã nhân viên","员工编号"],"adm.user.confirm_reset":["Cấp PIN tạm mới? PIN cũ hết dùng, mọi phiên bị thu hồi","发放新的临时PIN？旧PIN失效，所有会话将被撤销"],"adm.user.confirm_revoke":["Thu hồi mọi phiên của người này? Họ phải đăng nhập lại","撤销该用户的所有会话？该用户需重新登录"],"adm.user.email":["Email (không bắt buộc)","邮箱（可选）"],"adm.user.hide_locked":["Ẩn tài khoản đã khóa","隐藏已锁定的账号"],"adm.user.last_login":["Đăng nhập cuối","最近登录"],"adm.user.owner_note":["Chủ hệ thống: chỉ chủ hệ thống thao tác được","系统所有者：仅系统所有者可操作"],"adm.user.pin_locked":["Đang khóa do nhập sai PIN","因输错PIN被锁定","amber"],"adm.user.role_note":["Đổi cấp, bộ phận hoặc cờ làm mọi phiên của người này hết hiệu lực","修改级别、部门或标记后，该用户所有会话失效"],"adm.user.self_note":["Tài khoản của bạn: đổi PIN ở trang Tài khoản","这是您的账号：请在账户页修改PIN"],"adm.user.sessions":["Phiên đang mở","在线会话"],"adm.user.show_locked":["Hiện tài khoản đã khóa ({N})","显示已锁定的账号（{N}）"],"adm.user.temp_pin_once":["PIN tạm chỉ hiện một lần. Ghi lại và đưa tận tay người dùng; hạn {H} giờ, đăng nhập xong phải đổi PIN","临时PIN只显示一次。请记下并当面交给用户；有效期{H}小时，登录后必须修改PIN"],"adm.user.temp_pin_title":["PIN tạm","临时PIN"],"adm.user.temp_pin_until":["Hạn PIN tạm","临时PIN到期"],"adm.user.total":["{N} tài khoản","共{N}个账号"],"admin.audit":["Nhật ký thao tác","操作日志"],"admin.backup":["Sao lưu","备份"],"admin.report_logo":["Logo trên báo cáo","报表标志"],"admin.status":["Trạng thái hệ thống","系统状态"],"admin.users":["Người dùng và PIN tạm","用户与临时PIN"],"attempts_left":["Còn {N} lần thử","还可尝试 {N} 次"],"auth.checking_pin":["Đang kiểm tra PIN…","正在验证PIN…"],"auth.expired_offline":["Phiên đã hết hạn: chỉ xem nháp và xuất dự phòng","会话已过期：只能查看草稿和导出备份"],"auth.hello":["Xin chào","你好"],"auth.loading_data":["Đang tải dữ liệu…","正在加载数据…"],"auth.loading_page":["Đang tải dữ liệu (phần {N})…","正在加载数据（第 {N} 部分）…"],"auth.logout_all_confirm":["Mọi phiên, kể cả máy đang dùng, sẽ hết hiệu lực. Dùng khi mất điện thoại.","所有会话（包括本机）将失效。用于手机丢失时。"],"auth.logout_has_drafts":["Còn {N} mục chưa gửi lên máy chủ. Chọn cách xử lý trước khi đăng xuất.","仍有 {N} 条未同步到服务器。退出前请选择处理方式。"],"auth.open_with_pin":["Mở bằng PIN","用PIN打开"],"auth.others_relogin":["Các thiết bị khác phải đăng nhập lại","其他设备需重新登录"],"auth.pin_skip_wait":["Không chờ mạng — mở bằng dữ liệu trên máy","不等网络 — 使用本机数据打开"],"auth.revoked":["Phiên đã bị thu hồi hoặc quyền đã thay đổi","会话已撤销或权限已变更"],"auth.seconds":["{N} giây","{N} 秒"],"auth.server_changed":["App đã chuyển sang máy chủ khác — đăng nhập lại. Nháp chưa gửi của máy chủ cũ nằm ở mục Nháp thế hệ dữ liệu cũ","应用已切换到其他服务器——请重新登录。旧服务器未发送的草稿在“旧数据草稿”中"],"auth.server_slow":["Máy chủ đang phản hồi chậm…","服务器响应较慢…"],"auth.session_warn":["Phiên sắp hết hạn — {D}","会话即将到期 — {D}"],"auth.step_connect":["Kết nối máy chủ","连接服务器"],"auth.step_data":["Cập nhật dữ liệu","更新数据"],"auth.step_open":["Mở trang chủ","打开首页"],"auth.temp_pin_stale":["PIN tạm này không còn dùng được (đã có PIN tạm mới hơn, hoặc quá hạn đổi PIN). Đăng nhập lại bằng PIN tạm mới nhất","此临时PIN已失效（已发放更新的临时PIN或超过修改时限）。请用最新的临时PIN重新登录"],"back":["Quay lại","返回"],"btn.back":["Quay lại","返回"],"btn.backup_now":["Sao lưu ngay","立即备份"],"btn.cancel":["Hủy","取消"],"btn.change_pin":["Đổi PIN","修改PIN"],"btn.close":["Đóng","关闭"],"btn.confirm":["Đúng","确认"],"btn.delete_draft":["Xóa nháp","删除草稿"],"btn.delete_drafts":["Xóa nháp","删除草稿"],"btn.edit":["Sửa","编辑"],"btn.export_backup":["Xuất dự phòng","导出备份"],"btn.filter":["Lọc","筛选"],"btn.keep_drafts":["Giữ nháp trên máy","保留本机草稿"],"btn.lock":["Khóa","锁定"],"btn.logout":["Đăng xuất","退出登录"],"btn.logout_all":["Đăng xuất mọi thiết bị","退出所有设备"],"btn.relogin":["Đăng nhập lại","重新登录"],"btn.reset_pin":["Cấp PIN tạm","发放临时PIN"],"btn.retry":["Thử lại","重试"],"btn.revoke":["Thu hồi","撤销"],"btn.revoke_sessions":["Thu hồi phiên","撤销会话"],"btn.save":["Lưu","保存"],"btn.set_role":["Đổi cấp/vai trò","修改级别/岗位"],"btn.sync_now":["Đồng bộ ngay","立即同步"],"btn.unlock":["Mở khóa","解锁"],"btn.use_server":["Dùng bản máy chủ","采用服务器版本"],"cancel":["Hủy","取消"],"change_pin":["Đổi PIN","修改PIN"],"col.actions":["Thao tác","操作"],"col.status":["Tình trạng biểu","表单状态"],"conflict.rebased":["Đã gửi lại thay đổi của bạn trên bản máy chủ mới nhất","已在服务器最新版本上重新发送您的修改"],"conflict.title":["Xử lý xung đột","处理冲突"],"conflict.use_server_confirm":["Bỏ thay đổi của bạn và dùng bản máy chủ? Có thể xuất dự phòng trước.","放弃您的修改并采用服务器版本？可先导出备份。"],"current_pin":["PIN hiện tại","当前PIN"],"draft.auto_delete":["Tự xóa sau {N} ngày","{N} 天后自动删除"],"draft.blocked_hint":["Mục trước của cùng hồ sơ bị từ chối/xung đột; xử lý mục đó trước","同一记录的前一项被拒绝/冲突，请先处理该项"],"draft.created":["Tạo lúc","创建时间"],"draft.delete_all_confirm":["Xóa hẳn {N} nháp chưa gửi? Không lấy lại được.","确定删除 {N} 份未同步草稿？删除后无法恢复。"],"draft.delete_confirm":["Xóa hẳn nháp này? Không lấy lại được.","确定删除此草稿？删除后无法恢复。"],"draft.empty":["Không có mục nào","没有项目"],"draft.error_code":["Mã lỗi","错误代码"],"draft.old_epoch":["Nháp thế hệ dữ liệu cũ","旧数据草稿"],"draft.other_user":["Máy còn {N} nháp của người dùng khác","本机有 {N} 份其他用户的草稿"],"draft.photos":["{N} ảnh","{N} 张照片"],"draft.recent_sent":["Đã gửi lên máy chủ (7 ngày gần nhất)","已同步（最近7天）"],"draft.rejected":["Nháp bị từ chối","被拒草稿"],"draft.sent_at":["Gửi lúc","同步时间"],"draft.size":["Dung lượng","大小"],"draft.title":["Nháp chờ đồng bộ","待同步草稿"],"employee_code":["Mã nhân viên","员工编号"],"env_test":["THỬ","测试"],"err.client":["Lỗi trên máy","本机错误"],"err.forbidden":["Không có quyền","无权限"],"err.not_found":["Không tìm thấy","未找到"],"err.reload_hint":["Nếu vừa có bản mới: bấm để tải lại toàn bộ app. Nháp chưa gửi vẫn giữ trên máy.","如刚更新版本：点击重新加载整个应用。未发送的草稿仍保留在本机。"],"err.reload_new":["Tải lại bản mới","重新加载最新版本"],"field.choose":["— Chọn —","— 请选择 —"],"field.invalid_date":["Ngày không hợp lệ","日期无效"],"field.name":["Tên","名称"],"field.number_ambiguous":["Đã hiểu là {A}. Nếu là số hàng nghìn, gõ liền không dấu (vd 12350)","已识别为 {A}；如为千位数，请连续输入（如 12350）"],"field.number_bad_sep":["Không dùng dấu chấm/phẩy để tách hàng nghìn; gõ 1234567","请勿使用千位分隔符，请输入 1234567"],"field.one_lang":["Chỉ cần nhập một thứ tiếng, máy chủ tự dịch bên kia","只需填写一种语言，服务器自动翻译另一种"],"field.reason":["Lý do","原因"],"field.reason_required":["Bắt buộc nhập lý do","必须填写原因"],"field.required":["Bắt buộc nhập","必填"],"forgot_pin":["Quên PIN","忘记PIN"],"forgot_pin_help":["Liên hệ quản trị để đặt lại PIN","请联系管理员重置密码"],"form.saved":["Đã lưu máy chủ","已同步"],"i18n.check_required":["Tick \"Đã kiểm tra bản dịch\" trước khi lưu","保存前请勾选\"已核对译文\""],"i18n.checked":["Đã kiểm tra bản dịch","已核对译文"],"i18n.lang_vi":["Tiếng Việt","越南语"],"i18n.lang_zh":["Tiếng Trung","中文"],"i18n.suggest":["Gợi ý dịch","翻译建议"],"i18n.suggest_need_one":["Nhập một bên rồi bấm Gợi ý dịch","先填写一种语言再点翻译建议"],"level.owner":["Chủ hệ thống","系统所有者"],"list.more":["Hiện thêm {N} (còn {R})","再显示{N}条（剩余{R}条）"],"locked":["Tạm khóa do nhập sai PIN nhiều lần, thử lại sau {N} phút","因多次输错PIN已暂时锁定，请 {N} 分钟后重试"],"login":["Đăng nhập","登录"],"logo.bad_type":["Chỉ nhận ảnh PNG hoặc JPEG","仅支持PNG或JPEG图片"],"logo.current":["Logo đang dùng","当前标志"],"logo.hint":["Nên dùng ảnh PNG nền trong suốt; app tự thu nhỏ còn tối đa 800 px trước khi gửi","建议使用透明背景PNG；应用发送前自动缩小至最长800像素"],"logo.none":["Chưa có logo — báo cáo in ra không có logo","尚未设置标志——报表不显示标志"],"logo.preview_note":["Xem trước ở cỡ đầu trang PDF","按PDF页眉大小预览"],"logo.remove":["Gỡ logo","移除标志"],"logo.remove_confirm":["Gỡ logo khỏi báo cáo? Báo cáo in sau đó sẽ không có logo.","从报表移除标志？之后打印的报表将不显示标志。"],"logo.removed":["Đã gỡ logo","已移除标志"],"logo.replace":["Đổi logo","更换标志"],"logo.saved":["Đã lưu logo — báo cáo in từ giờ có logo mới","标志已保存——此后打印的报表使用新标志"],"logo.upload":["Chọn ảnh logo","选择标志图片"],"logo.where":["Logo công ty chỉ hiện trên báo cáo PDF và Excel (Đợt 2), không hiện trong app","公司标志仅显示在PDF和Excel报表上（第2期），不在应用内显示"],"manual_code":["Mở theo mã","按编号打开"],"menu.title":["ISO","体系管理"],"nav.account":["Tài khoản","账户"],"nav.home":["Trang chủ","首页"],"nav.scan":["Quét","扫码"],"need_network":["Cần kết nối mạng","需要网络连接"],"network_error":["Không kết nối được máy chủ","无法连接服务器"],"new_pin":["PIN mới","新PIN"],"new_pin_again":["Nhập lại PIN mới","确认新PIN"],"no_reuse_pin":["Không dùng lại PIN của app khác","请勿重复使用其他应用的PIN"],"offline":["Ngoại tuyến","离线"],"offline_unlock":["Mở khóa ngoại tuyến","离线解锁"],"op_state.COMMITTED":["Đã lưu máy chủ","已同步","green"],"open_with_pin":["Mở bằng PIN","用PIN打开"],"pin6":["PIN 6 số","六位数字密码"],"pin_format":["PIN phải gồm đúng 6 chữ số","PIN必须为6位数字"],"pin_mismatch":["Hai lần nhập PIN mới không khớp","两次输入的新PIN不一致"],"safari_tab":["Đang chạy trong Safari: nháp có thể bị xóa sau 7 ngày không mở","在Safari中运行：7天未打开草稿可能被清除"],"same_account":["Dùng cùng tài khoản với iPhone","与iPhone使用同一账户"],"save":["Lưu","保存"],"scan":["Quét tem QR của biểu","扫描表单二维码"],"scan_hint":["Đưa tem QR của biểu vào khung, hoặc nhập mã biểu (vd BM-CĐ-03-03)","将表单二维码标签对准框内，或输入表单编号（如BM-CĐ-03-03）"],"server_url":["Địa chỉ máy chủ (/exec)","服务器地址 (/exec)"],"server_url_bad":["Link phải có dạng https://script.google.com/macros/s/…/exec","链接格式应为 https://script.google.com/macros/s/…/exec"],"server_url_missing":["Chưa có địa chỉ máy chủ","尚未设置服务器地址"],"shared_device":["Máy dùng chung","公用设备"],"show_pin":["Hiện PIN","显示PIN"],"sync.committed":["Đã lưu máy chủ","已同步"],"sync.committed_n":["Đã lưu máy chủ: {N} mục","已同步：{N} 条"],"sync.conflict":["Xung đột, cần xử lý","冲突，需处理"],"sync.dataset_reset":["Dữ liệu đã được đặt lại, cần tải lại","数据已重置，需重新加载"],"sync.done":["Đã đồng bộ","同步完成"],"sync.failed":["Lỗi gửi","同步失败"],"sync.last":["Lần đồng bộ cuối","上次同步"],"sync.maintenance":["Bảo trì","维护中"],"sync.need_network":["Cần kết nối mạng","需要网络连接"],"sync.never":["Chưa đồng bộ","尚未同步"],"sync.offline":["Ngoại tuyến","离线"],"sync.online":["Trực tuyến","在线"],"sync.queued":["Chờ gửi","待同步"],"sync.queued_count":["{N} mục chờ gửi","待同步数据 {N} 条"],"sync.safari_tab":["Đang chạy trong Safari: nháp có thể bị xóa sau 7 ngày không mở","在Safari中运行：7天未打开草稿可能被清除"],"sys.maintenance":["Hệ thống đang bảo trì","系统维护中"],"sys.maintenance_over":["Hệ thống đã hết bảo trì","系统维护已结束"],"sys.maintenance_strip":["Hệ thống đang bảo trì — chỉ xem dữ liệu trên máy","系统维护中 — 仅可查看本机数据"],"sys.maintenance_unlock":["Hệ thống đang bảo trì (ví dụ đang Xóa sạch dữ liệu). Chỉ mở được dữ liệu đã có trên máy; bảo trì xong app tự kiểm tra lại.","系统维护中（例如正在清空数据）。仅可打开本机已有数据；维护结束后应用会自动重新检查。"],"tab.calendar":["Lịch","日程"],"tag.env_test":["THỬ","测试"],"tag.machine_translated":["dịch máy","机器翻译"],"tag.no_translation":["Chưa có bản dịch","暂无译文"],"temp_pin":["Bạn đang dùng PIN tạm, hãy đặt PIN mới","您正在使用临时PIN，请设置新PIN"],"unknown_result":["Chưa rõ kết quả, đang hỏi lại máy chủ","结果未知，正在向服务器确认"],"user_status.ACTIVE":["Đang hoạt động","正常","green"],"user_status.DISABLED":["Ngừng dùng","已停用","grey"],"user_status.MUST_CHANGE_PIN":["Phải đổi PIN","需修改PIN","amber"],"op_state.QUEUED":["Chờ gửi","待同步","amber"],"op_state.PREPARED":["Đang gửi","同步中","navy"],"op_state.SENDING":["Đang gửi","同步中","navy"],"op_state.FAILED":["Lỗi gửi","同步失败","red"],"op_state.REJECTED":["Bị từ chối","被拒","red"],"op_state.CONFLICT":["Xung đột","冲突","red"],"op_state.UNKNOWN":["Chưa rõ kết quả","结果未知","amber"],"op_state.UNKNOWN_RESULT":["Chưa rõ kết quả","结果未知","amber"],"user_status.LOCKED":["Tạm khóa","已锁定","red"],"backup_status.VERIFIED":["Đã kiểm chứng","已校验","green"],"backup_status.INCONSISTENT":["Không nhất quán","不一致","amber"],"backup_status.FAILED":["Thất bại","失败","red"],"backup_status.RUNNING":["Đang sao lưu","备份中","amber"],"op_state.BLOCKED":["Chờ mục trước","等待前项","amber"],"health.schema_version":["Phiên bản schema","架构版本"],"health.server_version":["Phiên bản máy chủ","服务器版本"],"health.dataset_epoch":["Thế hệ dữ liệu","数据批次"],"health.env":["Môi trường","环境"],"health.temp_props":["Khóa tạm còn sót trong Thuộc tính tập lệnh","脚本属性中残留的临时键"],"health.maintenance":["Bảo trì","维护模式"],"health.triggers":["Trigger đã cài","已安装触发器"],"health.trigger_minutes_24h":["Phút chạy trigger trong 24 giờ","24小时触发器运行分钟数"],"health.last_backup":["Sao lưu gần nhất","最近备份"],"health.mt_paused_until":["Tạm dừng dịch máy đến","机器翻译暂停至"],"health.login_paused_until":["Tạm dừng đăng nhập đến","登录暂停至"],"health.spreadsheet_cells":["Số ô bảng tính (giới hạn 5 triệu)","表格单元格数（上限500万）"],"brand.sub":["Hệ thống quản lý","体系管理"],"nav.scan_qr":["Quét tem QR","扫描二维码"],"nav.reports":["Báo cáo","报表"],"qr_foreign":["Mã này không phải tem biểu của app ISO (tem M&E là tem thiết bị)","此码不是ISO系统的表单标签（M&E标签为设备标签）"],"qr_unavailable":["Không tìm thấy biểu này (hoặc không thuộc bộ phận của bạn). Thử Đồng bộ ngay.","未找到该表单（或不属于您的部门）。请尝试立即同步。"],"level.1":["Tra cứu","查询"],"level.2":["Nhân viên","员工"],"level.3":["Trưởng bộ phận","部门主管"],"level.4":["Quản trị","管理员"],"account.scan_hint":["Quét tem QR dán trên sổ biểu, bìa hồ sơ để mở đúng biểu và xem lần ban hành đang hiệu lực","扫描表单册或档案封面上的二维码，打开对应表单并查看现行版本"],"account.work":["Công việc","工作"],"action.doc.upload":["Tệp / ảnh hồ sơ","记录文件/照片"],"conflict.help_run":["Bản ghi này đã được người khác sửa trên máy chủ trước khi bản của bạn gửi lên. Chọn giữ bản máy chủ (bỏ bản của bạn) hoặc gửi bản của bạn đè lên bản mới nhất.","该记录在您的版本上传前已被他人在服务器上修改。请选择保留服务器版本（放弃您的版本），或用您的版本覆盖最新版本。"],"conflict.mine_on_top":["Gửi bản của tôi lên bản mới nhất","用我的版本覆盖最新版本"],"weekday.1":["Thứ Hai","星期一"],"weekday.2":["Thứ Ba","星期二"],"weekday.3":["Thứ Tư","星期三"],"weekday.4":["Thứ Năm","星期四"],"weekday.5":["Thứ Sáu","星期五"],"weekday.6":["Thứ Bảy","星期六"],"weekday.7":["Chủ nhật","星期日"],"period.week":["Tuần {N}","第{N}周"],"period.month":["Tháng {M}","{M}月"],"home.pending_me":["Chờ bạn xử lý","待您处理"],"home.items_n":["{N} biểu","{N}个表单"],"home.none_filter":["Không có mục nào","没有项目"],"pend.count":["{N} việc chờ xử lý","{N}项待处理"],"admin.sample":["Dữ liệu mẫu","示例数据"],"adm.user.level_hint":["Tra cứu: xem · Nhân viên: nộp hồ sơ, soạn phiên bản · Trưởng bộ phận: duyệt tài liệu bộ phận, trả lại hồ sơ · Quản trị: duyệt cấp công ty, người dùng, cài đặt","查询：查看 · 员工：提交记录、编写版本 · 部门主管：审批部门文件、退回记录 · 管理员：审批公司级文件、用户、设置"],"adm.user.levels_note":["Cấp 1–3 chỉ thấy và ghi trong bộ phận của mình; tài liệu chung của Ban ISO ai cũng xem. Thư ký ISO và Quản trị thấy tất cả.","1–3级仅可查看和操作本部门；体系办通用文件所有人可见。ISO秘书和管理员可见全部。"],"adm.audit.all":["Mọi thao tác","全部操作"],"audit_grp.abnormal":["Xử lý Không đạt","不合格处理"],"audit_grp.missed":["Lý do bỏ sót","漏检原因"],"audit_grp.day":["Xác nhận ngày","日确认"],"audit_grp.library":["Thư viện hạng mục","项目库"],"audit_grp.user":["Người dùng","用户"],"audit_grp.settings":["Cấu hình","配置"],"audit_grp.report":["Logo báo cáo","报表标志"],"audit_grp.backup":["Sao lưu","备份"],"health.report_logo":["Logo trên báo cáo","报表标志"],"health.app_base_url":["Địa chỉ app","应用地址"],"sample.what":["Tạo khoảng 25 biểu giả ở 10 bộ phận, điều khoản ISO 9001 / chủ đề BRCGS mẫu và 4 tài khoản mẫu (Thư ký ISO, Trưởng QA, Nhân viên SX, Tra cứu KD) để thử app.","创建约25个示例表单（10个部门）、示例ISO 9001条款/BRCGS主题及4个示例账户（ISO秘书、质量主管、生产员工、销售查询），用于试用。"],"sample.note":["Chỉ có ở máy chủ THỬ. Không phải danh mục thật — nhập file Excel tổng để có danh mục thật.","仅测试服务器可用。非真实目录——导入Excel总表以获得真实目录。"],"sample.run":["Tạo dữ liệu mẫu","创建示例数据"],"sample.done":["Đã tạo {M} biểu, {T} điều khoản mẫu","已创建{M}个表单、{T}个示例条款"],"sample.already":["Đã có dữ liệu mẫu","示例数据已存在"],"sample.pins":["PIN tạm của tài khoản mẫu (đổi khi đăng nhập lần đầu, chỉ hiện một lần):","示例账户临时PIN（首次登录时修改，仅显示一次）："],"auth.reauth":["Nhập lại PIN để tiếp tục","请重新输入PIN以继续"],"tile.month":["Bảng tháng","月表"],"tile.pending":["Chờ xử lý","待处理"],"tile.library":["Thư viện hạng mục","项目库"],"tile.reports":["Báo cáo","报表"],"tile.drafts":["Nháp chờ gửi","待同步"],"home.week":["Tuần này","本周"],"home.none_drafts":["Không có nháp","无草稿"],"nav.catalog":["Danh mục","目录"],"nav.records":["Hồ sơ","记录"],"nav.coverage":["Phủ điều khoản","条款覆盖"],"nav.excel":["Excel","表格导入导出"],"nav.capa":["Khắc phục","纠正措施"],"nav.audits":["Đánh giá nội bộ","内部审核"],"nav.links":["Kết nối M&E / Checksheet","连接M&E/点检表"],"tile.catalog":["Danh mục","目录"],"tile.records":["Hồ sơ","记录"],"tile.coverage":["Phủ điều khoản","条款覆盖"],"tile.excel":["Excel","表格导入导出"],"tile.capa":["Khắc phục","纠正措施"],"tile.audits":["Đánh giá nội bộ","内部审核"],"tile.links":["Kết nối","连接"],"soon.tag":["Sắp có","即将推出"],"soon.what.records":["Bảng kỳ hồ sơ theo bộ phận (✓ đúng hạn, ! quá hạn, – chưa tới hạn), nộp hồ sơ bằng ảnh hoặc tệp, kể cả khi mất mạng.","按部门的记录周期表（✓按时、!逾期、–未到期），以照片或文件提交记录，离线也可提交。"],"soon.what.coverage":["Phủ điều khoản ISO 9001 và chủ đề BRCGS: số biểu, đã ban hành, in từ app, điều khoản bắt buộc còn thiếu biểu.","ISO 9001条款及BRCGS主题覆盖：表单数、已发布、系统打印、缺少表单的必须条款。"],"soon.what.reports":["Báo cáo PDF có logo + Excel: danh mục tài liệu hiện hành, tình trạng hồ sơ, phủ điều khoản, lịch sử phiên bản.","带标志的PDF及Excel报表：现行文件清单、记录状态、条款覆盖、版本历史。"],"soon.what.capa":["Sổ khắc phục, phiếu khắc phục, 8D khiếu nại, sản phẩm không phù hợp, SCAR nhà cung cấp.","纠正措施台账、纠正措施单、客诉8D、不合格品、供应商SCAR。"],"soon.what.audits":["Chương trình đánh giá nội bộ năm, kế hoạch đợt, checklist, phát hiện → phiếu khắc phục, báo cáo.","年度内审方案、审核计划、检查表、发现项→纠正措施单、报告。"],"soon.what.links":["Đọc ngày có hồ sơ từ M&E và Checksheet mỗi giờ để 33 biểu in từ app có ô ✓ mà không ai phải nộp lại.","每小时从M&E和点检表读取记录日期，33个系统打印表单自动显示✓，无需重复提交。"],"soon.when_1c":["Làm ở phiên 1c của Đợt 1","第1期1c阶段完成"],"soon.when_1d":["Làm ở phiên 1d của Đợt 1","第1期1d阶段完成"],"soon.when_d2":["Làm ở Đợt 2","第2期完成"],"soon.when_d3":["Làm ở Đợt 3","第3期完成"],"soon.when_d4":["Làm ở Đợt 4","第4期完成"],"role.secretary":["Thư ký ISO","ISO秘书","navy"],"role.auditor":["Đánh giá viên","审核员","navy"],"account.depts":["Bộ phận","部门"],"account.all_depts":["Mọi bộ phận","全部部门"],"account.flags":["Vai trò thêm","附加角色"],"admin.depts":["Bộ phận và trưởng bộ phận","部门与部门主管"],"adm.user.depts_hint":["Không chọn bộ phận nào = mọi bộ phận","不选择部门 = 全部部门"],"adm.user.secretary_hint":["Quản lý danh mục toàn công ty, ban hành, thu hồi, nhập Excel, lập chương trình đánh giá","管理全公司目录、发布、收回、导入Excel、制定审核方案"],"adm.user.auditor_hint":["Ghi phát hiện đánh giá nội bộ (Đợt 4); không đánh giá bộ phận của chính mình","记录内审发现（第4期）；不审核本部门"],"adm.dept.add":["Thêm bộ phận","添加部门"],"adm.dept.code":["Mã bộ phận","部门代码"],"adm.dept.name":["Tên bộ phận","部门名称"],"adm.dept.head":["Trưởng bộ phận","部门主管"],"adm.dept.no_head":["Chưa có trưởng bộ phận","未设部门主管"],"adm.dept.head_hint":["Trưởng bộ phận duyệt tài liệu cấp bộ phận và trả lại hồ sơ nộp sai (phiên 1b, 1c)","部门主管审批部门级文件并退回错误记录（1b、1c阶段）"],"adm.dept.active":["Đang dùng","使用中"],"adm.dept.total":["{N} bộ phận","{N}个部门"],"adm.dept.note":["Tên bộ phận phải khớp cột Bộ phận của file Excel tổng (dạng \"Việt · 中文\") để nhập đúng","部门名称须与Excel总表“部门”列一致（格式“越文 · 中文”）才能正确导入"],"cat.add":["Thêm biểu / tài liệu","添加表单/文件"],"cat.all":["Tất cả","全部"],"cat.clear":["Bỏ lọc","清除筛选"],"cat.code":["Mã","编号"],"cat.name":["Tên","名称"],"cat.count":["{N} biểu","{N}个表单"],"cat.dept":["Bộ phận","部门"],"cat.group":["Nhóm","分组"],"cat.kind":["Loại","类型"],"cat.where":["Nơi làm","执行位置"],"cat.status":["Tình trạng biểu","表单状态"],"cat.priority":["Ưu tiên","优先级"],"cat.priority_short":["ƯT","优先"],"cat.prio_n":["Ưu tiên {N}","优先级{N}","red"],"cat.prio_none":["Không ghi ưu tiên","未设优先级"],"cat.special":["Khác","其他"],"cat.no_file":["Đã ban hành, chưa có tệp","已发布，无文件","amber"],"cat.no_file_short":["chưa có tệp","无文件"],"cat.filters":["Bộ lọc","筛选"],"cat.rev":["Lần ban hành","发布次数"],"cat.rev_n":["Lần {N}","第{N}版"],"cat.search_ph":["Tìm mã, tên Việt hoặc 中文","搜索编号、越文或中文名称"],"cat.scope_note":["Bạn thấy biểu của bộ phận {D} và tài liệu chung của Ban ISO","您可查看{D}部门的表单及体系办通用文件"],"cat.none_filter":["Không có biểu nào khớp bộ lọc","没有符合筛选条件的表单"],"cat.empty":["Chưa có biểu nào trong danh mục","目录中暂无表单"],"cat.empty_sec":["Danh mục còn trống — nhập file Excel tổng để bắt đầu","目录为空——请导入Excel总表开始"],"status.NONE":["Chưa có","未编写","grey"],"status.DRAFTING":["Đang soạn","编写中","amber"],"status.ISSUED":["Đã ban hành","已发布","green"],"status.NA":["Không áp dụng","不适用","grey"],"kind.FORM":["Biểu mẫu","表单","navy"],"kind.MANUAL":["Sổ tay","手册","navy"],"kind.POLICY":["Chính sách","方针","navy"],"kind.PROCEDURE":["Quy trình","程序","navy"],"kind.WI":["Hướng dẫn công việc","作业指导书","navy"],"kind.EXTERNAL":["Tài liệu bên ngoài","外来文件","grey"],"level_doc.DEPT":["Cấp bộ phận","部门级","grey"],"level_doc.COMPANY":["Cấp công ty","公司级","navy"],"where.ME":["M&E","机电App"],"where.CS":["Checksheet","点检表"],"where.ME_PART":["Một phần M&E","部分机电App"],"where.CS_PART":["Một phần Checksheet","部分点检表"],"where.CS_PROPOSED":["Đề xuất Checksheet","建议用点检表"],"where.MANUAL":["Làm tay → App ISO","手工→ISO App"],"period.DAY":["Hằng ngày","每天"],"period.WEEK":["Hằng tuần","每周"],"period.MONTH":["Hằng tháng","每月"],"period.QUARTER":["Hằng quý","每季度"],"period.HALF":["Nửa năm","每半年"],"period.YEAR":["Hằng năm","每年"],"period.EVENT":["Khi phát sinh","发生时"],"item.not_found":["Không tìm thấy biểu này (hoặc không thuộc bộ phận của bạn)","未找到该表单（或不属于您的部门）"],"item.stale":["Bản in này đã lỗi thời: tem ghi lần {R}, đang hiệu lực lần {C}","此打印件已过期：标签为第{R}版，现行为第{C}版"],"item.current":["Đang hiệu lực: lần {R}","现行版本：第{R}版"],"item.no_file_note":["Biểu ● nhập từ Excel, chưa có tệp PDF/tệp gốc. Thư ký ISO tải lên ở phiên 1b.","从Excel导入的●表单尚无PDF/源文件，ISO秘书将在1b阶段上传。"],"item.na_reason":["Lý do không áp dụng","不适用原因"],"item.info":["Thông tin","信息"],"item.purpose":["Mục đích & nội dung","用途及内容"],"item.freq":["Tần suất","频次"],"item.period":["Kỳ hồ sơ","记录周期"],"item.period_days":["Chu kỳ hồ sơ (ngày)","记录周期（天）"],"item.period_hint":["1 ngày · 7 tuần · 31 tháng · 92 quý · 183 nửa năm · 366 năm · trống = khi phát sinh","1天·7周·31月·92季·183半年·366年·空=发生时"],"item.days":["ngày","天"],"item.flow":["Lập → Duyệt","填写 → 审核"],"item.keep":["Thời gian lưu","保存期限"],"item.where_note":["In ở đâu / còn thiếu","打印位置/缺项"],"item.law":["Căn cứ pháp luật VN","越南法规依据"],"item.cls":["Phân loại","类别"],"item.owner":["Người phụ trách","负责人"],"item.note":["Ghi chú / liên quan","备注/相关"],"item.standards":["Điều khoản ISO và BRCGS","ISO条款及BRCGS"],"item.no_clause":["Chưa ghi điều khoản ISO","未填写ISO条款"],"item.brc":["BRCGS Packaging (chủ đề)","BRCGS包装（主题）"],"item.issue":["Ban hành","发布"],"item.issued_at":["Ngày ban hành","发布日期"],"item.review_due":["Hạn rà soát","评审期限"],"item.qr":["Mã QR","二维码"],"item.versions":["Phiên bản hiện hành & lịch sử","现行版本及历史"],"item.versions_soon":["Xem PDF, tải tệp gốc, soạn → duyệt → ban hành: phiên 1b","查看PDF、下载源文件、编写→审批→发布：1b阶段"],"item.records":["Hồ sơ 12 kỳ gần nhất","最近12期记录"],"item.records_soon":["Bảng ✓ / ! / – theo kỳ và nộp hồ sơ: phiên 1c","按周期的✓/!/–表及提交记录：1c阶段"],"item.related":["Biểu cùng nhóm","同组表单"],"item.submit_record":["Nộp hồ sơ","提交记录"],"item.new_version":["Soạn phiên bản mới","编写新版本"],"item.qr_label":["Tem QR","二维码标签"],"item.code_hint":["BM-<bộ phận>-xx-yy cho biểu mẫu; QT- quy trình; HD- hướng dẫn; ST- sổ tay; CS- chính sách","表单BM-<部门>-xx-yy；程序QT-；作业指导HD-；手册ST-；方针CS-"],"item.level":["Cấp duyệt","审批级别"],"item.group_auto":["Theo mã biểu","按表单编号"],"item.iso9001":["ISO 9001","ISO 9001"],"item.iso14001":["ISO 14001","ISO 14001"],"item.iso45001":["ISO 45001","ISO 45001"],"item.iso50001":["ISO 50001","ISO 50001"],"item.status_note":["Tình trạng, lần ban hành, ngày ban hành đổi qua luồng phiên bản (phiên 1b) hoặc nhập Excel","状态、发布次数、发布日期通过版本流程（1b阶段）或导入Excel修改"],"field.invalid":["Giá trị không hợp lệ","值无效"],"home.stats":["Số liệu danh mục","目录数据"],"home.stat_total":["Tổng biểu","表单总数"],"home.stat_pct":["% ban hành","发布率"],"home.stat_overdue":["Hồ sơ quá hạn","逾期记录"],"home.stat_missing":["Điều khoản bắt buộc thiếu biểu","缺少表单的必须条款"],"home.stat_missing_sub":["Điều khoản ISO 9001","ISO 9001条款"],"home.no_file_n":["{N} biểu ● chưa có tệp","{N}个●表单无文件"],"home.by_dept":["Biểu theo bộ phận","各部门表单"],"home.week_soon":["Lịch tuần các hồ sơ đến hạn: phiên 1d","本周到期记录日程：1d阶段"],"xl.export":["Xuất danh mục","导出目录"],"xl.export_note":["Đúng khuôn file Excel tổng (5 sheet, tiêu đề dòng 4, dữ liệu từ dòng 5, công thức): xuất → sửa → nhập lại được.","与Excel总表格式一致（5个工作表、第4行标题、第5行起数据、公式）：导出→修改→可重新导入。"],"xl.scope_note":["Bạn xuất các biểu thuộc bộ phận của mình","您导出本部门的表单"],"xl.export_btn":["Xuất {N} biểu","导出{N}个表单"],"xl.template":["Tải mẫu","下载模板"],"xl.format_note":["Giữ được: tên sheet, công thức, cố định ô D5, nền vàng ô nhập, danh sách chọn ○ ◐ ● ✕, tô màu theo tình trạng, cột khóa ẩn AA.","保留：工作表名称、公式、冻结D5、输入格黄色底、○◐●✕下拉列表、按状态着色、隐藏AA列。"],"xl.export_fail":["Không tạo được tệp Excel","无法生成Excel文件"],"xl.import":["Nhập lô","批量导入"],"xl.import_note":["Chọn file Excel tổng. App so theo Mã biểu: chưa có → thêm, có rồi → sửa, giống hệt → Không đổi. Xem trước rồi mới ghi; người ghi phải khác người nhập (trừ Quản trị).","选择Excel总表。按表单编号比对：无→新增，有→修改，相同→不变。先预览后写入；写入人须与导入人不同（管理员除外）。"],"xl.choose":["Chọn file Excel tổng","选择Excel总表"],"xl.batches":["Lô nhập gần đây","最近导入批次"],"xl.batch":["Lô nhập","导入批次"],"imp.reading":["Đang đọc tệp…","正在读取文件…"],"imp.read_fail":["Không đọc được tệp","无法读取文件"],"imp.template_unknown":["Tệp không đúng khuôn file Excel tổng (cần sheet \"Danh mục tổng - 总清单\", tiêu đề có cột \"Mã biểu mẫu\")","文件不符合Excel总表格式（需要“Danh mục tổng - 总清单”工作表及“Mã biểu mẫu”列）"],"imp.checking":["Máy chủ đang kiểm tra phần {A}/{B}…","服务器正在检查第{A}/{B}部分…"],"imp.preview":["Xem trước","预览"],"imp.total":["{N} dòng","{N}行"],"imp.n_add":["Thêm {N}","新增{N}"],"imp.n_update":["Sửa {N}","修改{N}"],"imp.n_same":["Không đổi {N}","不变{N}"],"imp.n_error":["Lỗi {N}","错误{N}"],"imp.n_clause":["Điều khoản đổi {N}","条款变更{N}"],"imp.no_change":["Không đổi — tệp giống hệt danh mục hiện có","不变——文件与现有目录完全一致"],"imp.row":["Dòng","行"],"imp.action":["Kết quả","结果"],"imp.detail":["Chi tiết","详情"],"imp.written":["Đã ghi","已写入"],"imp.act.ADD":["Thêm","新增"],"imp.act.UPDATE":["Sửa","修改"],"imp.act.SAME":["Không đổi","不变"],"imp.act.ERROR":["Lỗi","错误"],"imp.errors_skip":["Dòng lỗi không được ghi; sửa trong tệp rồi nhập lại (dòng đã ghi sẽ báo Không đổi).","错误行不会写入；在文件中修改后重新导入（已写入行显示不变）。"],"imp.commit":["Ghi vào danh mục","写入目录"],"imp.commit_confirm":["Ghi các dòng thêm/sửa vào danh mục? Mỗi lượt ghi tối đa 100 dòng, cần nhập PIN.","将新增/修改行写入目录？每次最多写入100行，需要输入PIN。"],"imp.committing":["Đang ghi… đã ghi {N} dòng","正在写入…已写入{N}行"],"imp.committed":["Đã ghi {N} dòng vào danh mục","已写入{N}行到目录"],"imp.row_errors":["Dòng không ghi được (biểu bị sửa sau khi xem trước)","无法写入的行（预览后表单被修改）"],"imp.need_other":["Lô nhạy cảm: cần một Thư ký ISO khác hoặc Quản trị mở Excel → Lô nhập gần đây để ghi","敏感批次：需另一位ISO秘书或管理员在Excel→最近导入批次中写入"],"imp.cancel":["Bỏ lô","放弃批次"],"imp.cancel_confirm":["Bỏ lô nhập này? Các dòng chưa ghi sẽ không được ghi.","放弃此导入批次？未写入的行将不会写入。"],"imp.cancelled":["Đã bỏ lô","已放弃批次"],"imp.none":["Chưa có lô nhập nào","暂无导入批次"],"imp.wait_commit":["Chờ bạn ghi","待您写入"],"imp.by":["Nhập bởi {U} lúc {T}","{U}于{T}导入"],"imp.committed_by":["Ghi bởi {U}","由{U}写入"],"imp.clauses_diff":["Điều khoản: thêm {A} · sửa {U} · ngừng {D}","条款：新增{A}·修改{U}·停用{D}"],"imp.rows":["Các dòng thêm, sửa, lỗi","新增、修改、错误行"],"imp.grace_diff":["Ô D4 (số ngày cho phép trễ) trong tệp là {A}, app đang dùng {B} — đổi ở Trạng thái hệ thống → record_grace_days nếu cần","文件D4（允许延迟天数）为{A}，系统当前为{B}——如需修改请在系统状态→record_grace_days"],"imp.status.STAGING":["Đang gửi","发送中","grey"],"imp.status.PREVIEWED":["Chờ ghi","待写入","amber"],"imp.status.COMMITTING":["Đang ghi dở","写入中","amber"],"imp.status.COMPLETED":["Đã ghi","已写入","green"],"imp.status.CANCELLED":["Đã bỏ","已放弃","grey"],"audit_grp.item":["Sửa biểu","修改表单"],"audit_grp.import":["Nhập Excel","导入Excel"],"audit_grp.dept":["Bộ phận","部门"],"health.items":["Biểu trong danh mục","目录中表单数"],"health.clauses":["Điều khoản / chủ đề (đang dùng)","条款/主题（使用中）"],"health.dept_heads":["Bộ phận có trưởng bộ phận","已设主管的部门"],"health.iso_secretary":["Thư ký ISO + Quản trị","ISO秘书+管理员"],"col.dept_code":["Bộ phận","部门"],"col.group_key":["Nhóm","分组"],"col.name_vi":["Tên (Việt)","名称（越）"],"col.name_zh":["Tên (Trung)","名称（中）"],"col.purpose_vi":["Mục đích (Việt)","用途（越）"],"col.purpose_zh":["Mục đích (Trung)","用途（中）"],"col.iso9001":["ISO 9001","ISO 9001"],"col.iso14001":["ISO 14001","ISO 14001"],"col.iso45001":["ISO 45001","ISO 45001"],"col.iso50001":["ISO 50001","ISO 50001"],"col.brc_topics":["BRCGS","BRCGS"],"col.law":["Căn cứ pháp luật","法规依据"],"col.cls":["Phân loại","类别"],"col.freq_vi":["Tần suất (Việt)","频次（越）"],"col.freq_zh":["Tần suất (Trung)","频次（中）"],"col.flow":["Lập → Duyệt","填写→审核"],"col.keep":["Thời gian lưu","保存期限"],"col.priority":["Ưu tiên","优先级"],"col.where":["Nơi làm","执行位置"],"col.where_note":["In ở đâu","打印位置"],"col.current_rev":["Lần ban hành","发布次数"],"col.issued_at":["Ngày ban hành","发布日期"],"col.period_days":["Chu kỳ hồ sơ","记录周期"],"col.note":["Ghi chú","备注"],"col.group_label":["Tên nhóm","分组名称"],"action.record.submit":["Nộp hồ sơ","提交记录"],"health.backup_mirror":["Bản sao ở tài khoản Google thứ hai","第二个Google账户中的备份"],"adm.mirror.title":["Tài khoản sao lưu thứ hai","第二备份账户"],"adm.mirror.what":["Ba app dùng chung một tài khoản Google: tài khoản bị khóa thì mất cả bản sao lưu. Máy chủ chia sẻ (chỉ xem) thư mục Sao lưu và Dữ liệu cho tài khoản thứ hai; script SaoLuuPhu trong tài khoản đó chép về Drive của nó mỗi ngày.","三个应用共用一个Google账户：账户被锁则备份也会丢失。服务器将备份及数据文件夹（仅查看）共享给第二个账户；该账户中的SaoLuuPhu脚本每天复制到其云端硬盘。"],"adm.mirror.email":["Email tài khoản thứ hai","第二账户邮箱"],"adm.mirror.folders":["Thư mục đã chia sẻ","已共享文件夹"],"adm.mirror.checked":["Kiểm chia sẻ lúc","共享检查时间"],"adm.mirror.save":["Lưu và chia sẻ","保存并共享"],"adm.mirror.off":["Ngừng chia sẻ","停止共享"],"adm.mirror.off_confirm":["Bỏ chia sẻ thư mục Sao lưu và Dữ liệu cho tài khoản thứ hai? Bản đã chép bên đó vẫn giữ.","取消向第二账户共享备份及数据文件夹？已复制的副本仍保留。"],"adm.mirror.next":["Sau khi lưu: đăng nhập tài khoản thứ hai, cài script SaoLuuPhu một lần (Hướng dẫn triển khai, Phần I). Lần chia sẻ đầu Google gửi thư báo tới tài khoản đó.","保存后：登录第二账户，安装一次SaoLuuPhu脚本（部署指南第I部分）。首次共享时Google会向该账户发送通知邮件。"],"adm.mirror.saved":["Đã chia sẻ cho tài khoản thứ hai","已共享给第二账户"],"adm.mirror.stopped":["Đã ngừng chia sẻ","已停止共享"],"adm.mirror.failed":["Lưu email nhưng chia sẻ chưa được — xem lý do trên màn","已保存邮箱但共享失败——请查看原因"],"adm.mirror.bad_email":["Email chưa đúng dạng","邮箱格式不正确"],"mirror_status.OK":["Đang chia sẻ","共享中","green"],"mirror_status.FAILED":["Chia sẻ lỗi","共享失败","red"],"mirror_status.OFF":["Chưa đặt","未设置","grey"],"nav.versions":["Phiên bản","版本"],"file.need_pdf":["Chọn tệp PDF (.pdf)","请选择PDF文件（.pdf）"],"file.need_source":["Tệp gốc phải là Excel hoặc Word (.xlsx, .docx, .xls, .doc)","源文件须为Excel或Word（.xlsx、.docx、.xls、.doc）"],"file.too_big":["Tệp quá 10 MB","文件超过10 MB"],"file.too_big_mobile":["Trên điện thoại tối đa 5 MB — tải tệp lớn từ máy tính","手机上传最多5 MB，大文件请用电脑上传"],"file.empty":["Tệp rỗng","文件为空"],"file.view_pdf":["Xem PDF","查看PDF"],"file.get_source":["Tải tệp gốc","下载源文件"],"file.open_save":["Mở / Lưu","打开/保存"],"file.ready_tap":["Đã tải xong — chạm Mở / Lưu","已下载，请点打开/保存"],"cat.review_soon":["Sắp / quá hạn rà soát","即将/已过评审期限"],"home.pend_review":["{N} phiên bản chờ bạn duyệt","{N}个版本待您审批"],"home.pend_issue":["{N} phiên bản chờ ban hành","{N}个版本待发布"],"home.pend_returned":["{N} phiên bản bị trả lại","{N}个版本被退回"],"home.pend_drafts":["{N} bản nháp của bạn","您的{N}份草稿"],"home.pend_review_due":["{N} tài liệu sắp/quá hạn rà soát","{N}份文件即将/已过评审期限"],"item.review_over":["quá hạn {N} ngày","逾期{N}天"],"item.review_in":["còn {N} ngày","剩{N}天"],"item.no_file_sec":["Biểu ● nhập từ Excel, chưa có tệp. Bấm Gắn tệp bản hiện hành để tải PDF (và tệp gốc) của lần đang dùng.","从Excel导入的●表单尚无文件。请点“附加现行版本文件”上传当前版本的PDF（及源文件）。"],"item.reviewed":["Rà soát gần nhất","最近评审"],"item.manage":["Quản lý biểu (Thư ký ISO)","表单管理（ISO秘书）"],"item.review_btn":["Đã rà soát, giữ nguyên","已评审，保持不变"],"item.review_note":["Tài liệu đã được rà soát định kỳ và vẫn phù hợp: hạn rà soát mới = hôm nay + chu kỳ rà soát. Cần sửa nội dung thì soạn phiên bản mới.","文件已定期评审且仍适用：新评审期限=今天+评审周期。需修改内容请编写新版本。"],"item.review_done":["Đã gia hạn rà soát","已延长评审期限"],"item.na_btn":["Đặt Không áp dụng (✕)","设为不适用（✕）"],"item.unna_btn":["Dùng lại biểu","恢复使用"],"item.na_open":["Biểu đang có phiên bản soạn/chờ duyệt — hủy hoặc ban hành bản đó trước khi đặt ✕","该表单有编写中/待审批的版本，请先作废或发布后再设为✕"],"item.manage_note":["Đặt ✕: ngừng dùng biểu, hồ sơ cũ giữ nguyên. Các thao tác này hỏi lại PIN.","设为✕：停止使用表单，旧记录保留。这些操作需重新输入PIN。"],"item.na_note":["Biểu thôi dùng (vd gộp vào biểu khác). Hồ sơ đã có giữ nguyên; kỳ sau không tính hồ sơ.","停止使用该表单（如合并到其他表单）。已有记录保留；之后不再计算记录。"],"item.na_done":["Đã đặt Không áp dụng","已设为不适用"],"item.unna_done":["Biểu đã dùng lại","表单已恢复使用"],"vstate.DRAFT":["Nháp","草稿","grey"],"vstate.IN_REVIEW":["Chờ duyệt","待审批","amber"],"vstate.APPROVED":["Đã duyệt, chờ ban hành","已审批待发布","navy"],"vstate.ISSUED":["Đang hiệu lực","现行有效","green"],"vstate.SUPERSEDED":["Lỗi thời","已作废（被替代）","grey"],"vstate.CANCELLED":["Đã hủy","已取消","red"],"vtype.ATTACH":["Gắn tệp bản hiện hành","附加现行版本文件","amber"],"vtype.REVISION":["Lần ban hành mới","新发布版本","navy"],"ver.tab.review":["Chờ tôi duyệt","待我审批"],"ver.tab.issue":["Chờ ban hành","待发布"],"ver.tab.returned":["Bị trả lại","被退回"],"ver.tab.drafts":["Nháp của tôi","我的草稿"],"ver.tab.open":["Tất cả đang xử lý","全部处理中"],"ver.title":["Phiên bản","版本"],"ver.not_found":["Không tìm thấy phiên bản này","未找到该版本"],"ver.rev_n":["Lần {N}","第{N}版"],"ver.current_n":["Đang hiệu lực: lần {N}","现行版本：第{N}版"],"ver.returned":["bị trả lại","被退回"],"ver.none":["Không có phiên bản nào trong mục này","此项没有版本"],"ver.how":["Soạn phiên bản mới ở Chi tiết biểu → Soạn phiên bản mới. Luồng: Nháp → Gửi duyệt → Duyệt → Ban hành; bản cũ tự thành lỗi thời.","在表单详情→编写新版本中编写。流程：草稿→提交审批→审批→发布；旧版本自动作废。"],"ver.pdf":["Tệp PDF bản ban hành","发布版PDF文件"],"ver.source":["Tệp gốc (Excel / Word)","源文件（Excel/Word）"],"ver.pdf_hint":["Bắt buộc. Bản sẽ in và phát cho bộ phận. Tối đa 10 MB (điện thoại 5 MB).","必填。用于打印并分发给部门。最大10 MB（手机5 MB）。"],"ver.source_hint":["Không bắt buộc. Để lần sau sửa tiếp (.xlsx, .docx).","选填。便于下次修改（.xlsx、.docx）。"],"ver.pdf_required":["Chọn tệp PDF","请选择PDF文件"],"ver.attach_title":["Gắn tệp bản hiện hành","附加现行版本文件"],"ver.attach_btn":["Gắn tệp bản hiện hành","附加现行版本文件"],"ver.attach_note":["Biểu đã ban hành lần {N} trên giấy (nhập từ Excel). Tải PDF của đúng lần {N} — không qua duyệt lại, không đổi lần và ngày ban hành.","该表单已于纸质发布第{N}版（从Excel导入）。请上传第{N}版的PDF——无需重新审批，不改变发布次数和日期。"],"ver.attach_how":["Bấm Lưu và ban hành → nhập PIN. Cờ \"chưa có tệp\" tắt, mọi người xem được PDF.","点保存并发布→输入PIN。“无文件”标记消除，所有人可查看PDF。"],"ver.new_note":["Phiên bản mới sẽ là lần {N}. Ban hành xong, bản đang hiệu lực (nếu có) tự thành lỗi thời.","新版本为第{N}版。发布后，现行版本（如有）自动作废。"],"ver.flow_note":["Gửi duyệt → trưởng bộ phận duyệt (tài liệu cấp công ty: Quản trị) → Thư ký ISO ban hành. Duyệt, trả lại, ban hành hỏi lại PIN.","提交审批→部门主管审批（公司级文件：管理员）→ISO秘书发布。审批、退回、发布需重新输入PIN。"],"ver.summary":["Tóm tắt thay đổi","变更摘要"],"ver.effective":["Ngày hiệu lực","生效日期"],"ver.save_draft":["Lưu nháp","保存草稿"],"ver.save_submit":["Lưu và gửi duyệt","保存并提交审批"],"ver.save_issue":["Lưu và ban hành","保存并发布"],"ver.uploading":["Đang tải tệp lên…","正在上传文件…"],"ver.uploading_n":["Đang tải tệp lên ({S})…","正在上传文件（{S}）…"],"ver.uploaded":["Đã tải tệp lên","文件已上传"],"ver.open_exists":["Biểu đang có phiên bản lần {N} chưa xong — mở bản đó để làm tiếp","该表单有第{N}版尚未完成，请打开继续处理"],"ver.open_it":["Mở phiên bản đang soạn","打开编写中的版本"],"ver.open":["Đang xử lý","处理中"],"ver.item_na":["Biểu đang Không áp dụng (✕) — dùng lại biểu trước","该表单为不适用（✕），请先恢复使用"],"ver.details":["Chi tiết phiên bản","版本详情"],"ver.no_current":["Chưa có phiên bản ban hành trong app","应用中尚无已发布版本"],"ver.no_current_file":["Đã ban hành trên giấy, chưa có tệp trong app","已纸质发布，应用中尚无文件"],"ver.history_n":["Lịch sử phiên bản ({N})","版本历史（{N}）"],"ver.files":["Tệp","文件"],"ver.no_pdf":["Chưa có PDF","尚无PDF"],"ver.upload_pdf":["Tải PDF lên","上传PDF"],"ver.replace_pdf":["Thay PDF","替换PDF"],"ver.upload_source":["Tải tệp gốc lên","上传源文件"],"ver.replace_source":["Thay tệp gốc","替换源文件"],"ver.files_hint":["Tệp lưu riêng tư trên Drive của máy chủ ISO; chỉ người có quyền tải về qua app.","文件私密保存在ISO服务器云端硬盘；仅有权限者可通过应用下载。"],"ver.info":["Thông tin phiên bản","版本信息"],"ver.author":["Người soạn","编写人"],"ver.submitted":["Gửi duyệt","提交审批"],"ver.approved":["Duyệt","审批"],"ver.issued":["Ban hành","发布"],"ver.superseded":["Thành lỗi thời","作废时间"],"ver.cancelled":["Hủy","取消"],"ver.edit":["Sửa nháp","修改草稿"],"ver.submit":["Gửi duyệt","提交审批"],"ver.approve":["Duyệt","审批通过"],"ver.return":["Trả lại","退回"],"ver.issue":["Ban hành","发布"],"ver.cancel":["Hủy phiên bản","取消版本"],"ver.wait_head":["Đang chờ trưởng bộ phận (hoặc Quản trị) duyệt","等待部门主管（或管理员）审批"],"ver.wait_admin":["Tài liệu cấp công ty: chờ Quản trị (cấp 4) duyệt","公司级文件：等待管理员（4级）审批"],"ver.wait_issue":["Đã duyệt — chờ Thư ký ISO ban hành","已审批，等待ISO秘书发布"],"ver.need_pdf":["Tải PDF lên rồi mới gửi duyệt được","上传PDF后才能提交审批"],"ver.returned_by":["Bị trả lại bởi {U} lúc {D}","{U}于{D}退回"],"ver.superseded_note":["Bản này đã lỗi thời — có lần ban hành mới hơn","此版本已作废，已有更新的发布版本"],"ver.cancelled_note":["Phiên bản đã hủy","版本已取消"],"ver.approve_note":["Ghi chú khi duyệt (không bắt buộc)","审批备注（选填）"],"ver.self_note":["Bạn là người soạn bản này — Quản trị được tự duyệt.","您是此版本的编写人——管理员可自行审批。"],"ver.approved_ok":["Đã duyệt","已审批"],"ver.returned_ok":["Đã trả lại người soạn","已退回编写人"],"ver.submitted_ok":["Đã gửi duyệt","已提交审批"],"ver.issued_ok":["Đã ban hành","已发布"],"ver.cancelled_ok":["Đã hủy phiên bản","已取消版本"],"ver.issue_confirm":["Ban hành lần {N}, ngày ban hành {D}. Bản đang hiệu lực (nếu có) sẽ thành lỗi thời; hạn rà soát tính lại từ hôm nay.","发布第{N}版，发布日期{D}。现行版本（如有）将作废；评审期限从今天重新计算。"],"ver.issue_attach_confirm":["Gắn PDF này cho lần {N} đang hiệu lực. Không đổi lần và ngày ban hành.","将此PDF附加到现行第{N}版。不改变发布次数和日期。"],"ver.issue_old":["Lần {C} đang hiệu lực sẽ thành lỗi thời.","现行第{C}版将作废。"],"ver.cancel_note":["Hủy bản đang soạn. Tệp đã tải vẫn giữ trong lịch sử.","取消编写中的版本。已上传文件保留在历史中。"],"audit_grp.version":["Phiên bản","版本"],"audit_grp.doc":["Tệp tài liệu","文件"],"health.versions":["Phiên bản","版本"],"health.file_missing":["Biểu ● chưa có tệp","●表单无文件"],"health.review_overdue":["Tài liệu quá hạn rà soát","逾期评审文件"]};

@@ -80,6 +80,7 @@ export async function renderAccount(view, { shell }) {
     ${u.iso_secretary || u.auditor ? row(bi('account.flags'), [u.iso_secretary ? bi('role.secretary') : '', u.auditor ? bi('role.auditor') : ''].filter(Boolean).join('<br>')) : ''}
   </section>
   <section class="card acc-links"><h2>${bi('account.work')}</h2>
+    ${lvl >= 2 || sec ? link('nav.versions', '/versions') : ''}
     ${lvl >= 3 || sec ? link('nav.excel', '/excel') : ''}
     ${lvl >= 2 ? link('nav.coverage', '/coverage', `<span class="tag soon">${bi('soon.tag')}</span>`) : ''}
     ${link('nav.reports', '/reports', `<span class="tag soon">${bi('soon.tag')}</span>`)}

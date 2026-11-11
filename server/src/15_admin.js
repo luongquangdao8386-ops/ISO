@@ -131,6 +131,28 @@ function migrateSchema() {
   log_('migrateSchema xong. Thêm: ' + (added.length ? added.join('; ') : 'không có') + '. schema_version=' + SCHEMA_VERSION);
 }
 
+/**
+ * Dán Code.gs mới mà quên chạy migrateSchema: trigger nền tự chạy migrateSchema khi schema_version của bảng tính khác mã
+ * (thêm sheet/cột còn thiếu, không xóa gì). Lỗi thì để healthCheck báo, không chặn trigger.
+ */
+function autoMigrate_() {
+  try {
+    if (String(stateGet_(readState_(), 'schema_version', '')) === SCHEMA_VERSION) return false;
+    migrateSchema();
+    dbReset_();
+    return true;
+  } catch (e) {
+    log_('autoMigrate_: ' + (e && e.message));
+    return false;
+  }
+}
+
+/** Sheet đã có trong bảng tính chưa (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema) */
+function sheetExists_(name) {
+  if (DB_.sheets[name]) return true;
+  try { sh_(name); return true; } catch (e) { return false; }
+}
+
 function clearSysCaches_() {
   cache_().removeAll(['sys:props', 'sys:state', 'cfg:settings']);
 }

@@ -157,7 +157,8 @@ test('web: menu trái (màn phiên sau mờ "Sắp có"), Excel xuất đúng kh
   try {
     const { page } = app;
     await login(page);
-    assert.equal(await page.locator('.side .side-item').count(), 10);
+    assert.equal(await page.locator('.side .side-item').count(), 11);
+    assert.equal(await page.locator('.side .side-item[data-nav="versions"]').count(), 1);
     assert.equal(await page.locator('.side .side-item.soon').count(), 6);
     assert.ok(await page.locator('.stats').isVisible());
     assert.ok(await page.locator('.home-depts').isVisible());

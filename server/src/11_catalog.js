@@ -285,7 +285,9 @@ function itemRowFromImport_(ctx, cur, code, f, nowIso) {
   if (!row.current_version_id) {
     if (row.status === 'ISSUED') { row.issued_source = 'IMPORT'; row.file_missing = true; } else { row.issued_source = ''; row.file_missing = false; }
   }
-  row.review_due = row.status === 'ISSUED' && row.issued_at ? addMonthsIso_(row.issued_at, Number(setting_('doc_review_months') || 12)) : '';
+  // Hạn rà soát: tính từ ngày ban hành; giữ hạn đã có khi biểu vẫn ● cùng ngày ban hành (ban hành trong app, đã bấm "Đã rà soát")
+  var keepDue = cur && cur.review_due && cur.status === 'ISSUED' && row.status === 'ISSUED' && cmpVal_(cur.issued_at) === cmpVal_(row.issued_at);
+  row.review_due = keepDue ? cur.review_due : (row.status === 'ISSUED' && row.issued_at ? addMonthsIso_(row.issued_at, Number(setting_('doc_review_months') || 12)) : '');
   if (!cur) cNew_(ctx, row); else cUpdate_(ctx, row);
   return row;
 }

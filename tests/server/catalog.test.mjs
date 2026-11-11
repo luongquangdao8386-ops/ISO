@@ -54,11 +54,12 @@ test('quyền: cấp 1–3 không phải Thư ký bị FORBIDDEN (trước khi h
   assert.equal(look.write('settings.edit', { changes: { record_grace_days: 4 } }).code, 'FORBIDDEN');
   assert.equal(look.write('user.create', { user_id: uuid() }).code, 'FORBIDDEN');
   assert.equal(head.call('user.view', {}).code, 'FORBIDDEN');
-  // Phiên 1b/1c: action đã đăng ký nhưng chưa có mã
-  assert.equal(head.write('version.save', {}).code, 'FEATURE_NOT_ENABLED');
+  // Phiên 1c: action đã đăng ký nhưng chưa có mã
   assert.equal(head.write('record.submit', {}).code, 'FEATURE_NOT_ENABLED');
   const p = head.call('sync.bootstrap', {}).data.permissions.actions;
-  assert.ok(!p.includes('item.edit') && !p.includes('import.preview') && !p.includes('version.save'));
+  assert.ok(!p.includes('item.edit') && !p.includes('import.preview') && !p.includes('version.issue') && !p.includes('record.submit'));
+  assert.ok(p.includes('version.save') && p.includes('version.approve') && p.includes('doc.get'));
+  assert.ok(!look.call('sync.bootstrap', {}).data.permissions.actions.includes('version.save'));
 });
 
 test('item.edit: Thư ký ISO thêm quy trình (loại, cấp, nhóm theo mã, mã QR), sửa thông tin; mã trùng bị từ chối; dịch máy tên còn thiếu', () => {

@@ -1397,3 +1397,22 @@ a.day { display: block; text-decoration: none; color: inherit; }
 .filters .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; margin: 4px 0 8px; }
 .filters .inp.sel { min-height: 42px; padding-top: 6px; padding-bottom: 6px; font-size: 1rem; } /* < 16px thì iPhone phóng to khi chọn */
 @media (min-width: 900px) { .filters .form-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+/* ---- Phiên bản & ban hành (phiên 1b) ---- */
+.pend-rows { flex-direction: column; gap: 0; }
+.pend-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 6px 2px; border-top: 1px solid #F3D9D5; text-decoration: none; color: var(--text); font-weight: 600; }
+.pend-row:first-child { border-top: 0; }
+.pend-row svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.ver-card .ver-cur { padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--green); border-radius: 10px; background: #FBFDFB; }
+.ver-card .ver-cur .rec-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.doc-row { flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.doc-btn { display: inline-flex; flex-direction: column; align-items: flex-start; text-align: left; min-height: 44px; max-width: 100%; }
+.doc-btn .doc-label { font-weight: 700; }
+.doc-btn .doc-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.ver-hist summary { cursor: pointer; padding: 8px 0; font-weight: 600; color: var(--navy); }
+.ver-row .cat-meta { white-space: normal; }
+.up-row { flex-wrap: wrap; gap: 8px; }
+.file-fld input[type=file] { padding: 8px; font-size: 0.875rem; }
+.item-actions { flex-wrap: wrap; gap: 8px; }
+.kv-block { padding: 6px 0; border-bottom: 1px solid var(--bg); font-size: 0.875rem; }
+.kv-block p { margin: 4px 0 0; white-space: pre-line; }

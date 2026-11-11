@@ -200,7 +200,22 @@ function healthRows_() {
   add('clauses', iso > 0 && brc > 0, 'ISO 9001: ' + iso + ' · BRCGS: ' + brc, iso && brc ? '' : 'Nhập file Excel tổng (sheet Phủ ISO 9001, Phủ BRCGS)');
   var heads = readRows_('Depts').filter(function (d) { return d.active; });
   var noHead = heads.filter(function (d) { return !d.head_user_id; }).map(function (d) { return d.dept_code; });
-  add('dept_heads', !noHead.length, (heads.length - noHead.length) + ' / ' + heads.length, noHead.length ? 'Chưa có trưởng bộ phận: ' + noHead.join(', ') : '');
+  // Không có trưởng bộ phận thì Quản trị (cấp 4) duyệt thay — không coi là lỗi khi có Quản trị đang hoạt động
+  var admins = readRows_('Users').filter(function (u) { return u.active && Number(u.role_level) === 4; }).length;
+  add('dept_heads', !noHead.length || admins > 0, (heads.length - noHead.length) + ' / ' + heads.length,
+    noHead.length ? 'Chưa có trưởng bộ phận: ' + noHead.join(', ') + (admins ? ' — Quản trị duyệt thay' : '') : '');
+  if (sheetExists_('Versions')) {
+    var vs = readRows_('Versions');
+    var cnt = function (st) { return vs.filter(function (v) { return v.state === st; }).length; };
+    add('versions', true, 'Nháp ' + cnt('DRAFT') + ' · Chờ duyệt ' + cnt('IN_REVIEW') + ' · Chờ ban hành ' + cnt('APPROVED') + ' · Đang hiệu lực ' + cnt('ISSUED'));
+  } else {
+    add('versions', false, 'Thiếu sheet Versions', 'Chạy migrateSchema');
+  }
+  var nofile = items.filter(function (it) { return it.status === 'ISSUED' && it.file_missing; }).length;
+  add('file_missing', true, nofile, nofile ? 'Biểu ● chưa có tệp: Danh mục → lọc Chưa có tệp → Gắn tệp' : '');
+  var today = todayVN_();
+  var overdue = items.filter(function (it) { return it.status === 'ISSUED' && it.review_due && it.review_due < today; }).length;
+  add('review_overdue', !overdue, overdue, overdue ? 'Tài liệu quá hạn rà soát: rà soát rồi bấm Đã rà soát, hoặc soạn phiên bản mới' : '');
   var owners = readRows_('Users').filter(function (u) { return u.active && (u.iso_secretary || Number(u.role_level) === 4); });
   var hasSec = readRows_('Users').some(function (u) { return u.active && u.iso_secretary; });
   add('iso_secretary', hasSec, owners.length, hasSec ? '' : 'Chưa có Thư ký ISO: Tài khoản → Quản trị → Người dùng → cờ Thư ký ISO');

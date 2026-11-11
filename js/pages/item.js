@@ -1,13 +1,16 @@
-// Chi tiết biểu / tài liệu (phần thông tin, phiên 1a): mục đích, tần suất, Lập → Duyệt, thời gian lưu, điều khoản ISO, chủ đề BRCGS,
-// lần ban hành, hạn rà soát, nơi làm, biểu liên quan. Phiên bản & lịch sử (1b), hồ sơ 12 kỳ (1c), tem QR (Đợt 2) hiện "Sắp có".
+// Chi tiết biểu / tài liệu: mục đích, tần suất, Lập → Duyệt, thời gian lưu, điều khoản ISO, chủ đề BRCGS, lần ban hành, hạn rà soát,
+// nơi làm, biểu liên quan (1a); phiên bản hiện hành (xem PDF, tải tệp gốc), bản đang soạn, lịch sử phiên bản, Soạn phiên bản mới,
+// gắn tệp cho biểu ● nhập từ Excel, đặt Không áp dụng ✕ / dùng lại, Đã rà soát (1b). Hồ sơ 12 kỳ (1c), tem QR (Đợt 2) hiện "Sắp có".
 // Sửa thông tin (Thư ký ISO, cấp 4): /item/:id/edit, thêm mới /item/new.
 import { bi, biText, esc, fmtDate, nameText, uuid, badge } from '../core.js';
-import { ICON, toast } from '../ui.js';
-import { byId, items, recs, depts, isSecretary, users, userName, groupText, KINDS, WHERES } from '../data.js';
-import { navigate } from '../router.js';
+import { ICON, toast, dialog, $ } from '../ui.js';
+import { byId, items, recs, depts, isSecretary, users, userName, groupText, KINDS, WHERES, versionsOf, canCreateVersion, reviewSoon, daysBetween, today, VERSION_OPEN, can } from '../data.js';
+import { navigate, refresh } from '../router.js';
 import { afterCommit } from '../app.js';
-import { textInput, textArea, selectInput, numberInput, bilingualInputs, wireForm, readField, showErrors, writeOnline, writeFail, busy, assistedFields } from '../form.js';
+import { textInput, textArea, selectInput, numberInput, bilingualInputs, wireForm, readField, showErrors, writeOnline, writeWithPin, writeFail, busy, assistedFields } from '../form.js';
+import { docButton, wireDocButtons } from '../files.js';
 import { statusDot } from './catalog.js';
+import { versionRow, vBadge } from './version.js';
 
 const PERIOD_OF = (d) => {
   if (d === null || d === undefined || d === '') return 'EVENT';
@@ -35,13 +38,26 @@ export async function renderItem(view, { shell, params, query }) {
   const scanned = query && query.r ? String(query.r) : '';
   const stale = scanned && it.current_rev && scanned.padStart(2, '0') !== String(it.current_rev).padStart(2, '0');
   const iso = [['ISO 9001', it.iso9001], ['ISO 14001', it.iso14001], ['ISO 45001', it.iso45001], ['ISO 50001', it.iso50001]].filter((x) => x[1]);
+  const vers = await versionsOf(it.item_id);
+  const curV = vers.find((v) => v.version_id === it.current_version_id) || null;
+  const openV = vers.find((v) => VERSION_OPEN.has(v.state)) || null;
+  const hist = vers.filter((v) => v !== curV && v !== openV);
+  // Máy chủ chưa lên bản 1b (chưa có version.*): không hiện nút phiên bản
+  const vOn = await can('version.save');
+  const canNew = vOn && !openV && canCreateVersion(it, 'REVISION');
+  const canAttach = vOn && !openV && it.status === 'ISSUED' && it.file_missing && canCreateVersion(it, 'ATTACH');
+  const manage = sec && await can('item.setNa');
+  const t = today();
+  const dueDays = it.review_due ? daysBetween(t, it.review_due) : null;
+  const dueHtml = it.review_due ? esc(fmtDate(it.review_due)) + (it.status === 'ISSUED' && reviewSoon(it, t)
+    ? ` <span class="badge ${dueDays < 0 ? 't-red' : 't-amber'}">${bi(dueDays < 0 ? 'item.review_over' : 'item.review_in', { N: Math.abs(dueDays) })}</span>` : '') : '—';
   view.innerHTML = `<div class="item">
     ${scanned ? `<p class="banner ${stale ? 'err' : 'ok'}">${stale ? bi('item.stale', { R: esc(scanned), C: esc(it.current_rev) }) : bi('item.current', { R: esc(it.current_rev || scanned) })}</p>` : ''}
     <section class="card item-head">
       <div class="rec-top"><span class="code big">${esc(it.code)}</span>${statusDot(it.status)} ${badge('status.' + (it.status || 'NONE'))}</div>
       <h2 class="item-name">${pair(it.name_vi, it.name_zh)}</h2>
       <div class="rec-badges">${badge('kind.' + (it.kind || 'FORM'))} ${badge('level_doc.' + (it.level || 'DEPT'))}${it.priority ? ' ' + badge('cat.prio_n', { N: it.priority }) : ''}${it.status === 'ISSUED' && it.file_missing ? ' ' + badge('cat.no_file') : ''}</div>
-      ${it.status === 'ISSUED' && it.file_missing ? `<p class="banner warn small">${bi('item.no_file_note')}</p>` : ''}
+      ${it.status === 'ISSUED' && it.file_missing ? `<p class="banner warn small">${bi(sec ? 'item.no_file_sec' : 'item.no_file_note')}</p>` : ''}
       ${it.status === 'NA' && it.na_reason ? `<p class="banner small">${bi('item.na_reason')}: ${esc(it.na_reason)}</p>` : ''}
     </section>
     <section class="card"><h3>${bi('item.info')}</h3>
@@ -66,18 +82,66 @@ export async function renderItem(view, { shell, params, query }) {
     <section class="card"><h3>${bi('item.issue')}</h3>
       ${row('cat.rev', esc(it.current_rev || '—'))}
       ${row('item.issued_at', esc(fmtDate(it.issued_at) || '—'))}
-      ${row('item.review_due', esc(fmtDate(it.review_due) || '—'))}
+      ${row('item.review_due', dueHtml)}
+      ${it.reviewed_at ? row('item.reviewed', `${esc(userName(um, it.reviewed_by))} <span class="muted small">${esc(fmtDate(it.reviewed_at))}</span>`) : ''}
       ${row('item.qr', `<span class="code small">${esc(it.qr_key || '')}</span>`)}
     </section>
-    <section class="card soon-card"><div class="card-head"><h3>${bi('item.versions')}</h3><span class="tag soon">${bi('soon.tag')}</span></div><p class="muted small">${bi('item.versions_soon')}</p></section>
+    <section class="card ver-card"><h3>${bi('item.versions')}</h3>
+      ${curV ? `<div class="ver-cur"><div class="rec-top"><strong>${bi('ver.current_n', { N: esc(curV.rev) })}</strong>${vBadge(curV)}</div>
+          <div class="muted small">${bi('item.issued_at')}: ${esc(fmtDate(curV.issued_at))}${curV.effective_date && curV.effective_date !== curV.issued_at ? ` · ${bi('ver.effective')}: ${esc(fmtDate(curV.effective_date))}` : ''}</div>
+          ${curV.change_summary_vi || curV.change_summary_zh ? `<p class="small">${esc(curV.change_summary_vi || curV.change_summary_zh)}</p>` : ''}
+          <div class="row doc-row">${docButton(curV.pdf_doc_id, 'PDF', curV.pdf_file_name, curV.pdf_size)}${docButton(curV.source_doc_id, 'SOURCE', curV.source_file_name, curV.source_size)}</div>
+          <a class="small" href="#/version/${encodeURIComponent(curV.version_id)}">${bi('ver.details')} ›</a></div>`
+        : `<p class="muted small">${bi(it.status === 'ISSUED' ? 'ver.no_current_file' : 'ver.no_current')}</p>`}
+      ${openV ? `<p class="lbl">${bi('ver.open')}</p><ul class="cat-list">${versionRow(openV, it, { um })}</ul>` : ''}
+      ${hist.length ? `<details class="ver-hist"><summary>${bi('ver.history_n', { N: hist.length })}</summary><ul class="cat-list">${hist.map((v) => versionRow(v, it, { um })).join('')}</ul></details>` : ''}
+    </section>
     <section class="card soon-card"><div class="card-head"><h3>${bi('item.records')}</h3><span class="tag soon">${bi('soon.tag')}</span></div><p class="muted small">${bi('item.records_soon')}</p></section>
     <div class="row item-actions">
+      ${canAttach ? `<a class="btn primary" href="#/version/new/${encodeURIComponent(it.item_id)}?attach=1">${ICON.upload}<span>${bi('ver.attach_btn')}</span></a>` : ''}
+      ${canNew ? `<a class="btn${canAttach ? '' : ' primary'}" href="#/version/new/${encodeURIComponent(it.item_id)}">${ICON.edit}<span>${bi('item.new_version')}</span></a>` : ''}
+      ${openV ? `<a class="btn primary" href="#/version/${encodeURIComponent(openV.version_id)}">${ICON.edit}<span>${bi('ver.open_it')}</span></a>` : ''}
       <button type="button" class="btn" disabled title="${esc(biText('soon.tag'))}">${ICON.upload}<span>${bi('item.submit_record')}</span><span class="tag soon">${bi('soon.tag')}</span></button>
-      <button type="button" class="btn" disabled title="${esc(biText('soon.tag'))}">${ICON.edit}<span>${bi('item.new_version')}</span><span class="tag soon">${bi('soon.tag')}</span></button>
       <button type="button" class="btn" disabled title="${esc(biText('soon.tag'))}">${ICON.qr}<span>${bi('item.qr_label')}</span><span class="tag soon">${bi('soon.tag')}</span></button>
     </div>
+    ${manage ? `<section class="card"><h3>${bi('item.manage')}</h3><div class="row">
+      ${it.status === 'ISSUED' ? `<button type="button" class="btn small" id="it-review">${ICON.check}<span>${bi('item.review_btn')}</span></button>` : ''}
+      ${it.status === 'NA' ? `<button type="button" class="btn small" id="it-unna">${ICON.refresh}<span>${bi('item.unna_btn')}</span></button>`
+        : `<button type="button" class="btn small danger" id="it-na" ${openV ? 'disabled' : ''}>${ICON.x}<span>${bi('item.na_btn')}</span></button>`}
+      </div>${openV && it.status !== 'NA' ? `<p class="muted small">${bi('item.na_open')}</p>` : ''}<p class="muted small">${bi('item.manage_note')}</p></section>` : ''}
     ${rel.length ? `<section class="card"><h3>${bi('item.related')}</h3><ul class="cat-list">${rel.slice(0, 30).map((x) => `<li><a class="cat-row" href="#/item/${encodeURIComponent(x.item_id)}"><span class="cat-top"><span class="code">${esc(x.code)}</span>${statusDot(x.status)}</span><span class="cat-name">${esc(x.name_vi || x.name_zh)}</span>${ICON.chevron}</a></li>`).join('')}</ul></section>` : ''}
   </div>`;
+  wireDocButtons(view);
+  const again = async (key) => { await afterCommit(); toast(bi(key), 'ok'); refresh(); };
+  const on = (id, fn) => { const b = $('#' + id, view); if (b) b.addEventListener('click', async () => { if (!navigator.onLine) { toast(bi('sync.need_network'), 'err'); return; } busy(b, true); try { await fn(); } finally { busy(b, false); } }); };
+  on('it-na', async () => {
+    const reason = await dialog({
+      title: bi('item.na_btn'),
+      body: `<p class="muted small">${bi('item.na_note')}</p><label class="fld"><span>${bi('field.reason')} <span class="req">*</span></span><textarea class="inp" rows="3" maxlength="300" id="na-reason"></textarea></label>`,
+      actions: [{ label: bi('btn.cancel'), value: null }, { label: bi('item.na_btn'), kind: 'danger', read: (w) => $('#na-reason', w).value.trim() }]
+    });
+    if (reason === null || reason === undefined) return;
+    if (!reason) { toast(bi('field.required'), 'err'); return; }
+    const r = await writeWithPin('item.setNa', { item_id: it.item_id, na: true, reason }, { expected_version: it.record_version });
+    if (r.ok) return again('item.na_done');
+    writeFail(r);
+  });
+  on('it-unna', async () => {
+    const r = await writeWithPin('item.setNa', { item_id: it.item_id, na: false }, { expected_version: it.record_version });
+    if (r.ok) return again('item.unna_done');
+    writeFail(r);
+  });
+  on('it-review', async () => {
+    const note = await dialog({
+      title: bi('item.review_btn'),
+      body: `<p class="muted small">${bi('item.review_note')}</p><label class="fld"><span>${bi('item.note')}</span><textarea class="inp" rows="2" maxlength="300" id="rv-note"></textarea></label>`,
+      actions: [{ label: bi('btn.cancel'), value: null }, { label: bi('item.review_btn'), kind: 'primary', read: (w) => $('#rv-note', w).value.trim() }]
+    });
+    if (note === null || note === undefined) return;
+    const r = await writeWithPin('item.review', { item_id: it.item_id, note }, { expected_version: it.record_version });
+    if (r.ok) return again('item.review_done');
+    writeFail(r);
+  });
 }
 
 /* ---------------- Thêm / sửa thông tin biểu (Thư ký ISO, cấp 4) ---------------- */
