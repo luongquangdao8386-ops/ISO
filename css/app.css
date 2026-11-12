@@ -1656,3 +1656,17 @@ ul.plain { list-style: none; padding: 0; margin: 6px 0; }
 .tpl-sheet.muted .code { color: var(--muted); }
 .tpl-up .file-btn { margin-top: 8px; }
 .tag.t-amber { background: #FFF1CC; color: #8A5A00; }
+
+/* ---------------- Khắc phục (Đợt 3, phiên 3a) ---------------- */
+.capa-form .chips, .modal .chips { flex-wrap: wrap; margin-bottom: 6px; }
+.capa-form .chips .chip, .modal .chips .chip { white-space: normal; text-align: left; }
+.capa-act-list { margin: 0; padding: 0; }
+.capa-act { border-top: 1px solid var(--line); padding: 10px 0; }
+.capa-act:first-child { border-top: 0; }
+.capa-act .rec-top { flex-wrap: wrap; gap: 6px; }
+.capa-act-text { margin: 6px 0 4px; }
+.capa-act-done { margin-top: 6px; padding: 6px 8px; border-radius: 8px; background: var(--ok-bg, rgba(30, 123, 74, .08)); }
+.capa-act .row { margin-top: 8px; }
+.capa-vh { border-top: 1px solid var(--line); padding: 8px 0; }
+.capa-vh:first-child { border-top: 0; }
+.capa .card-head h3 { margin: 0; }

@@ -1,6 +1,7 @@
 // Báo cáo (Đợt 2, phiên 2c): 4 báo cáo do máy chủ tính (27_reports.js) — Danh mục tài liệu hiện hành (thay BM-ISO-02-01), Tình trạng
 // hồ sơ theo bộ phận và kỳ (tháng / quý), Phủ điều khoản ISO 9001 và BRCGS, Lịch sử phiên bản của một tài liệu; phiên 2d thêm Sổ phân phối
-// & thu hồi (thay BM-ISO-02-03) và Phiếu đề nghị tài liệu (một phiếu để in ký, hoặc sổ theo dõi năm — thay BM-ISO-02-02).
+// & thu hồi (thay BM-ISO-02-03) và Phiếu đề nghị tài liệu (một phiếu để in ký, hoặc sổ theo dõi năm — thay BM-ISO-02-02); phiên 3a thêm
+// Khắc phục (một phiếu để in ký, hoặc sổ theo dõi khắc phục năm — mã biểu theo cài đặt, mặc định BM-CĐ-14-02).
 // Chọn báo cáo + bộ lọc → Xem báo cáo (bản xem trước như trang in, chưa có số) → Tải PDF (máy chủ dựng bằng Google Docs, A4 ngang,
 // logo công ty) / Tải Excel (dựng trên máy, js/report-xlsx.js): lần tải đầu lưu báo cáo và cấp số BC-yymm-001; tải tiếp (PDF rồi
 // Excel) cùng bộ lọc → cùng số, cùng số liệu. Báo cáo đã lưu: tải lại PDF / Excel đúng như lúc lập.
@@ -8,20 +9,20 @@
 import { api, bi, biText, esc, nameText, resMsg, uuid, b64ToBytes, fmtDateTime, session } from '../core.js';
 import { $, ICON, toast, dialog, freshFilters } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, depts, recs, can, seesAll, canSeeRecords, isSecretary, today } from '../data.js';
+import { items, depts, recs, can, seesAll, canSeeRecords, isSecretary, today, capaOn } from '../data.js';
 import { busy } from '../form.js';
 import { openFile } from '../files.js';
 import { reportLogo } from '../report-logo.js';
 import { reportExcelFile } from '../report-xlsx.js';
 
-const KINDS = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ'];
-const KIND_ICON = { CATALOG: 'library', RECORDS: 'file', COVERAGE: 'checklist', VERSIONS: 'archive', DIST: 'print', DOCREQ: 'edit' };
-const NEED_RECORDS = { RECORDS: 1, COVERAGE: 1, DIST: 1, DOCREQ: 1 };
+const KINDS = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA'];
+const KIND_ICON = { CATALOG: 'library', RECORDS: 'file', COVERAGE: 'checklist', VERSIONS: 'archive', DIST: 'print', DOCREQ: 'edit', CAPA: 'repairs' };
+const NEED_RECORDS = { RECORDS: 1, COVERAGE: 1, DIST: 1, DOCREQ: 1, CAPA: 1 };
 const N_OPTS = { MONTH: [3, 6, 12], QUARTER: [2, 4, 8] };
 const N_DEF = { MONTH: 6, QUARTER: 4 };
 const LONG = 180000; // máy chủ dựng PDF bằng Google Docs: tới cả phút với danh mục lớn
 
-const INIT = { kind: 'CATALOG', dept: '', scope: 'ISSUED', grain: 'MONTH', end: '', n: 6, std: 'BOTH', codes: true, item: '', dstate: 'ALL', year: 0, rstate: 'ALL', req: '' };
+const INIT = { kind: 'CATALOG', dept: '', scope: 'ISSUED', grain: 'MONTH', end: '', n: 6, std: 'BOTH', codes: true, item: '', dstate: 'ALL', year: 0, rstate: 'ALL', req: '', capa: '', cstate: 'ALL' };
 const state = { ...INIT };
 /** Bản xem trước / báo cáo đang làm: {sig, runId, code, layout, logo} — đổi bộ lọc thì bỏ */
 let cur = null;
@@ -58,6 +59,7 @@ function filtersOf(s) {
   if (s.kind === 'COVERAGE') return { dept: s.dept, std: s.std, codes: !!s.codes };
   if (s.kind === 'DIST') return { dept: s.dept, state: s.dstate };
   if (s.kind === 'DOCREQ') return s.req ? { request_id: s.req } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.rstate };
+  if (s.kind === 'CAPA') return s.capa ? { capa_id: s.capa } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.cstate };
   return { item_id: s.item };
 }
 const sigOf = (s) => JSON.stringify([s.kind, filtersOf(s)]);
@@ -69,6 +71,7 @@ function applyQuery(q) {
   if (q.dept !== undefined) state.dept = String(q.dept);
   if (q.std && ['BOTH', 'ISO9001', 'BRC'].includes(q.std)) state.std = q.std;
   if (q.req) state.req = String(q.req);
+  if (q.capa) state.capa = String(q.capa);
 }
 
 /* ---------------- Bản xem trước (cùng bố cục với PDF, Excel) ---------------- */
@@ -151,7 +154,7 @@ async function download(btn, job, after) {
 /* ---------------- Màn Báo cáo ---------------- */
 
 /** Mô tả bộ lọc của một báo cáo đã lưu */
-function filterText(run, deptMap, itemMap, reqMap = new Map()) {
+function filterText(run, deptMap, itemMap, reqMap = new Map(), capaMap = new Map()) {
   const f = run.filters || {};
   const parts = [];
   if (run.kind === 'VERSIONS') { const it = itemMap.get(f.item_id); parts.push(it ? esc(it.code) : ''); } else parts.push(f.dept ? esc(nameText(deptMap.get(f.dept)) || f.dept) : bi('rpt.all_depts'));
@@ -159,6 +162,7 @@ function filterText(run, deptMap, itemMap, reqMap = new Map()) {
   if (run.kind === 'RECORDS') parts.push(`${esc(keyLabel(f.grain, f.end))} · ${bi('rp.n.' + f.grain, { N: f.n })}`);
   if (run.kind === 'COVERAGE') parts.push(bi('rpt.std.' + (f.std || 'BOTH')));
   if (run.kind === 'DIST') parts.push(bi('rpt.dist_state.' + (f.state || 'ALL')));
+  if (run.kind === 'CAPA') { if (f.capa_id) { parts.length = 0; parts.push(esc((capaMap.get(f.capa_id) || {}).code || '')); } else parts.push(esc(String(f.year || '')) + ' · ' + bi('rpt.capa_state.' + (f.state || 'ALL'))); }
   if (run.kind === 'DOCREQ') { if (f.request_id) { parts.length = 0; parts.push(esc((reqMap.get(f.request_id) || {}).code || '')); } else parts.push(esc(String(f.year || '')) + ' · ' + bi('rpt.req_state.' + (f.state || 'ALL'))); }
   return parts.filter(Boolean).join(' · ');
 }
@@ -171,7 +175,9 @@ export async function renderReports(view, ctx) {
     return;
   }
   if (ctx.entered) { freshFilters(ctx, state, INIT); applyQuery(query); cur = null; }
-  if (!kindAllowed(state.kind)) state.kind = 'CATALOG';
+  const capaReady = await capaOn();
+  const kindOk = (k) => kindAllowed(k) && (k !== 'CAPA' || capaReady);
+  if (!kindOk(state.kind)) state.kind = 'CATALOG';
   const all = await items();
   const deps = await depts();
   const deptMap = new Map(deps.map((d) => [d.dept_code, d]));
@@ -184,7 +190,11 @@ export async function renderReports(view, ctx) {
   const reqMap = new Map(reqList.map((r) => [r.request_id, r]));
   if (state.req && !reqMap.has(state.req)) state.req = '';
   const thisYear = Number(today().slice(0, 4));
-  const years = [...new Set([thisYear, ...reqList.map((r) => Number(String(r.submitted_at).slice(0, 4))).filter((y) => y > 2000)])].sort((a, b) => b - a);
+  // Khắc phục (3a): chọn một phiếu (in ký) hoặc sổ theo dõi năm
+  const capaList = (await recs('CAPA')).filter((c) => !c.archived_at).sort((a, b) => String(b.code).localeCompare(String(a.code)));
+  const capaMap = new Map(capaList.map((c) => [c.capa_id, c]));
+  if (state.capa && !capaMap.has(state.capa)) state.capa = '';
+  const years = [...new Set([thisYear, ...reqList.map((r) => Number(String(r.submitted_at).slice(0, 4))), ...capaList.map((c) => Number(String(c.found_date).slice(0, 4)))].filter((y) => y > 2000))].sort((a, b) => b - a);
   if (!state.year) state.year = thisYear;
   let saved = null; // báo cáo đã lưu (report.list)
 
@@ -193,11 +203,16 @@ export async function renderReports(view, ctx) {
     const k = state.kind;
     const out = [];
     if (k === 'DOCREQ') out.push(sel('rf-req', 'rpt.f.req', [['', biText('rp.req_log')]].concat(reqList.slice(0, 300).map((r) => [r.request_id, `${r.code} · ${biText('dr.type.' + r.req_type).split(' · ')[0]} · ${(itemMap.get(r.item_id) || {}).code || r.new_code || ''}`])), state.req));
-    if (k !== 'VERSIONS' && !(k === 'DOCREQ' && state.req)) out.push(sel('rf-dept', k === 'DIST' ? 'dist.recipient' : 'rpt.f.dept', [['', biText(seesAll() ? 'rpt.all_depts' : 'cat.all')]].concat((k === 'DIST' ? deps : deptOpts).map((d) => [d.dept_code, `${d.dept_code} · ${nameText(d)}`])), state.dept));
+    if (k === 'CAPA') out.push(sel('rf-capa', 'rpt.f.capa', [['', biText('rp.capa_log')]].concat(capaList.slice(0, 300).map((c) => [c.capa_id, `${c.code} · ${String(c.title_vi || c.title_zh || c.problem_vi || c.problem_zh || '').split('\n')[0].slice(0, 60)}`])), state.capa));
+    if (k !== 'VERSIONS' && !(k === 'DOCREQ' && state.req) && !(k === 'CAPA' && state.capa)) out.push(sel('rf-dept', k === 'DIST' ? 'dist.recipient' : 'rpt.f.dept', [['', biText(seesAll() ? 'rpt.all_depts' : 'cat.all')]].concat((k === 'DIST' ? deps : deptOpts).map((d) => [d.dept_code, `${d.dept_code} · ${nameText(d)}`])), state.dept));
     if (k === 'DIST') out.push(sel('rf-dstate', 'rpt.f.dist_state', ['ALL', 'ACTIVE', 'DUE', 'RECALLED'].map((x) => [x, biText('rpt.dist_state.' + x)]), state.dstate));
     if (k === 'DOCREQ' && !state.req) {
       out.push(sel('rf-year', 'rpt.f.year', years.map((y) => [y, String(y)]), state.year));
       out.push(sel('rf-rstate', 'rpt.f.req_state', ['ALL', 'OPEN', 'DONE', 'REJECTED'].map((x) => [x, biText('rpt.req_state.' + x)]), state.rstate));
+    }
+    if (k === 'CAPA' && !state.capa) {
+      out.push(sel('rf-year', 'rpt.f.year', years.map((y) => [y, String(y)]), state.year));
+      out.push(sel('rf-cstate', 'rpt.f.capa_state', ['ALL', 'OPEN', 'OVERDUE', 'VERIFYING', 'CLOSED'].map((x) => [x, biText('rpt.capa_state.' + x)]), state.cstate));
     }
     if (k === 'CATALOG') out.push(sel('rf-scope', 'rpt.f.scope', [['ISSUED', biText('rpt.scope.ISSUED')], ['ALL', biText('rpt.scope.ALL')]], state.scope));
     if (k === 'RECORDS') {
@@ -228,7 +243,7 @@ export async function renderReports(view, ctx) {
     return `<ul class="cat-list rp-saved">${saved.items.slice(0, 50).map((r) => `<li class="rp-run" data-run="${esc(r.report_run_id)}">
       <div class="cat-top"><span class="code">${esc(r.code)}</span><span class="muted small">${esc(fmtDateTime(r.generated_at))}</span></div>
       <div class="cat-name">${bi('rpt.kind.' + r.kind)}</div>
-      <div class="cat-meta">${filterText(r, deptMap, itemMap, reqMap)}${isSecretary() && r.generated_by_name ? ' · ' + esc(r.generated_by_name) : ''}</div>
+      <div class="cat-meta">${filterText(r, deptMap, itemMap, reqMap, capaMap)}${isSecretary() && r.generated_by_name ? ' · ' + esc(r.generated_by_name) : ''}</div>
       <div class="row"><button type="button" class="btn small" data-rpdf="${esc(r.report_run_id)}">${ICON.file}<span>${bi('rp.pdf')}</span></button>
         <button type="button" class="btn small" data-rxlsx="${esc(r.report_run_id)}">${ICON.excel}<span>${bi('rp.excel')}</span></button></div></li>`).join('')}</ul>`;
   };
@@ -239,7 +254,7 @@ export async function renderReports(view, ctx) {
   };
 
   const draw = () => {
-    const kinds = KINDS.filter(kindAllowed);
+    const kinds = KINDS.filter(kindOk);
     view.innerHTML = `<div class="rp-web">
       <div class="rp-left">
         <section class="card"><h2>${bi('rp.pick')}</h2><div class="rp-list" role="tablist">${kinds.map((k) => `<button type="button" class="card rp-item${state.kind === k ? ' on' : ''}" data-kind="${k}" role="tab" aria-selected="${state.kind === k}">
@@ -312,6 +327,8 @@ export async function renderReports(view, ctx) {
     on('rf-req', (el) => { state.req = el.value; });
     on('rf-year', (el) => { state.year = Number(el.value); });
     on('rf-rstate', (el) => { state.rstate = el.value; });
+    on('rf-capa', (el) => { state.capa = el.value; });
+    on('rf-cstate', (el) => { state.cstate = el.value; });
     $('#rp-run', view).addEventListener('click', async (ev) => {
       const btn = ev.currentTarget;
       if (!navigator.onLine) { toast(bi('rp.need_network'), 'err'); return; }

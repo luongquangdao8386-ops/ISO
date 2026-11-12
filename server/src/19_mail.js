@@ -1,11 +1,14 @@
 /* 19_mail: Gmail nhắc hạn (Đợt 2, phiên 2b — mục "Nhắc hạn, báo cáo, tem QR" của đặc tả; cách làm như M&E 19_alerts).
- * Ba loại nhắc (Đợt 3–4 thêm khắc phục, đánh giá nội bộ):
+ * Năm loại nhắc (Đợt 4 thêm đánh giá nội bộ):
  *  - REC_OVERDUE   Hồ sơ quá hạn → trưởng bộ phận (bộ phận chưa có trưởng → Thư ký ISO): tóm tắt sáng thứ Hai hằng tuần, mỗi biểu
  *                  có kỳ đến hạn xét bị Quá hạn (record.status overdue, cả biểu in từ M&E / Checksheet) một dòng; tuần sau còn quá hạn
  *                  thì nhắc lại.
  *  - REVIEW_DUE    Tài liệu đến hạn rà soát → người phụ trách tài liệu + Thư ký ISO: mốc 30, 7, 0 ngày trước hạn; quá hạn nhắc mỗi 7 ngày.
  *  - VERSION_WAIT  Phiên bản chờ duyệt / chờ ban hành quá version_wait_days (3) ngày → người duyệt / Thư ký ISO: mỗi ngày làm việc
  *                  (Thứ Hai – Thứ Sáu) tới khi xử lý.
+ *  - CAPA_DUE      Khắc phục (3a, 32_capa.js): hành động đến hạn → người phụ trách hành động: mốc 7, 1, 0 ngày trước hạn; quá hạn mỗi 7 ngày
+ *                  (phiếu chưa có hành động đang mở → người phụ trách phiếu, theo hạn của phiếu).
+ *  - CAPA_VERIFY   Hạn kiểm tra hiệu lực của phiếu chờ kiểm tra → trưởng bộ phận / Thư ký ISO, cùng mốc.
  * Người nhận phải có email do Quản trị (cấp 4) xác nhận (Users.email_confirmed_at; đổi email thì mất xác nhận). Người nhận chính chưa
  * có email đã xác nhận → gửi Thư ký ISO thay (via FALLBACK), không để mất nhắc.
  * NotificationLogs là hàng chờ: QUEUED → SENDING → SENT | FAILED (thử lại tối đa 3 lần) | UNKNOWN (SENDING quá 1 giờ: có thể đã gửi,
@@ -14,7 +17,7 @@
  * ISO dừng gửi khi còn ≤ mail_quota_reserve người nhận; mỗi lần chạy ghi hạn mức còn lại để theo dõi (màn Gmail, Trạng thái hệ thống).
  */
 
-var MAIL_KINDS_ = ['REC_OVERDUE', 'REVIEW_DUE', 'VERSION_WAIT'];
+var MAIL_KINDS_ = ['REC_OVERDUE', 'REVIEW_DUE', 'VERSION_WAIT', 'CAPA_DUE', 'CAPA_VERIFY'];
 var MAIL_MAX_ATTEMPTS_ = 3;
 var MAIL_STALE_MS_ = 3600000;
 var MAIL_SENDER_ = 'ISO · 体系管理';
@@ -190,6 +193,9 @@ function mailDesired_(mc, opts) {
       });
     });
   }
+
+  // 4. Khắc phục (3a): hành động đến hạn, hạn kiểm tra hiệu lực — mốc 7, 1, 0 ngày; quá hạn mỗi 7 ngày
+  capaMailNotes_(mc, out);
   return out;
 }
 
@@ -220,6 +226,11 @@ function mailExpand_(mc, notes) {
 
 function mailDays_(n) { return n + ' ngày · ' + n + '天'; }
 
+/** Còn N ngày / hôm nay / quá hạn N ngày */
+function mailDueText_(dr) {
+  return dr > 0 ? 'còn · 剩余 ' + mailDays_(dr) : dr === 0 ? 'hôm nay · 今天' : 'quá hạn · 已逾期 ' + mailDays_(-dr);
+}
+
 /** Dòng thư của một việc (detail lúc xếp hàng; số ngày tính lại theo hôm nay) */
 function mailLine_(kind, d, today, base) {
   var L = [];
@@ -231,12 +242,18 @@ function mailLine_(kind, d, today, base) {
     if (d.src) L.push('  ' + lab_('ev.check_in.' + d.src));
   } else if (kind === 'REVIEW_DUE') {
     var dr = daysBetweenIso_(today, d.review_due);
-    L.push('  Hạn rà soát · 评审期限: ' + fmtDateVN_(d.review_due) + ' (' + (dr > 0 ? 'còn · 剩余 ' + mailDays_(dr) : dr === 0 ? 'hôm nay · 今天' : 'quá hạn · 已逾期 ' + mailDays_(-dr)) + ')');
+    L.push('  Hạn rà soát · 评审期限: ' + fmtDateVN_(d.review_due) + ' (' + mailDueText_(dr) + ')');
     L.push('  Lần ban hành · 版次: ' + (d.rev || '—') + (d.issued_at ? ' · ban hành · 发布 ' + fmtDateVN_(d.issued_at) : '') + (d.owner ? ' · phụ trách · 负责人: ' + d.owner : ''));
   } else if (kind === 'VERSION_WAIT') {
     var w = daysBetweenIso_(d.since, today);
     L.push('  ' + (d.state === 'IN_REVIEW' ? 'Chờ duyệt từ · 待审批自 ' : 'Đã duyệt, chờ ban hành từ · 已审批，待发布自 ') + fmtDateVN_(d.since) + ' (' + mailDays_(w) + ')' +
       ' — lần · 版次 ' + (d.rev || '—') + (d.author ? ' · người soạn · 编写人: ' + d.author : ''));
+  } else if (kind === 'CAPA_DUE') {
+    L.push('  ' + (d.content ? 'Hành động ' + d.seq + ' · 措施' + d.seq + ': ' + d.content : lab_(d.whole === 'DONE' ? 'mail.capa_whole_done' : 'mail.capa_whole_plan')));
+    L.push('  Hạn · 期限: ' + fmtDateVN_(d.due) + ' (' + mailDueText_(daysBetweenIso_(today, d.due)) + ')' + (d.owner ? ' · phụ trách · 负责人: ' + d.owner : ''));
+  } else if (kind === 'CAPA_VERIFY') {
+    L.push('  ' + lab_('mail.capa_verify_n', { N: d.round || 1 }) + ' — hạn · 期限 ' + fmtDateVN_(d.due) + ' (' + mailDueText_(daysBetweenIso_(today, d.due)) + ')' +
+      (d.owner ? ' · phụ trách phiếu · 单据负责人: ' + d.owner : ''));
   }
   if (d.for_names) L.push('  Gửi thay cho · 代为通知: ' + d.for_names + ' (chưa có email đã xác nhận · 尚无已确认邮箱)');
   link(d.path);

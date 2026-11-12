@@ -54,10 +54,12 @@ test('quyền: cấp 1–3 không phải Thư ký bị FORBIDDEN (trước khi h
   assert.equal(look.write('settings.edit', { changes: { record_grace_days: 4 } }).code, 'FORBIDDEN');
   assert.equal(look.write('user.create', { user_id: uuid() }).code, 'FORBIDDEN');
   assert.equal(head.call('user.view', {}).code, 'FORBIDDEN');
-  // Đợt 3: action đã đăng ký nhưng chưa có mã
-  assert.equal(head.write('capa.edit', {}).code, 'FEATURE_NOT_ENABLED');
+  // Đợt 4: action đã đăng ký nhưng chưa có mã (Thư ký ISO / cấp 4)
+  const tk = userClient(env, 'TK2', 2, '583926', { depts: 'ISO', secretary: true });
+  assert.equal(tk.write('audit.program.edit', {}).code, 'FEATURE_NOT_ENABLED');
   const p = head.call('sync.bootstrap', {}).data.permissions.actions;
-  assert.ok(!p.includes('item.edit') && !p.includes('import.preview') && !p.includes('version.issue') && !p.includes('capa.edit'));
+  assert.ok(!p.includes('item.edit') && !p.includes('import.preview') && !p.includes('version.issue') && !p.includes('audit.program.edit'));
+  assert.ok(p.includes('capa.save') && p.includes('capa.verify'));
   assert.ok(p.includes('version.save') && p.includes('version.approve') && p.includes('doc.get') && p.includes('record.submit') && p.includes('record.return'));
   assert.ok(!look.call('sync.bootstrap', {}).data.permissions.actions.includes('version.save'));
 });

@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.5 (Đợt 2, phiên 2e — Phạm vi Cơ điện, Kho tệp mẫu)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d3.1 (Đợt 3, phiên 3a — Khắc phục)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -23,6 +23,73 @@ Phiên 2e (12/11/2026, anh yêu cầu "chỉ phạm vi cơ điện + Kho tệp m
 của bộ phận **Cơ điện** (mặc định): 115 biểu của bộ phận khác **ẩn với mọi người, không bị xóa** (chọn lại bộ phận là hiện lại), nhập
 Excel tổng bỏ qua dòng ngoài phạm vi; **Kho tệp mẫu** — bộ biểu Excel đã căn chỉnh in (14 tệp BM-CD-01 … BM-CD-14, 151 sheet), mọi
 người tải về in; tệp tải về **mở sẵn đúng sheet của biểu** (Ctrl+P → In sheet hiện tại).
+Phiên 3a (hướng A — giữ phạm vi Cơ điện, anh chốt 12/11/2026) thêm: **Khắc phục** — phiếu khắc phục `KP-yymm-001` (thay sổ / phiếu
+khắc phục cơ điện **BM-CĐ-14-02**): lập phiếu (nguồn phát hiện, mô tả, xử lý tức thời, biểu liên quan, người phụ trách, hạn) →
+ghi **nguyên nhân gốc** → **hành động** khắc phục / phòng ngừa (người phụ trách trong app hoặc tên người ngoài app, hạn) → báo xong
+từng hành động (kết quả, ảnh / tệp bằng chứng) → **Gửi kiểm tra hiệu lực** → **Kiểm tra hiệu lực** (PIN): Có hiệu lực thì đóng phiếu,
+Không hiệu lực thì thêm hành động bổ sung rồi kiểm tra lại; **Gmail** nhắc người phụ trách hành động 7, 1, 0 ngày trước hạn (quá hạn
+mỗi 7 ngày) và người kiểm tra trước hạn kiểm tra hiệu lực; báo cáo **Phiếu khắc phục** (in ký) và **Sổ theo dõi khắc phục** (cả năm),
+PDF + Excel. Đánh giá nội bộ (Đợt 4) vẫn mờ "Sắp có · 即将推出".
+
+## CẬP NHẬT LÊN BẢN 3a (1.0.0-d3.1) — làm một lần, trên máy tính
+
+Bản 3a **thêm 2 sheet `Capas`, `CapaActions` và 3 cài đặt** (`capa_form_code`, `capa_log_form_code` = BM-CĐ-14-02, `capa_verify_days`
+= 30) → phải chạy `migrateSchema`. **Không** hỏi quyền Google mới, **không** cần `installTriggers` (nhắc khắc phục đi chung trigger Gmail
+`sendDueMail` đã có). App 3a vẫn chạy với máy chủ cũ (ô Khắc phục ẩn, màn Khắc phục báo "Máy chủ chưa lên bản 3a").
+
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký: `migrateSchema xong. Thêm: Capas; CapaActions. schema_version=1.0.8`.
+   (Chưa cập nhật bản 2e thì dòng nhật ký có thêm `TplFiles`; chưa lên 2d thì thêm `Versions(request_id); DocRequests; Distributions`.)
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d3.1 khac phuc` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` (đang mở thì đóng hẳn rồi mở lại) → **Tài khoản → Thông tin** ghi `1.0.0-d3.1` (màn báo lỗi thì bấm **Tải lại bản
+   mới**). **Tài khoản → Quản trị → Trạng thái hệ thống**:
+   - `schema_version` = **1.0.8**;
+   - dòng mới **Khắc phục** = `Đang xử lý 0 · chờ kiểm tra hiệu lực 0 · đã đóng 0 · hành động quá hạn 0 · quá hạn kiểm tra hiệu lực 0`.
+
+### Thử bản 3a (Thư ký ISO hoặc owner — iPhone hoặc máy tính)
+
+Phiếu thử sẽ **hủy ở bước cuối** (phiếu không xóa được; số `KP-2611-001` dùng cho phiếu thử, phiếu thật bắt đầu từ `KP-2611-002`).
+
+1. **Trang chủ** → ô **Khắc phục** (hết "Sắp có"; máy tính: menu trái **Khắc phục**) → "Chưa có phiếu khắc phục nào…" →
+   **Lập phiếu khắc phục**.
+2. Nguồn phát hiện: **Sự cố, hỏng thiết bị** (chọn sẵn); Bộ phận chịu trách nhiệm: **CĐ · Cơ điện** (chọn sẵn); Ngày phát hiện: hôm nay
+   (sẵn); **Biểu / tài liệu liên quan**: chọn một biểu cơ điện, vd `BM-CĐ-04-03 · Sổ dừng máy`; **Tóm tắt**: `Thử khắc phục`;
+   **Mô tả sự không phù hợp**: `Máy nén khí số 2 dừng do quá nhiệt (phiếu thử)`; **Xử lý tức thời**: `Chuyển sang máy nén số 1`;
+   Người phụ trách: tên anh (sẵn); Hạn hoàn thành: sau 30 ngày (sẵn) → **Lập phiếu** → màn phiếu số **KP-2611-001**, **Đang xử lý**.
+3. Thẻ **Nguyên nhân gốc** → **Ghi nguyên nhân gốc** → ô Tiếng Việt: `Két giải nhiệt bám bụi, chưa có trong lịch bảo trì tuần` → **Lưu**
+   (vài giây sau có thêm dòng tiếng Trung, nhãn "dịch máy").
+4. Thẻ **Hành động khắc phục / phòng ngừa** → **Thêm hành động** → Nội dung (Tiếng Việt): `Vệ sinh két giải nhiệt` (người phụ trách: anh,
+   hạn: sau 14 ngày — để sẵn) → **Lưu**. **Thêm hành động** lần nữa → `Lắp cảm biến báo nhiệt`; Người phụ trách: chọn
+   **— Người ngoài app (ghi tên bên dưới) —**; Người thực hiện: `Tổ cơ điện ca 2` → **Lưu**. Nút **Gửi kiểm tra hiệu lực** còn mờ
+   (dòng chữ: còn hành động chưa xong).
+5. Hành động 1 → **Báo xong** → ngày hoàn thành hôm nay (sẵn), Kết quả: `Đã vệ sinh két` → **Báo xong**. Hành động 2 → **Báo xong** →
+   `Đã lắp cảm biến` → **Báo xong**. Cả hai có dải xanh "Hoàn thành …".
+6. Thẻ **Ảnh / tệp** → **Thêm ảnh / tệp** → chọn 1 ảnh (iPhone: Chụp ảnh hoặc Thư viện) → vài giây sau có nút **Xem ảnh**.
+7. **Gửi kiểm tra hiệu lực** → hộp thoại: hạn kiểm tra hiệu lực sau 30 ngày (sẵn) → **Gửi kiểm tra hiệu lực** → phiếu thành **Chờ kiểm
+   tra hiệu lực**.
+8. **Kiểm tra hiệu lực** → chọn **Không hiệu lực** → Nhận xét: `Thử: chưa đạt` → **Lưu kết quả** → nhập PIN → phiếu về **Đang xử lý**,
+   dải đỏ "Lần kiểm tra 1 (…) không hiệu lực — thêm hành động bổ sung…"; thẻ **Kiểm tra hiệu lực** ghi lần 1.
+   (Người phụ trách phiếu không tự kiểm tra hiệu lực, trừ Quản trị cấp 4 — Thư ký ISO cấp 4 làm được. Báo "Không có quyền" thì đăng nhập
+   owner để kiểm tra.)
+9. Cuối màn phiếu → **In phiếu khắc phục (PDF / Excel)** → màn Báo cáo, loại **Khắc phục** đã chọn sẵn phiếu KP-2611-001, bản xem trước
+   **PHIẾU YÊU CẦU HÀNH ĐỘNG KHẮC PHỤC**, mã biểu **BM-CĐ-14-02**, 4 mục (Sự không phù hợp · Phân tích nguyên nhân · Hành động · Kiểm tra
+   hiệu lực), khối ký Người phụ trách / Người kiểm tra hiệu lực → **Tải PDF** → "Đã có PDF BC-2611-…" → **Mở / lưu tệp** → xem PDF có
+   logo công ty. (Muốn mã biểu khác, vd BM-ISO-04-01 khi mở rộng toàn công ty: Quản trị → Cấu hình → `capa_form_code`.)
+10. Ô **Phiếu khắc phục** chọn **Sổ theo dõi khắc phục (cả năm)** → **Xem báo cáo** → **SỔ THEO DÕI HÀNH ĐỘNG KHẮC PHỤC** có dòng
+    KP-2611-001.
+11. Quay lại **Khắc phục** → phiếu KP-2611-001 → **Hủy phiếu** → Lý do: `Phiếu thử nghiệm` → **Đúng** (hỏi PIN nếu đã quá 5 phút)
+    → phiếu **Đã hủy**.
+12. **Tài khoản → Quản trị → Trạng thái hệ thống**: dòng **Khắc phục** lại về `Đang xử lý 0 · … · đã đóng 0 …` (phiếu hủy không tính).
+13. (Gmail đang bật) **Tài khoản → Quản trị → Gmail nhắc hạn** → thẻ Lịch nhắc có 2 dòng mới **Khắc phục**, **Kiểm tra hiệu lực**.
+
+Máy giả lập đã chạy đúng 12 bước trên (iPhone 390×844). Không thử được: iPhone thật (chụp ảnh, hộp in PDF), PDF thật của Google Docs
+(phông Việt / Trung), thư Gmail thật.
+
+Dùng thật: khi có sự cố / phát hiện cần khắc phục — lập phiếu ngay (có thể ghi nguyên nhân, hành động sau); người phụ trách hành động
+có tài khoản app thì thấy ở **Chờ bạn xử lý** khi còn ≤ 7 ngày tới hạn và nhận Gmail (nếu đã có email xác nhận); người không dùng app
+thì ghi tên ở ô Người thực hiện, người phụ trách phiếu báo xong thay.
 
 ## CẬP NHẬT LÊN BẢN 2e (1.0.0-d2.5) — làm một lần, trên máy tính
 

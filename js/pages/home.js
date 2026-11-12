@@ -3,11 +3,11 @@
 // = số biểu có kỳ đến hạn xét gần nhất bị Quá hạn. Chờ bạn xử lý: phiên bản (1b), hồ sơ bị trả lại (1c), hồ sơ quá hạn cần nộp,
 // tài liệu sắp/quá hạn rà soát, thao tác gửi không được (1d). Lịch tuần (1d): hồ sơ đến hạn trong tuần, ‹ › đổi tuần.
 // Ô module của đợt sau mờ "Sắp có · 即将推出". Phiên 2d: phiếu đề nghị, bản in cần thu hồi ở Chờ bạn xử lý; ô Đề nghị tài liệu,
-// Phân phối & thu hồi, In tem QR.
+// Phân phối & thu hồi, In tem QR. Phiên 3a: hành động khắc phục đến hạn, phiếu chờ kiểm tra hiệu lực ở Chờ bạn xử lý; ô Khắc phục.
 import { bi, biText, esc, fmtDate, fmtNumber, session, nameText } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi } from '../data.js';
+import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { missingMandatory } from '../coverage.js';
@@ -31,6 +31,9 @@ async function pendingHtml() {
     [p.req_todo.length, 'home.pend_req_todo', p.req_todo.length === 1 ? '/request/' + encodeURIComponent(p.req_todo[0].request_id) : '/requests?f=todo', 't-red-text'],
     [p.req_rejected.length, 'home.pend_req_rejected', p.req_rejected.length === 1 ? '/request/' + encodeURIComponent(p.req_rejected[0].request_id) : '/requests?f=mine', ''],
     [p.dist_due.length, p.dist_overdue.length ? 'home.pend_dist_overdue' : 'home.pend_dist_due', '/dist?f=DUE', p.dist_overdue.length ? 't-red-text' : ''],
+    [p.capa_acts.length, 'home.pend_capa_acts', p.capa_acts.length === 1 ? '/capa/' + encodeURIComponent(p.capa_acts[0].capa_id) : '/capa?f=mine', 't-red-text'],
+    [p.capa_verify.length, 'home.pend_capa_verify', p.capa_verify.length === 1 ? '/capa/' + encodeURIComponent(p.capa_verify[0].capa_id) : '/capa?f=verify', 't-red-text'],
+    [p.capa_owner.length, 'home.pend_capa_owner', p.capa_owner.length === 1 ? '/capa/' + encodeURIComponent(p.capa_owner[0].capa_id) : '/capa?f=mine', ''],
     [p.drafts.length, 'home.pend_drafts', '/versions?f=drafts', ''],
     [p.nofile.length, 'home.no_file_n', '/catalog?f=nofile', ''],
     [p.review_due.length, 'home.pend_review_due', '/catalog?f=review', '']
@@ -126,6 +129,14 @@ async function gridHtml(list) {
   const q = (await queueItems().catch(() => [])).filter((o) => o.user_id === uid && o.dataset_epoch === session.epoch).length;
   const dcOn = await docControlOn();
   const tplN = (await tplActive()).length;
+  const cOn = await capaOn();
+  let capaTail = '';
+  if (cOn) {
+    const acts = (await recs('CAPA_ACT')).filter((a) => !a.archived_at);
+    const open = (await recs('CAPA')).filter((c) => !c.archived_at && (c.state === 'OPEN' || c.state === 'VERIFYING'));
+    const late = open.filter((c) => capaOverdue(c, acts.filter((a) => a.capa_id === c.capa_id))).length;
+    capaTail = open.length ? bi(late ? 'capa.tile_late' : 'capa.tile_open', { N: open.length, L: late }) : '';
+  }
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
     { key: 'templates', icon: 'folder', href: '/templates', tail: tplN ? bi('tpl.files_n', { N: tplN }) : '' },
@@ -136,7 +147,7 @@ async function gridHtml(list) {
     { key: 'dist', icon: 'archive', href: '/dist', show: (lvl >= 2 || sec) && dcOn },
     { key: 'labels', icon: 'qr', href: '/labels', show: lvl >= 2 || sec },
     { key: 'reports', icon: 'reports', href: '/reports' },
-    { key: 'capa', icon: 'repairs', href: '/capa', soon: 1, lvl: 2 },
+    { key: 'capa', icon: 'repairs', href: '/capa', show: (lvl >= 2 || sec) && cOn, tail: capaTail },
     { key: 'audits', icon: 'inspections', href: '/audits', soon: 1, lvl: 2 },
     { key: 'links', icon: 'link', href: '/links', lvl: 4 },
     { key: 'drafts', icon: 'sync', href: '/account/drafts', tail: q ? bi('sync.queued_count', { N: q }) : bi('home.none_drafts') }

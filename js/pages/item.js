@@ -18,6 +18,7 @@ import { canSubmitRecord, recordCheck } from '../data.js';
 import { itemRequestsCard, approvedCancelFor } from './docreq.js';
 import { itemDistCard } from './dist.js';
 import { itemTplCard, wireTplButtons } from './tpl.js';
+import { itemCapaCard } from './capa.js';
 
 const PERIOD_OF = (d) => {
   if (d === null || d === undefined || d === '') return 'EVENT';
@@ -114,6 +115,7 @@ export async function renderItem(view, { shell, params, query }) {
     ${await itemRecordsCard(it)}
     ${await itemRequestsCard(it)}
     ${await itemDistCard(it)}
+    ${await itemCapaCard(it)}
     <div class="row item-actions">
       ${canAttach ? `<a class="btn primary" href="#/version/new/${encodeURIComponent(it.item_id)}?attach=1">${ICON.upload}<span>${bi('ver.attach_btn')}</span></a>` : ''}
       ${canNew ? `<a class="btn${canAttach ? '' : ' primary'}" href="#/version/new/${encodeURIComponent(it.item_id)}">${ICON.edit}<span>${bi('item.new_version')}</span></a>` : ''}

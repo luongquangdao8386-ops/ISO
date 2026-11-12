@@ -65,6 +65,21 @@ var SHEETS = {
   TplFiles: { book: 'B', dot: 1, key: 'tpl_id', c: true,
     cols: 'tpl_id set_code dept_code title_vi title_zh file_name mime_type size_bytes sha256 document_id sheets_json sheet_count state ' +
       'replaced_by_id replaced_at uploaded_at uploaded_by note deleted_at deleted_by delete_reason' },
+  // Phiếu khắc phục (Đợt 3, phiên 3a, 32_capa.js): mã KP-yymm-001; source nguồn phát hiện; dept_code bộ phận chịu trách nhiệm; item_id biểu
+  // liên quan (tùy chọn); ref_text tham chiếu (số phiếu sửa chữa M&E, thiết bị, đợt đánh giá…); problem mô tả sự không phù hợp; correction xử lý
+  // tức thời; cause nguyên nhân gốc (bắt buộc trước khi kiểm tra hiệu lực); owner_user_id người phụ trách phiếu; due_date hạn hoàn thành;
+  // state OPEN | VERIFYING | CLOSED | CANCELLED; files_json ảnh / tệp như Records; verify_count số lần kiểm tra không hiệu lực;
+  // verify_history_json mọi lần kiểm tra [{date, at, by, result, note_vi, note_zh}]
+  Capas: { book: 'B', dot: 1, key: 'capa_id', c: true, i18n: true,
+    cols: 'capa_id code source dept_code item_id ref_text found_date found_by_name title_vi title_zh problem_vi problem_zh ' +
+      'correction_vi correction_zh cause_vi cause_zh owner_user_id due_date state files_json completed_at completed_by verify_due ' +
+      'verify_count verified_at verified_by verify_date verify_result verify_note_vi verify_note_zh verify_history_json closed_at ' +
+      'cancelled_at cancelled_by cancel_reason' },
+  // Hành động khắc phục / phòng ngừa của phiếu: owner_user_id người phụ trách trong app (nhận Gmail nhắc 7, 1, 0 ngày trước hạn), assignee_name
+  // tên người thực hiện ngoài app; round = lần kiểm tra hiệu lực lúc thêm (0: kế hoạch đầu, 1: bổ sung sau lần kiểm tra không hiệu lực thứ nhất…)
+  CapaActions: { book: 'B', dot: 1, key: 'action_id', c: true, i18n: true,
+    cols: 'action_id capa_id seq atype content_vi content_zh owner_user_id assignee_name due_date state done_date done_at done_by ' +
+      'result_vi result_zh cancelled_at cancelled_by cancel_reason round' },
   // Điều khoản ISO 9001 và chủ đề BRCGS Packaging (std|key)
   Clauses: { book: 'B', dot: 1, key: 'clause_id', c: true, i18n: true,
     cols: 'clause_id std key group_vi group_zh name_vi name_zh mandatory_record sort_order active' },
@@ -130,7 +145,9 @@ var TYPE_OVERRIDES_ = {
   pages: 'INT', client_created_at: 'STRING', void_by: 'STRING', period_type: 'STRING',
   evidence_id: 'STRING', period_key: 'STRING', count: 'INT', last_date: 'DATE', src_codes: 'STRING', source: 'STRING',
   email_confirmed_by: 'STRING', stage: 'STRING', kind: 'STRING', via: 'STRING', dedupe_key: 'STRING', digest_id: 'STRING', recipient_id: 'STRING',
-  set_code: 'STRING', sheet_count: 'INT', uploaded_by: 'STRING', deleted_by: 'STRING', mime_type: 'STRING'
+  set_code: 'STRING', sheet_count: 'INT', uploaded_by: 'STRING', deleted_by: 'STRING', mime_type: 'STRING',
+  ref_text: 'STRING', found_by_name: 'STRING', completed_by: 'STRING', verified_by: 'STRING', verify_due: 'DATE', verify_count: 'INT',
+  verify_result: 'STRING', seq: 'INT', round: 'INT', atype: 'STRING', assignee_name: 'STRING', done_by: 'STRING'
 };
 
 /** Kiểu cột suy theo tên. */

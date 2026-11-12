@@ -82,8 +82,16 @@ var ACTION_TABLE_ = [
   'mail.test|4|pin|W',
   'mail.run|4|pin|W',
   'mail.resend|4|pin|W',
-  // Đợt 3–4: khắc phục, đánh giá nội bộ
-  'capa.edit|2|net|W',
+  // Khắc phục (Đợt 3, phiên 3a): phiếu KP-yymm-001 (BM-CĐ-14-02) — lập / sửa, hành động (thêm, sửa, báo xong, hủy), gửi kiểm tra hiệu lực;
+  // kiểm tra hiệu lực, hủy phiếu hỏi PIN. Quyền theo phiếu (bộ phận, người phụ trách, người lập) kiểm ở handler / PRECHECK_ (trước PIN)
+  'capa.save|2|net|W',
+  'capa.action.save|2|net|W',
+  'capa.action.done|2|net|W',
+  'capa.action.cancel|2|net|W',
+  'capa.complete|2|net|W',
+  'capa.verify|2|pin|W',
+  'capa.cancel|2|pin|W',
+  // Đợt 4: đánh giá nội bộ
   'audit.program.edit|X|net|W',
   // Báo cáo: logo
   'report.logo.get|1|net|R',

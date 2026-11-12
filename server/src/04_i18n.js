@@ -95,7 +95,15 @@ var SUB_MSG = {
   APP_SCOPE: ['Bộ phận ngoài phạm vi áp dụng của app (Quản trị → Phạm vi áp dụng)', '该部门不在应用适用范围内（管理→适用范围）'],
   SCOPE_DEPT: ['Phạm vi áp dụng chỉ gồm mã bộ phận có trong danh sách Bộ phận, cách nhau dấu phẩy', '适用范围只能填写部门列表中的部门代码，用逗号分隔'],
   TPL_SHEETS: ['Danh sách sheet của tệp không hợp lệ (tối đa 300 sheet)', '文件的工作表列表无效（最多300个）'],
-  TPL_STATE: ['Tệp mẫu đã được thay hoặc đã bỏ', '模板文件已被替换或已删除']
+  TPL_STATE: ['Tệp mẫu đã được thay hoặc đã bỏ', '模板文件已被替换或已删除'],
+  // Khắc phục (3a)
+  CAPA_NO_CAUSE: ['Cần ghi nguyên nhân gốc trước khi gửi kiểm tra hiệu lực', '提交有效性验证前须填写根本原因'],
+  CAPA_ACTIONS_OPEN: ['Còn hành động chưa xong — báo xong hoặc hủy hành động đó trước', '仍有未完成的措施——请先完成或取消'],
+  CAPA_NO_ACTION: ['Cần ít nhất một hành động khắc phục đã xong', '至少需要一项已完成的纠正措施'],
+  TOO_MANY_ACTIONS: ['Mỗi phiếu tối đa 30 hành động', '每张单最多30项措施'],
+  DATE_FUTURE: ['Ngày không được sau hôm nay', '日期不得晚于今天'],
+  DATE_PAST: ['Ngày không được trước hôm nay', '日期不得早于今天'],
+  CAPA_DATE: ['Ngày phải từ ngày phát hiện tới hôm nay', '日期须在发现日期至今天之间']
 };
 
 function fmtMsg_(pair, vars) {

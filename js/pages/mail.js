@@ -7,7 +7,7 @@ import { isWide } from '../shell.js';
 import { roleLevel, can } from '../data.js';
 import { writeWithPin, writeFail, busy } from '../form.js';
 
-const KINDS = ['REC_OVERDUE', 'REVIEW_DUE', 'VERSION_WAIT'];
+const KINDS = ['REC_OVERDUE', 'REVIEW_DUE', 'VERSION_WAIT', 'CAPA_DUE', 'CAPA_VERIFY'];
 const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 
 const kv = (k, v) => `<div class="kv"><span>${bi(k)}</span><strong>${v}</strong></div>`;

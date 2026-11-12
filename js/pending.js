@@ -4,9 +4,11 @@
 // Phiên 1d: biểu có kỳ gần nhất quá hạn hồ sơ mà tôi nộp được; tài liệu tôi phụ trách sắp/quá hạn rà soát; thao tác gửi không được.
 // Phiên 2d: phiếu đề nghị chờ tôi xem xét, phiếu đã chấp thuận chờ thực hiện (Thư ký ISO; người đề nghị soạn phiên bản theo phiếu),
 // phiếu của tôi không được chấp thuận (30 ngày), bản in cần thu hồi (Thư ký ISO).
+// Phiên 3a: hành động khắc phục của tôi đến hạn trong 7 ngày / quá hạn; phiếu chờ tôi kiểm tra hiệu lực (hạn trong 7 ngày / quá hạn);
+// phiếu tôi phụ trách chưa có hành động đang mở (cần lập kế hoạch, hoặc đã xong hành động — gửi kiểm tra hiệu lực).
 import { session } from './core.js';
 import { recs, items, isSecretary, canApprove, versionEditable, reviewSoon, today, addDaysIso, canSeeRecords, canSubmitRecord, recordCheck,
-  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue } from './data.js';
+  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa } from './data.js';
 import { queueItems } from './sync.js';
 import { covers } from './periods.js';
 
@@ -52,8 +54,15 @@ export async function pendingFor() {
   const dists = sec ? (await recs('DIST')).filter((d) => d.state === 'ACTIVE' && distDue(d, byId.get(d.item_id))) : [];
   out.dist_due = dists;
   out.dist_overdue = dists.filter((d) => distOverdue(d, byId.get(d.item_id)));
+  const capas = (await recs('CAPA')).filter((c) => !c.archived_at);
+  const capaActs = (await recs('CAPA_ACT')).filter((a) => !a.archived_at);
+  const soon = addDaysIso(today(), 7);
+  const openCapa = new Set(capas.filter((c) => c.state === 'OPEN').map((c) => c.capa_id));
+  out.capa_acts = capaActs.filter((a) => a.state === 'OPEN' && a.owner_user_id === uid && openCapa.has(a.capa_id) && a.due_date && a.due_date <= soon);
+  out.capa_verify = capas.filter((c) => c.state === 'VERIFYING' && canVerifyCapa(c) && (!c.verify_due || c.verify_due <= soon));
+  out.capa_owner = capas.filter((c) => c.state === 'OPEN' && c.owner_user_id === uid && !capaActs.some((a) => a.capa_id === c.capa_id && a.state === 'OPEN'));
   out.total = out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
-    out.req_review.length + out.req_todo.length + out.req_rejected.length +
+    out.req_review.length + out.req_todo.length + out.req_rejected.length + out.capa_acts.length + out.capa_verify.length + out.capa_owner.length +
     (out.nofile.length ? 1 : 0) + (out.review_due.length ? 1 : 0) + (out.rec_late.length ? 1 : 0) + (out.dist_due.length ? 1 : 0);
   return out;
 }

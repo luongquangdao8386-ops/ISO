@@ -7,18 +7,26 @@
  *  - VERSIONS Lịch sử phiên bản của một tài liệu.
  *  - DIST     Sổ phân phối & thu hồi bản in (phiên 2d, thay BM-ISO-02-03): theo nơi nhận, lần ban hành, đang dùng / cần thu hồi / đã thu hồi.
  *  - DOCREQ   Phiếu đề nghị ban hành / sửa đổi / hủy tài liệu (phiên 2d, thay BM-ISO-02-02): một phiếu (request_id) hoặc sổ theo dõi theo năm.
+ *  - CAPA     Khắc phục (phiên 3a, 32_capa.js — mã biểu theo Settings capa_form_code / capa_log_form_code, mặc định BM-CĐ-14-02): một phiếu
+ *             (capa_id) để in ký, hoặc sổ theo dõi khắc phục theo năm phát hiện.
  * report.run: xem trước (không ghi). report.save: lưu bản chụp (tệp JSON riêng tư trên Drive + dòng ReportRuns, mã BC-yymm-001) rồi
  * trả PDF (máy chủ dựng bằng Google Docs tạm, 28_report_pdf.js) hoặc bản chụp để app dựng Excel; gọi lại cùng report_run_id → cùng mã,
  * cùng số liệu. report.list: báo cáo đã lưu (người lập thấy của mình; Thư ký ISO, cấp 4 thấy tất cả).
  * Quyền: Danh mục, Lịch sử phiên bản — mọi cấp (trong phạm vi biểu); Tình trạng hồ sơ, Phủ điều khoản — cấp 2+ / Thư ký ISO
  * ("Xem tổng hợp, phủ điều khoản" ở bảng quyền). Cấp 1–3 chỉ có biểu trong bộ phận mình + tài liệu chung. */
 
-var REPORT_KINDS_ = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ'];
+var REPORT_KINDS_ = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA'];
 var REPORT_SNAPSHOT_MAX_ = 4 * 1024 * 1024;
 /** Biểu mẫu ISO mà báo cáo thay (in ở khối thông tin bên phải) */
 var REPORT_FORM_CODE_ = { CATALOG: 'BM-ISO-02-01', DOCREQ: 'BM-ISO-02-02', DIST: 'BM-ISO-02-03' };
 /** Tên tệp tải về */
-var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban', DIST: 'so-phan-phoi-thu-hoi', DOCREQ: 'de-nghi-tai-lieu' };
+var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban', DIST: 'so-phan-phoi-thu-hoi', DOCREQ: 'de-nghi-tai-lieu', CAPA: 'so-theo-doi-khac-phuc' };
+
+/** Mã biểu in trên báo cáo: khắc phục theo cài đặt (phiếu / sổ), còn lại theo REPORT_FORM_CODE_ */
+function reportFormCode_(kind, f) {
+  if (kind === 'CAPA') return String(setting_(f && f.capa_id ? 'capa_form_code' : 'capa_log_form_code') || '');
+  return REPORT_FORM_CODE_[kind] || '';
+}
 var REPORT_GRAINS_ = { MONTH: { def: 6, max: 12 }, QUARTER: { def: 4, max: 8 } };
 
 /* ---------------- Quyền ---------------- */
@@ -26,7 +34,7 @@ var REPORT_GRAINS_ = { MONTH: { def: 6, max: 12 }, QUARTER: { def: 4, max: 8 } }
 /** Loại báo cáo người dùng được xem */
 function reportKindAllowed_(u, kind) {
   if (REPORT_KINDS_.indexOf(kind) < 0) return false;
-  if (kind === 'RECORDS' || kind === 'COVERAGE' || kind === 'DIST' || kind === 'DOCREQ') return isSecretary_(u) || Number(u.role_level) >= 2;
+  if (kind === 'RECORDS' || kind === 'COVERAGE' || kind === 'DIST' || kind === 'DOCREQ' || kind === 'CAPA') return isSecretary_(u) || Number(u.role_level) >= 2;
   return true;
 }
 
@@ -71,6 +79,10 @@ function reportFilters_(kind, f, today) {
     if (!isUuidV4_(f.request_id)) throw validationError_([fieldError_('filters.request_id', 'ID_INVALID')]);
     return { request_id: String(f.request_id) };
   }
+  if (kind === 'CAPA' && f.capa_id) {
+    if (!isUuidV4_(f.capa_id)) throw validationError_([fieldError_('filters.capa_id', 'ID_INVALID')]);
+    return { capa_id: String(f.capa_id) };
+  }
   if (kind !== 'VERSIONS') {
     if (dept) {
       var d = findOne_('Depts', 'dept_code', dept);
@@ -112,6 +124,13 @@ function reportFilters_(kind, f, today) {
     var rs = f.state || 'ALL';
     if (['ALL', 'OPEN', 'DONE', 'REJECTED'].indexOf(rs) < 0) { errs.push(fieldError_('filters.state', 'INVALID_VALUE')); rs = 'ALL'; }
     out.state = rs;
+  } else if (kind === 'CAPA') {
+    var cy = f.year === undefined || f.year === null || f.year === '' ? Number(today.slice(0, 4)) : Number(f.year);
+    if (!(cy >= 2000 && cy <= Number(today.slice(0, 4))) || Math.floor(cy) !== cy) { errs.push(fieldError_('filters.year', 'INVALID_VALUE')); cy = Number(today.slice(0, 4)); }
+    out.year = cy;
+    var cs = f.state || 'ALL';
+    if (['ALL', 'OPEN', 'OVERDUE', 'VERIFYING', 'CLOSED'].indexOf(cs) < 0) { errs.push(fieldError_('filters.state', 'INVALID_VALUE')); cs = 'ALL'; }
+    out.state = cs;
   }
   if (errs.length) throw validationError_(errs);
   return out;
@@ -547,9 +566,9 @@ function reportCompute_(ctx, kind, filters) {
   var f = reportFilters_(kind, filters, today);
   var res = kind === 'CATALOG' ? reportCatalog_(ctx, f, today) : kind === 'RECORDS' ? reportRecords_(ctx, f, today)
     : kind === 'COVERAGE' ? reportCoverage_(ctx, f) : kind === 'DIST' ? reportDist_(ctx, f, today)
-    : kind === 'DOCREQ' ? reportDocreq_(ctx, f) : reportVersions_(ctx, f);
-  var t = LABELS['rpt.title.' + kind] || [kind, kind];
-  var formCode = REPORT_FORM_CODE_[kind] || '';
+    : kind === 'DOCREQ' ? reportDocreq_(ctx, f) : kind === 'CAPA' ? reportCapa_(ctx, f, today) : reportVersions_(ctx, f);
+  var t = LABELS['rpt.title.' + kind + (kind === 'CAPA' && !f.capa_id ? '_LOG' : '')] || [kind, kind];
+  var formCode = reportFormCode_(kind, f);
   var formRev = '';
   if (formCode) {
     var fi = findOne_('Items', 'code', formCode);
@@ -572,8 +591,9 @@ function reportCompute_(ctx, kind, filters) {
 /** Tên tệp tải về: BC-2611-001_danh-muc-tai-lieu.pdf (lịch sử phiên bản thêm mã biểu) */
 function reportFileName_(snap, ext) {
   var tail = snap.kind === 'VERSIONS' && snap.data && snap.data.item ? '_' + String(snap.data.item.code).replace(/[\/\\:*?"<>|\s]+/g, '-')
-    : snap.kind === 'DOCREQ' && snap.data && snap.data.one ? '_' + String(snap.data.one.code) : '';
-  return (snap.code ? snap.code + '_' : '') + REPORT_SLUG_[snap.kind] + tail + '.' + ext;
+    : (snap.kind === 'DOCREQ' || snap.kind === 'CAPA') && snap.data && snap.data.one ? '_' + String(snap.data.one.code) : '';
+  var slug = snap.kind === 'CAPA' && snap.data && snap.data.one ? 'phieu-khac-phuc' : REPORT_SLUG_[snap.kind];
+  return (snap.code ? snap.code + '_' : '') + slug + tail + '.' + ext;
 }
 
 /* ---------------- Action ---------------- */

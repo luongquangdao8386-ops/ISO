@@ -377,3 +377,45 @@ export async function distsOf(itemId) {
   return (await recs('DIST')).filter((d) => d.item_id === itemId && d.state !== 'VOID' && !d.archived_at)
     .sort((a, b) => String(b.dist_date).localeCompare(String(a.dist_date)) || String(a.dept_code).localeCompare(String(b.dept_code)));
 }
+
+/* ---------------- Khắc phục (phiên 3a) — quyền phía client chỉ để ẩn/hiện nút, máy chủ kiểm lại (32_capa.js) ---------------- */
+
+/** Máy chủ đã lên bản 3a (có capa.save trong danh sách quyền) — chưa có thì màn Khắc phục báo cần cập nhật máy chủ */
+export async function capaOn() { return can('capa.save'); }
+export const CAPA_SOURCES = ['EQUIPMENT', 'INSPECTION', 'AUDIT', 'SAFETY', 'PROCESS', 'OTHER'];
+/** Lập phiếu cho bộ phận: cấp 2+ trong bộ phận, Thư ký ISO */
+export function canCreateCapa(dept) { return inScopeDept(dept) && (isSecretary() || (roleLevel() >= 2 && deptWritable(dept))); }
+/** Sửa phiếu, hành động, gửi kiểm tra hiệu lực: Thư ký ISO, trưởng bộ phận, người phụ trách phiếu, người lập */
+export function canEditCapa(c) {
+  if (!c || !inScopeDept(c.dept_code)) return false;
+  if (isSecretary()) return true;
+  if (roleLevel() >= 3 && deptWritable(c.dept_code)) return true;
+  return roleLevel() >= 2 && (c.owner_user_id === myId() || c.created_by === myId());
+}
+/** Báo xong hành động: người sửa được phiếu, người phụ trách hành động */
+export function canDoCapaAction(c, a) { return canEditCapa(c) || (roleLevel() >= 2 && !!a.owner_user_id && a.owner_user_id === myId()); }
+/** Kiểm tra hiệu lực: Thư ký ISO, trưởng bộ phận; không phải người phụ trách phiếu (cấp 4 được khi admin_self_approval) */
+export function canVerifyCapa(c) {
+  if (!c || c.state !== 'VERIFYING' || !inScopeDept(c.dept_code)) return false;
+  const lvl = roleLevel();
+  if (lvl >= 4) return c.owner_user_id !== myId() || (session.settings || {}).admin_self_approval !== false;
+  if (c.owner_user_id === myId()) return false;
+  return isSecretary() || (lvl === 3 && deptWritable(c.dept_code));
+}
+/** Hủy phiếu: Thư ký ISO, người lập */
+export function canCancelCapa(c) { return !!c && inScopeDept(c.dept_code) && (isSecretary() || (roleLevel() >= 2 && c.created_by === myId())); }
+/** Gắn ảnh / tệp: người sửa được phiếu, người kiểm tra hiệu lực, người phụ trách một hành động */
+export function canCapaFiles(c, acts) {
+  if (!c || (c.state !== 'OPEN' && c.state !== 'VERIFYING')) return false;
+  return canEditCapa(c) || canVerifyCapa(c) || (roleLevel() >= 2 && acts.some((a) => a.state !== 'CANCELLED' && a.owner_user_id === myId()));
+}
+/** Phiếu quá hạn (như máy chủ): đang xử lý mà quá hạn phiếu hoặc có hành động đang mở quá hạn; chờ kiểm tra hiệu lực mà quá hạn kiểm tra */
+export function capaOverdue(c, acts, t = today()) {
+  if (!c) return false;
+  if (c.state === 'OPEN') return (!!c.due_date && c.due_date < t) || (acts || []).some((a) => a.state === 'OPEN' && a.due_date && a.due_date < t);
+  return c.state === 'VERIFYING' && !!c.verify_due && c.verify_due < t;
+}
+/** Hành động của phiếu theo thứ tự */
+export async function capaActsOf(capaId) {
+  return (await recs('CAPA_ACT')).filter((a) => a.capa_id === capaId && !a.archived_at).sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+}

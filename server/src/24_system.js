@@ -66,7 +66,7 @@ var SETTINGS_BOUNDS_ = {
   client_timeout_seconds: [10, 60], client_long_timeout_seconds: [20, 300],
   sync_page_size: [100, 2000], doc_max_bytes: [1048576, 52428800], doc_mobile_upload_max_bytes: [1048576, 52428800],
   photo_max_edge_px: [640, 4096], photo_jpeg_quality: [0.5, 0.95], photo_thumb_edge_px: [120, 1024], backup_hour: [0, 23], backup_keep_count: [2, 52],
-  doc_review_months: [1, 60], record_grace_days: [0, 60], version_wait_days: [1, 30], mail_quota_reserve: [0, 90]
+  doc_review_months: [1, 60], record_grace_days: [0, 60], version_wait_days: [1, 30], mail_quota_reserve: [0, 90], capa_verify_days: [0, 365]
 };
 var SETTINGS_ENUMS_ = {
   backup_weekday: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
@@ -106,6 +106,8 @@ function parseSettingInput_(def, v) {
   if (key === 'min_client_version' && !/^\d+\.\d+\.\d+$/.test(s)) throw bad();
   if (key === 'records_start_date' && s && !isDateStr_(s)) throw bad();
   if (key === 'scope_depts') return normScopeDepts_(s);
+  if ((key === 'capa_form_code' || key === 'capa_log_form_code') && s && !ITEM_CODE_RE_.test(s.toUpperCase().replace(/\s+/g, ''))) throw bad();
+  if (key === 'capa_form_code' || key === 'capa_log_form_code') return s.toUpperCase().replace(/\s+/g, '');
   if (s.length > 500) throw bad();
   return s;
 }
@@ -288,6 +290,9 @@ function healthRows_() {
   add('reports', rh[0], rh[1], rh[2]);
   var dc = docControlHealth_();
   add('doc_control', dc[0], dc[1], dc[2]);
+  // Khắc phục (3a)
+  var ch = capaHealth_();
+  add('capa', ch[0], ch[1], ch[2]);
   var cells = 0;
   [prop_('BUSINESS_SPREADSHEET_ID'), prop_('SECURITY_SPREADSHEET_ID')].forEach(function (id) {
     if (!id) return;

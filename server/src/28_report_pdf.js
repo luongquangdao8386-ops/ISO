@@ -35,6 +35,11 @@ function reportPctText_(v) { return v === null || v === undefined ? '—' : Stri
 function reportMetaLeft_(snap) {
   var f = snap.filters || {}, d = snap.data || {};
   var out = [];
+  if (snap.kind === 'CAPA' && d.one) {
+    out.push([lab_('rpt.f.capa'), d.one.code]);
+    out.push([lab_('rpt.f.dept'), d.one.dept_code]);
+    return out;
+  }
   if (snap.kind === 'DOCREQ' && d.one) {
     out.push([lab_('rpt.f.req'), d.one.code]);
     out.push([lab_('rpt.f.dept'), d.one.dept_code]);
@@ -56,6 +61,7 @@ function reportMetaLeft_(snap) {
   if (snap.kind === 'COVERAGE') out.push([lab_('rpt.f.std'), lab_('rpt.std.' + f.std)]);
   if (snap.kind === 'DIST') out.push([lab_('rpt.f.dist_state'), lab_('rpt.dist_state.' + f.state)]);
   if (snap.kind === 'DOCREQ') { out.push([lab_('rpt.f.year'), String(f.year)]); out.push([lab_('rpt.f.req_state'), lab_('rpt.req_state.' + f.state)]); }
+  if (snap.kind === 'CAPA') { out.push([lab_('rpt.f.year'), String(f.year)]); out.push([lab_('rpt.f.capa_state'), lab_('rpt.capa_state.' + f.state)]); }
   if (snap.scope_depts) out.push([lab_('rpt.f.scope_depts'), snap.scope_depts]);
   return out;
 }
@@ -298,7 +304,7 @@ function layoutDocreq_(snap) {
 function reportLayout_(snap) {
   var body = snap.kind === 'CATALOG' ? layoutCatalog_(snap) : snap.kind === 'RECORDS' ? layoutRecords_(snap)
     : snap.kind === 'COVERAGE' ? layoutCoverage_(snap) : snap.kind === 'DIST' ? layoutDist_(snap)
-    : snap.kind === 'DOCREQ' ? layoutDocreq_(snap) : layoutVersions_(snap);
+    : snap.kind === 'DOCREQ' ? layoutDocreq_(snap) : snap.kind === 'CAPA' ? layoutCapa_(snap) : layoutVersions_(snap);
   var sg = body.sign || {};
   var gen = String(snap.generated_at || '');
   return {

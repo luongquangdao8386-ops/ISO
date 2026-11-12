@@ -17,7 +17,10 @@ var SYNC_ENTITIES_ = [
   // Sổ phân phối & thu hồi (2d): như hồ sơ — cấp 2+ và Thư ký ISO, theo phạm vi của biểu
   { type: 'DIST', sheet: 'Distributions', scoped: 'record' },
   // Kho tệp mẫu (2e): tệp đang dùng — mọi cấp; tệp đã thay — cấp 3+, Thư ký ISO; tệp đã bỏ — xóa khỏi máy (TOMBSTONE)
-  { type: 'TPL', sheet: 'TplFiles', scoped: 'tpl' }
+  { type: 'TPL', sheet: 'TplFiles', scoped: 'tpl' },
+  // Khắc phục (3a): phiếu — cấp 2+ / Thư ký ISO, bộ phận mình, phiếu mình lập / phụ trách / có hành động mình phụ trách; hành động theo phiếu
+  { type: 'CAPA', sheet: 'Capas', scoped: 'capa' },
+  { type: 'CAPA_ACT', sheet: 'CapaActions', scoped: 'capa_act' }
 ];
 
 /** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */
@@ -38,6 +41,8 @@ function syncItemMap_(aux) {
 function syncProject_(ctx, ent, row, aux) {
   if (ent.scoped === 'docreq') return docreqVisible_(ctx.user, row) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'tpl') return tplVisible_(ctx.user, row) ? projectRow_(ctx, row) : null;
+  if (ent.scoped === 'capa') return syncCapaVisible_(ctx, row, aux) ? projectRow_(ctx, row) : null;
+  if (ent.scoped === 'capa_act') return syncCapaVisible_(ctx, syncCapaMap_(aux)[row.capa_id], aux) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'record') {
     return canSeeRecords_(ctx.user, syncItemMap_(aux)[row.item_id]) ? projectRow_(ctx, row) : null;
   }

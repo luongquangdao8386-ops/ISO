@@ -5,10 +5,10 @@ quá hạn, phủ điều khoản. Thay danh mục Excel DM-ISO-01 bằng hệ t
 GitHub Pages (iPhone và máy tính). Cùng lõi với M&E và Checksheet (chép từ repo `CS`): PIN 6 số, phiên, ghi có xác nhận, đồng bộ,
 hàng chờ khi mất mạng. Giao diện luôn song ngữ Việt · 中文.
 
-**Trạng thái:** bản `1.0.0-d2.5` — **Đợt 2 phiên 2e** (Phạm vi Cơ điện + Kho tệp mẫu). Đợt 1, Đợt 2 (2a–2d) xong code.
+**Trạng thái:** bản `1.0.0-d3.1` — **Đợt 3 phiên 3a** (Khắc phục, phạm vi Cơ điện). Đợt 1, Đợt 2 (2a–2e) xong code.
 **Đã phát hành THẬT** ở `/ISO/` (từ 11/11/2026, không qua THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang
-`/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ. Cập nhật máy chủ lên 2e: dán `Code.gs` → `migrateSchema` → Phiên bản mới (Hướng dẫn
-triển khai, mục "CẬP NHẬT LÊN BẢN 2e").
+`/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ. Cập nhật máy chủ lên 3a: dán `Code.gs` → `migrateSchema` → Phiên bản mới (Hướng dẫn
+triển khai, mục "CẬP NHẬT LÊN BẢN 3a").
 
 ## Phiên 1a có gì
 
@@ -146,7 +146,25 @@ triển khai, mục "CẬP NHẬT LÊN BẢN 2e").
   khác). Chi tiết biểu có thẻ **Tệp mẫu**; Danh mục lọc **Chưa có tệp mẫu**; Trạng thái hệ thống dòng **Kho tệp mẫu**, **Phạm vi áp dụng**.
   Bộ thật 14 tệp BM-CD-01 … 14: 151 sheet, ghép đủ 106/106 biểu cơ điện (đã thử ngoài repo, không commit tệp).
 
-Tiếp: Đợt 3 khắc phục (3a–3c) · Đợt 4 đánh giá nội bộ (4a–4c).
+### Đợt 3 phiên 3a (1.0.0-d3.1) — Khắc phục (hướng A: phạm vi Cơ điện, phiếu theo BM-CĐ-14-02)
+
+- **Phiếu khắc phục** `KP-yymm-001` (`server/src/32_capa.js`, `js/pages/capa.js`; sheet `Capas`, `CapaActions`, schema 1.0.8): nguồn
+  phát hiện (sự cố thiết bị, kiểm tra / kiểm định, đánh giá, an toàn – môi trường – năng lượng, quy trình, khác), bộ phận chịu trách nhiệm
+  (trong phạm vi áp dụng), biểu liên quan, tham chiếu, mô tả, xử lý tức thời, nguyên nhân gốc, người phụ trách, hạn. Trạng thái
+  Đang xử lý → Chờ kiểm tra hiệu lực → Đã đóng (hoặc về Đang xử lý khi Không hiệu lực, lưu mọi lần kiểm tra) · Đã hủy.
+- **Hành động** khắc phục / phòng ngừa: người phụ trách trong app hoặc tên người ngoài app, hạn; báo xong (ngày + kết quả), mở lại, bỏ
+  (lý do). Gửi kiểm tra hiệu lực cần nguyên nhân gốc + mọi hành động xong (ít nhất một đã xong). Kiểm tra hiệu lực (PIN): Thư ký ISO,
+  trưởng bộ phận; người phụ trách phiếu không tự kiểm tra (cấp 4 được khi `admin_self_approval`). Hủy phiếu (PIN): Thư ký ISO, người lập.
+  Quyền kiểm ở máy chủ trước khi hỏi PIN.
+- Ảnh / tệp bằng chứng (`doc.upload` entity `CAPA`, vào hàng chờ như hồ sơ); người phụ trách hành động ở bộ phận khác thấy phiếu.
+- **Gmail**: `CAPA_DUE` (hành động đến hạn → người phụ trách hành động; phiếu chưa có hành động đang mở → người phụ trách phiếu) và
+  `CAPA_VERIFY` (hạn kiểm tra hiệu lực → trưởng bộ phận / Thư ký ISO), mốc 7, 1, 0 ngày trước hạn, quá hạn mỗi 7 ngày.
+- **Báo cáo** loại Khắc phục: một phiếu (in ký: Người phụ trách / Người kiểm tra hiệu lực) hoặc sổ theo dõi năm; mã biểu theo cài đặt
+  `capa_form_code` / `capa_log_form_code` (mặc định BM-CĐ-14-02; mở rộng toàn công ty đổi sang BM-ISO-04-01 / 04-02).
+- Chờ bạn xử lý: hành động của tôi ≤ 7 ngày tới hạn / quá hạn, phiếu chờ tôi kiểm tra hiệu lực, phiếu tôi phụ trách chưa có hành động
+  đang mở. Chi tiết biểu có thẻ **Khắc phục**. Trạng thái hệ thống dòng **Khắc phục**.
+
+Tiếp: 3b khiếu nại 8D, SCAR · 3c sản phẩm không phù hợp · Đợt 4 đánh giá nội bộ (4a–4c).
 
 ## Cấu trúc
 

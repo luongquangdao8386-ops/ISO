@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d2.5';
+var SERVER_VERSION = '1.0.0-d3.1';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.7';
+var SCHEMA_VERSION = '1.0.8';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -79,6 +79,11 @@ var SETTINGS_DEFAULTS = [
   ['mail_quota_reserve', 'INT', 10, false, 1, 'Chừa lại hạn mức Gmail cho M&E, Checksheet (số người nhận/ngày): còn bằng hoặc ít hơn thì ISO tạm dừng gửi', '为机电、点检表预留的邮件额度（收件人/天）：剩余不超过此数时ISO暂停发送'],
   // Đợt 2 (phiên 2d): sổ phân phối & thu hồi — bản in của lần cũ chưa thu hồi quá số ngày này (kể từ ngày ban hành lần mới) thì báo đỏ
   ['dist_recall_days', 'INT', 7, true, 1, 'Thu hồi bản in lần cũ trong (ngày) kể từ khi ban hành lần mới', '发布新版后收回旧版纸质文件的期限（天）'],
+  // Đợt 3 (phiên 3a): khắc phục — mã biểu in trên phiếu / sổ khắc phục (phạm vi Cơ điện: BM-CĐ-14-02; mở rộng toàn công ty thì đổi sang
+  // BM-ISO-04-01 / BM-ISO-04-02), số ngày từ khi xong hành động tới kiểm tra hiệu lực (mặc định khi bấm Hoàn thành hành động)
+  ['capa_form_code', 'STRING', 'BM-CĐ-14-02', true, 1, 'Mã biểu của phiếu khắc phục (in trên phiếu)', '纠正措施单的表单编号（打印在单据上）'],
+  ['capa_log_form_code', 'STRING', 'BM-CĐ-14-02', true, 1, 'Mã biểu của sổ theo dõi khắc phục (in trên sổ)', '纠正措施跟踪台账的表单编号（打印在台账上）'],
+  ['capa_verify_days', 'INT', 30, true, 1, 'Kiểm tra hiệu lực sau khi xong hành động khắc phục (ngày, mặc định)', '纠正措施完成后验证有效性的天数（默认）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本']
 ];
@@ -108,7 +113,7 @@ var SYSTEM_STATE_INITIAL = [
 var CODE_PATTERNS = {
   RECORD: { prefix: 'HS', digits: 4, yymm: true, sheet: 'Records', col: 'code' },
   DOC_REQUEST: { prefix: 'DN', digits: 3, yymm: true, sheet: 'DocRequests', col: 'code' },
-  CAPA: { prefix: 'KP', digits: 3, yymm: true, sheet: null, col: null },
+  CAPA: { prefix: 'KP', digits: 3, yymm: true, sheet: 'Capas', col: 'code' },
   REPORT: { prefix: 'BC', digits: 3, yymm: true, sheet: 'ReportRuns', col: 'code' }
 };
 
@@ -117,8 +122,23 @@ var DOC_ENTITY_SHEETS_ = {
   VERSION: { sheet: 'Versions', key: 'version_id', kinds: ['PDF', 'SOURCE'] },
   RECORD: { sheet: 'Records', key: 'record_id', kinds: ['PHOTO', 'FILE'] },
   // Kho tệp mẫu (2e): một dòng TplFiles = một tệp mẫu (bộ biểu xlsx nhiều sheet, hoặc docx/pdf), tải lên bằng tpl.upload
-  TPL: { sheet: 'TplFiles', key: 'tpl_id', kinds: ['TEMPLATE'] }
+  TPL: { sheet: 'TplFiles', key: 'tpl_id', kinds: ['TEMPLATE'] },
+  // Khắc phục (3a): ảnh hiện trường, bằng chứng thực hiện / kiểm tra hiệu lực (ảnh, PDF, Excel, Word) gắn vào phiếu khắc phục
+  CAPA: { sheet: 'Capas', key: 'capa_id', kinds: ['PHOTO', 'FILE'] }
 };
+
+/** Khắc phục (Đợt 3, phiên 3a — thay BM-CĐ-14-02 trong phạm vi Cơ điện; BM-ISO-04-01 phiếu, 04-02 sổ khi mở rộng toàn công ty), mã KP-yymm-001.
+ *  Nguồn: sự cố thiết bị · kiểm tra / kiểm định · đánh giá · an toàn – môi trường – năng lượng · không tuân thủ quy trình · khác
+ *  (3b thêm khiếu nại, nhà cung cấp; 3c thêm sản phẩm không phù hợp).
+ *  Phiếu: OPEN đang xử lý → (xong mọi hành động, có nguyên nhân) VERIFYING chờ kiểm tra hiệu lực → CLOSED đã đóng (có hiệu lực) |
+ *  OPEN lại (không hiệu lực: thêm hành động, lần kiểm tra sau); CANCELLED hủy (lập nhầm, kèm lý do).
+ *  Hành động: OPEN → DONE (ngày hoàn thành + kết quả) | CANCELLED. */
+var CAPA_SOURCES_ = ['EQUIPMENT', 'INSPECTION', 'AUDIT', 'SAFETY', 'PROCESS', 'OTHER'];
+var CAPA_STATES_ = ['OPEN', 'VERIFYING', 'CLOSED', 'CANCELLED'];
+var CAPA_ACT_TYPES_ = ['CORRECTIVE', 'PREVENTIVE'];
+var CAPA_ACT_STATES_ = ['OPEN', 'DONE', 'CANCELLED'];
+var CAPA_MAX_ACTIONS_ = 30;
+var CAPA_MAX_FILES_ = 30;
 
 /** Kho tệp mẫu (2e): ACTIVE đang dùng · REPLACED đã thay bằng tệp mới cùng bộ (giữ để tra) · DELETED đã bỏ (tải nhầm).
  *  Mỗi tệp tối đa TPL_MAX_SHEETS_ sheet; mỗi lần tải lên tối đa TPL_MAX_CODES_ mã biểu tự nhận từ tên sheet. */

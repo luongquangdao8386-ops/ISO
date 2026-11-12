@@ -77,6 +77,7 @@ export async function updateSyncStatus() {
     app.shell.setBadge('records', p.rec_returned.length);
     app.shell.setBadge('requests', p.req_review.length + p.req_todo.length);
     app.shell.setBadge('dist', p.dist_due.length);
+    app.shell.setBadge('capa', p.capa_acts.length + p.capa_verify.length + p.capa_owner.length);
   } catch (e) { /* không chặn */ }
 }
 
@@ -182,8 +183,13 @@ function registerRoutes() {
   route('/labels', lazy('./pages/labels.js', 'renderLabels'), { nav: 'labels' });
   route('/templates', lazy('./pages/tpl.js', 'renderTemplates'), { nav: 'templates' });
   route('/templates/upload', lazy('./pages/tpl.js', 'renderTplUpload'), { nav: 'templates' });
+  // Khắc phục (Đợt 3, phiên 3a)
+  route('/capa', lazy('./pages/capa.js', 'renderCapas'), { nav: 'capa' });
+  route('/capa/new', lazy('./pages/capa.js', 'renderCapaForm'), { nav: 'capa' });
+  route('/capa/:id/edit', lazy('./pages/capa.js', 'renderCapaForm'), { nav: 'capa' });
+  route('/capa/:id', lazy('./pages/capa.js', 'renderCapa'), { nav: 'capa' });
   // Màn của đợt sau: hiện "Sắp có · 即将推出"
-  ['capa', 'audits'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
+  ['audits'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
   route('/links', lazy('./pages/links.js', 'renderLinks'), { nav: 'links' });
   route('/account', lazy('./pages/account.js', 'renderAccount'), { nav: 'account' });
   route('/account/drafts', lazy('./pages/drafts.js', 'renderDrafts'), { nav: 'account' });
@@ -247,7 +253,7 @@ window.addEventListener('resize', () => {
 
 // Màn xem (trang chủ, danh mục, chi tiết biểu, hồ sơ, tài khoản) vẽ lại sau khi tự gửi nháp xong.
 // Không vẽ lại màn nhập (sửa biểu, Excel), khi đang mở hộp thoại hoặc đang gõ.
-const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|templates|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
+const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|templates|capa|capa\/(?!new)[^/]+|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
 export function refreshAfterSend(r) {
   if (!app.shell) return;
   const path = currentPath();
