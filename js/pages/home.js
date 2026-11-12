@@ -2,11 +2,12 @@
 // Tổng biểu, % ban hành, điều khoản bắt buộc thiếu biểu tính từ danh mục trên máy (như trang Tổng hợp của file Excel); hồ sơ quá hạn
 // = số biểu có kỳ đến hạn xét gần nhất bị Quá hạn. Chờ bạn xử lý: phiên bản (1b), hồ sơ bị trả lại (1c), hồ sơ quá hạn cần nộp,
 // tài liệu sắp/quá hạn rà soát, thao tác gửi không được (1d). Lịch tuần (1d): hồ sơ đến hạn trong tuần, ‹ › đổi tuần.
-// Ô module của đợt sau mờ "Sắp có · 即将推出".
+// Ô module của đợt sau mờ "Sắp có · 即将推出". Phiên 2d: phiếu đề nghị, bản in cần thu hồi ở Chờ bạn xử lý; ô Đề nghị tài liệu,
+// Phân phối & thu hồi, In tem QR.
 import { bi, biText, esc, fmtDate, fmtNumber, session, nameText } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek } from '../data.js';
+import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { missingMandatory } from '../coverage.js';
@@ -26,6 +27,10 @@ async function pendingHtml() {
     [p.rec_returned.length, 'home.pend_rec_returned', p.rec_returned.length === 1 ? '/record/' + encodeURIComponent(p.rec_returned[0].record_id) : '/records?f=returned', 't-red-text'],
     [p.rec_late.length, 'home.pend_rec_late', p.rec_late.length === 1 ? '/record/new?item=' + encodeURIComponent(p.rec_late[0].item_id) : '/records?f=late', 't-red-text'],
     [p.send_problems.length, 'home.pend_send_problems', '/account/drafts', 't-red-text'],
+    [p.req_review.length, 'home.pend_req_review', p.req_review.length === 1 ? '/request/' + encodeURIComponent(p.req_review[0].request_id) : '/requests?f=review', 't-red-text'],
+    [p.req_todo.length, 'home.pend_req_todo', p.req_todo.length === 1 ? '/request/' + encodeURIComponent(p.req_todo[0].request_id) : '/requests?f=todo', 't-red-text'],
+    [p.req_rejected.length, 'home.pend_req_rejected', p.req_rejected.length === 1 ? '/request/' + encodeURIComponent(p.req_rejected[0].request_id) : '/requests?f=mine', ''],
+    [p.dist_due.length, p.dist_overdue.length ? 'home.pend_dist_overdue' : 'home.pend_dist_due', '/dist?f=DUE', p.dist_overdue.length ? 't-red-text' : ''],
     [p.drafts.length, 'home.pend_drafts', '/versions?f=drafts', ''],
     [p.nofile.length, 'home.no_file_n', '/catalog?f=nofile', ''],
     [p.review_due.length, 'home.pend_review_due', '/catalog?f=review', '']
@@ -119,11 +124,15 @@ async function gridHtml(list) {
   const sec = isSecretary();
   const uid = session.user && session.user.user_id;
   const q = (await queueItems().catch(() => [])).filter((o) => o.user_id === uid && o.dataset_epoch === session.epoch).length;
+  const dcOn = await docControlOn();
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
     { key: 'records', icon: 'file', href: '/records', lvl: 2, show: canSeeRecords() },
     { key: 'coverage', icon: 'checklist', href: '/coverage', show: canSeeRecords() },
     { key: 'excel', icon: 'excel', href: '/excel', show: lvl >= 3 || sec },
+    { key: 'requests', icon: 'edit', href: '/requests', show: (lvl >= 2 || sec) && dcOn },
+    { key: 'dist', icon: 'archive', href: '/dist', show: (lvl >= 2 || sec) && dcOn },
+    { key: 'labels', icon: 'qr', href: '/labels', show: lvl >= 2 || sec },
     { key: 'reports', icon: 'reports', href: '/reports' },
     { key: 'capa', icon: 'repairs', href: '/capa', soon: 1, lvl: 2 },
     { key: 'audits', icon: 'inspections', href: '/audits', soon: 1, lvl: 2 },

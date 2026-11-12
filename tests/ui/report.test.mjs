@@ -62,7 +62,7 @@ test('iPhone: Trang chủ → Báo cáo → Danh mục tài liệu → Xem → T
     assert.equal(await page.locator('.grid9 .tile[href="#/reports"].soon').count(), 0, 'ô Báo cáo hết "Sắp có"');
     await page.click('.grid9 .tile[href="#/reports"]');
     await page.waitForSelector('.rp-item[data-kind="CATALOG"].on');
-    assert.equal(await page.locator('.rp-item').count(), 4);
+    assert.equal(await page.locator('.rp-item').count(), 6); // 2d: + Sổ phân phối, Phiếu đề nghị
     assert.equal(await page.locator('#rp-saved .muted').count(), 1); // chưa có báo cáo nào
     // Bộ lọc chỉ có ô chọn: không có ô gõ (iPhone không bật bàn phím)
     assert.equal(await page.locator('.rp-filter-card input[type="text"], .rp-filter-card input:not([type]), .rp-filter-card textarea').count(), 0);
@@ -207,7 +207,7 @@ test('đúng các bước HUONG_DAN "CẬP NHẬT LÊN BẢN 2c" + "Thử Báo c
   g.dbReset_();
   env.logs.length = 0;
   g.migrateSchema();
-  assert.ok(env.logs.includes('migrateSchema xong. Thêm: ReportRuns. schema_version=1.0.5'), env.logs.join('\n'));
+  assert.ok(env.logs.some((l) => /^migrateSchema xong\. Thêm: ReportRuns\. schema_version=1\.0\.\d+$/.test(l)), env.logs.join('\n'));
   g.dbReset_();
   const app = await openApp({ env, now: NOW, ...WEB, site: 'ISO' });
   try {
@@ -217,7 +217,7 @@ test('đúng các bước HUONG_DAN "CẬP NHẬT LÊN BẢN 2c" + "Thử Báo c
     await go(page, '#/admin/status');
     await page.waitForSelector('text=Báo cáo đã lưu');
     const st = await page.textContent('body');
-    assert.ok(st.includes('Đã lưu 0 báo cáo') && st.includes('1.0.5') && st.includes('Chưa có logo công ty trên báo cáo'));
+    assert.ok(st.includes('Đã lưu 0 báo cáo') && st.includes(env.g.SCHEMA_VERSION) && st.includes('Chưa có logo công ty trên báo cáo'));
     // Thử 1–2: Danh mục tài liệu, Đang hiệu lực → trống; Tất cả tình trạng → có bảng
     await page.click('.side .side-item[data-nav="reports"]');
     await page.waitForSelector('#rp-run');

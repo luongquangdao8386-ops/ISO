@@ -4,7 +4,7 @@ import { bi, biText, esc, fmtDateTime, badge, session, api, resMsg, nameText, BU
 import { ICON, toast, dialog, askPin } from '../ui.js';
 import { getMeta, queueItems, exportBackup } from '../sync.js';
 import { reauth } from '../auth.js';
-import { boot, roleLevel, isOwner, isSecretary, can, myDepts, mapOf } from '../data.js';
+import { boot, roleLevel, isOwner, isSecretary, can, myDepts, mapOf, docControlOn } from '../data.js';
 import { app, syncNow, updateSyncStatus } from '../app.js';
 import { shareFileNow } from '../media.js';
 
@@ -63,6 +63,7 @@ export async function renderAccount(view, { shell }) {
   const deps = await mapOf('DEPT');
   const mine = myDepts();
   const sec = isSecretary();
+  const dcOn = await docControlOn();
   const admin = [];
   if (await can('user.view')) admin.push(['admin.users', '/admin/users']);
   if (await can('dept.edit')) admin.push(['admin.depts', '/admin/depts']);
@@ -83,6 +84,9 @@ export async function renderAccount(view, { shell }) {
   </section>
   <section class="card acc-links"><h2>${bi('account.work')}</h2>
     ${lvl >= 2 || sec ? link('nav.versions', '/versions') : ''}
+    ${(lvl >= 2 || sec) && dcOn ? link('nav.requests', '/requests') : ''}
+    ${(lvl >= 2 || sec) && dcOn ? link('nav.dist', '/dist') : ''}
+    ${lvl >= 2 || sec ? link('nav.labels', '/labels') : ''}
     ${lvl >= 3 || sec ? link('nav.excel', '/excel') : ''}
     ${lvl >= 2 || sec ? link('nav.coverage', '/coverage') : ''}
     ${link('nav.reports', '/reports')}

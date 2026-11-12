@@ -11,7 +11,11 @@ var SYNC_ENTITIES_ = [
   // Hồ sơ (1c): theo phạm vi của biểu; cấp 2+ và Thư ký ISO (cấp 1 Tra cứu không xem hồ sơ)
   { type: 'RECORD', sheet: 'Records', scoped: 'record' },
   // Ngày có hồ sơ từ M&E / Checksheet (2a): như hồ sơ — cấp 2+ và Thư ký ISO, theo phạm vi của biểu
-  { type: 'EVIDENCE', sheet: 'Evidence', scoped: 'record' }
+  { type: 'EVIDENCE', sheet: 'Evidence', scoped: 'record' },
+  // Phiếu đề nghị tài liệu (2d): cấp 2+ / Thư ký ISO — phiếu của mình, của bộ phận mình
+  { type: 'DOCREQ', sheet: 'DocRequests', scoped: 'docreq' },
+  // Sổ phân phối & thu hồi (2d): như hồ sơ — cấp 2+ và Thư ký ISO, theo phạm vi của biểu
+  { type: 'DIST', sheet: 'Distributions', scoped: 'record' }
 ];
 
 /** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */
@@ -30,6 +34,7 @@ function syncItemMap_(aux) {
 
 /** Dòng → bản ghi gửi client; null nếu không gửi (ngoài phạm vi bộ phận) */
 function syncProject_(ctx, ent, row, aux) {
+  if (ent.scoped === 'docreq') return docreqVisible_(ctx.user, row) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'record') {
     return canSeeRecords_(ctx.user, syncItemMap_(aux)[row.item_id]) ? projectRow_(ctx, row) : null;
   }

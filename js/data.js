@@ -295,3 +295,51 @@ export async function recordWeek(off = 0) {
   const entries = (await items()).map((it) => ({ it, recs: byItem.get(it.item_id) || [], pending: queued.get(it.item_id) || [], evidence: evByItem.get(it.item_id) || [] }));
   return weekAgenda(entries, { ...opts, mon: addDaysIso(mondayOf(opts.today), 7 * off) });
 }
+
+/* ---------------- Kiểm soát tài liệu (phiên 2d) — quyền phía client chỉ để ẩn/hiện nút, máy chủ kiểm lại ---------------- */
+
+/** Máy chủ đã lên bản 2d (có docreq.save trong danh sách quyền) — chưa có thì app ẩn phần đề nghị, phân phối */
+export async function docControlOn() { return can('docreq.save'); }
+export const DOCREQ_TYPES = ['NEW', 'REVISE', 'CANCEL'];
+/** Đề nghị sửa / hủy: cấp 2+ / Thư ký ISO, tài liệu xem được (đề nghị là ý kiến; chủ tài liệu xem xét) */
+export function canRequest(it) { return !!it && it.status !== 'NA' && (isSecretary() || roleLevel() >= 2); }
+/** Xem xét phiếu (chấp thuận / không chấp thuận): như duyệt phiên bản, người đề nghị không tự xem xét (cấp 4 được) */
+export function canDecideReq(r) {
+  const lvl = roleLevel();
+  if (!r || r.state !== 'SUBMITTED') return false;
+  if (lvl >= 4) return r.submitted_by !== myId() || (session.settings || {}).admin_self_approval !== false;
+  if (r.submitted_by === myId() || r.level === 'COMPANY') return false;
+  return lvl === 3 && deptWritable(r.dept_code);
+}
+export function canEditReq(r) { return !!r && r.state === 'SUBMITTED' && (r.submitted_by === myId() || isSecretary()); }
+export function canCancelReq(r) { return !!r && (r.state === 'APPROVED' ? isSecretary() : canEditReq(r)); }
+
+/** Phiếu đề nghị theo tài liệu (mới nhất trước) */
+export async function requestsOf(itemId) {
+  return (await recs('DOCREQ')).filter((r) => r.item_id === itemId && !r.archived_at)
+    .sort((a, b) => String(b.submitted_at).localeCompare(String(a.submitted_at)));
+}
+
+/** Lần ban hành hiện hành (● nhập từ Excel không ghi lần = 01) */
+export function curRevOf(it) { return it ? String(it.current_rev || (it.status === 'ISSUED' ? '01' : '')) : ''; }
+export function normRev(r) { const s = String(r || '').replace(/^0+(?=\d)/, ''); return s.length < 2 ? ('0' + s).slice(-2) : s; }
+/** Dòng phân phối đang dùng mà tài liệu đã ban hành lần khác / ngừng dùng → cần thu hồi (như distDue_ của máy chủ) */
+export function distDue(d, it) {
+  if (!d || d.state !== 'ACTIVE' || !it) return false;
+  return it.status === 'NA' || normRev(d.rev) !== normRev(curRevOf(it));
+}
+/** Ngày bắt đầu phải thu hồi: ngày ban hành lần hiện hành (✕: ngày đặt ✕) */
+export function distDueSince(it) { return !it ? '' : it.status === 'NA' ? String(it.updated_at || '').slice(0, 10) : String(it.issued_at || ''); }
+/** Cần thu hồi quá dist_recall_days ngày */
+export function distOverdue(d, it, t = today()) {
+  if (!distDue(d, it)) return false;
+  const since = distDueSince(it);
+  return !!since && addDaysIso(since, Number((session.settings || {}).dist_recall_days || 7)) < t;
+}
+/** Trạng thái hiển thị: ACTIVE · DUE · RECALLED · VOID */
+export function distState(d, it) { return d.state === 'ACTIVE' && distDue(d, it) ? 'DUE' : d.state; }
+/** Sổ phân phối theo tài liệu (bỏ dòng ghi nhầm) */
+export async function distsOf(itemId) {
+  return (await recs('DIST')).filter((d) => d.item_id === itemId && d.state !== 'VOID' && !d.archived_at)
+    .sort((a, b) => String(b.dist_date).localeCompare(String(a.dist_date)) || String(a.dept_code).localeCompare(String(b.dept_code)));
+}

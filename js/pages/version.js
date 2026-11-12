@@ -109,13 +109,17 @@ export async function renderVersionNew(view, { shell, params, query }) {
     return;
   }
   if (!(await can('version.save')) || !canCreateVersion(it, vtype)) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi(it.status === 'NA' ? 'ver.item_na' : 'err.forbidden')}</p></div>`; return; }
+  // Soạn theo phiếu đề nghị đã chấp thuận (2d): chọn sẵn phiếu ?req= hoặc phiếu đầu tiên; "Không theo phiếu" vẫn được
+  const reqs = attach ? [] : (await recs('DOCREQ')).filter((q) => q.item_id === it.item_id && q.state === 'APPROVED' && q.req_type !== 'CANCEL');
+  const reqSel = reqs.find((q) => q.request_id === (query && query.req)) || reqs[0] || null;
   const nextRev = attach ? String(Number(it.current_rev) || 1).padStart(2, '0')
     : String(Math.max(Number(it.current_rev) || (it.status === 'ISSUED' ? 1 : 0), ...vers.filter((v) => v.state === 'ISSUED' || v.state === 'SUPERSEDED').map((v) => Number(v.rev) || 0)) + 1).padStart(2, '0');
   view.innerHTML = `<form class="card form ver-form" novalidate>
     <div class="rec-top"><span class="code big">${esc(it.code)}</span>${statusDot(it.status)}</div>
     <p class="item-name">${pair(it.name_vi, it.name_zh)}</p>
     <p class="banner ${attach ? 'warn' : 'info'} small">${attach ? bi('ver.attach_note', { N: esc(nextRev) }) : bi('ver.new_note', { N: esc(nextRev) })}</p>
-    ${attach ? '' : bilingualInputs('change_summary', null, { labelKey: 'ver.summary', area: true, maxlength: 1000, suggest: 'change_summary' })}
+    ${reqs.length ? `<label class="fld"><span>${bi('dr.by_request')}</span><select class="inp sel" id="f-request_id">${reqs.map((q) => `<option value="${esc(q.request_id)}"${q === reqSel ? ' selected' : ''}>${esc(q.code)} · ${esc(String(q.reason_vi || q.reason_zh || '').slice(0, 60))}</option>`).join('')}<option value="">${bi('dr.no_request')}</option></select><div class="hint">${bi('dr.by_request_hint')}</div></label>` : ''}
+    ${attach ? '' : bilingualInputs('change_summary', reqSel ? { change_summary_vi: reqSel.content_vi || reqSel.reason_vi || '', change_summary_zh: reqSel.content_vi || reqSel.reason_vi ? '' : reqSel.content_zh || reqSel.reason_zh || '' } : null, { labelKey: 'ver.summary', area: true, maxlength: 1000, suggest: 'change_summary' })}
     ${attach ? '' : dateInput('effective_date', 'ver.effective', '')}
     ${fileField('PDF', true)}
     ${fileField('SOURCE', false)}
@@ -141,6 +145,8 @@ export async function renderVersionNew(view, { shell, params, query }) {
     else { const e = checkFile(pdf, 'PDF'); if (e) errs.push({ field: 'pdf', key: e }); }
     if (src) { const e = checkFile(src, 'SOURCE'); if (e) errs.push({ field: 'source', key: e }); }
     const p = { version_id: uuid(), item_id: it.item_id, vtype };
+    const rqv = readField(form, 'request_id');
+    if (rqv) p.request_id = rqv;
     if (!attach) {
       p.change_summary_vi = readField(form, 'change_summary_vi');
       p.change_summary_zh = readField(form, 'change_summary_zh');
@@ -308,7 +314,9 @@ export async function renderVersion(view, ctx) {
   });
   on('v-issue', async () => {
     const cur = it.current_rev && it.current_version_id && it.current_version_id !== v.version_id ? biText('ver.issue_old', { C: it.current_rev }) : '';
-    const ok = await confirmBox('ver.issue', `<p>${bi(v.vtype === 'ATTACH' ? 'ver.issue_attach_confirm' : 'ver.issue_confirm', { N: esc(v.rev), D: esc(fmtDate(today())) })}</p>${cur ? `<p class="muted small">${esc(cur)}</p>` : ''}`, 'ver.issue');
+    // Bản in của lần đang hiệu lực sẽ thành "cần thu hồi" (2d)
+    const held = v.vtype === 'ATTACH' ? [] : (await recs('DIST')).filter((d) => d.item_id === it.item_id && d.state === 'ACTIVE');
+    const ok = await confirmBox('ver.issue', `<p>${bi(v.vtype === 'ATTACH' ? 'ver.issue_attach_confirm' : 'ver.issue_confirm', { N: esc(v.rev), D: esc(fmtDate(today())) })}</p>${cur ? `<p class="muted small">${esc(cur)}</p>` : ''}${held.length ? `<p class="banner warn small">${bi('dist.will_recall', { N: held.length })}</p>` : ''}`, 'ver.issue');
     if (!ok) return;
     const r = await writeWithPin('version.issue', { version_id: v.version_id }, { expected_version: exp() });
     if (r.ok) return again('ver.issued_ok');

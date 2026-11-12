@@ -75,6 +75,8 @@ export async function updateSyncStatus() {
     app.shell.setBadge('home', p.total);
     app.shell.setBadge('versions', p.review.length + p.issue.length + p.returned.length);
     app.shell.setBadge('records', p.rec_returned.length);
+    app.shell.setBadge('requests', p.req_review.length + p.req_todo.length);
+    app.shell.setBadge('dist', p.dist_due.length);
   } catch (e) { /* không chặn */ }
 }
 
@@ -172,6 +174,12 @@ function registerRoutes() {
   route('/excel/batch/:id', lazy('./pages/excel.js', 'renderBatch'), { nav: 'excel' });
   route('/coverage', lazy('./pages/coverage.js', 'renderCoverage'), { nav: 'coverage' });
   route('/reports', lazy('./pages/reports.js', 'renderReports'), { nav: 'reports' });
+  route('/requests', lazy('./pages/docreq.js', 'renderRequests'), { nav: 'requests' });
+  route('/request/new', lazy('./pages/docreq.js', 'renderRequestNew'), { nav: 'requests' });
+  route('/request/:id', lazy('./pages/docreq.js', 'renderRequest'), { nav: 'requests' });
+  route('/dist', lazy('./pages/dist.js', 'renderDist'), { nav: 'dist' });
+  route('/dist/new/:item', lazy('./pages/dist.js', 'renderDistNew'), { nav: 'dist' });
+  route('/labels', lazy('./pages/labels.js', 'renderLabels'), { nav: 'labels' });
   // Màn của đợt sau: hiện "Sắp có · 即将推出"
   ['capa', 'audits'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
   route('/links', lazy('./pages/links.js', 'renderLinks'), { nav: 'links' });
@@ -237,7 +245,7 @@ window.addEventListener('resize', () => {
 
 // Màn xem (trang chủ, danh mục, chi tiết biểu, hồ sơ, tài khoản) vẽ lại sau khi tự gửi nháp xong.
 // Không vẽ lại màn nhập (sửa biểu, Excel), khi đang mở hộp thoại hoặc đang gõ.
-const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
+const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
 export function refreshAfterSend(r) {
   if (!app.shell) return;
   const path = currentPath();

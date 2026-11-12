@@ -1,9 +1,10 @@
 // Chi tiết biểu / tài liệu: mục đích, tần suất, Lập → Duyệt, thời gian lưu, điều khoản ISO, chủ đề BRCGS, lần ban hành, hạn rà soát,
 // nơi làm, biểu liên quan (1a); phiên bản hiện hành (xem PDF, tải tệp gốc), bản đang soạn, lịch sử phiên bản, Soạn phiên bản mới,
 // gắn tệp cho biểu ● nhập từ Excel, đặt Không áp dụng ✕ / dùng lại, Đã rà soát (1b); hồ sơ 12 kỳ gần nhất, Nộp hồ sơ, mở từ tem QR
-// (…/#/f/<mã>?r=<lần>): tem của bản đã lỗi thời báo đỏ (1c). In tem QR (Đợt 2) hiện "Sắp có".
+// (…/#/f/<mã>?r=<lần>): tem của bản đã lỗi thời báo đỏ (1c). Phiên 2d: phiếu đề nghị sửa đổi / hủy của tài liệu, bản in đang phát và
+// cần thu hồi, In tem QR (/labels?item=); đặt ✕ theo phiếu hủy đã chấp thuận; thêm tài liệu mới theo phiếu (/item/new?req=).
 // Sửa thông tin (Thư ký ISO, cấp 4): /item/:id/edit, thêm mới /item/new.
-import { bi, biText, esc, fmtDate, nameText, uuid, badge } from '../core.js';
+import { bi, biText, esc, fmtDate, nameText, uuid, badge, session } from '../core.js';
 import { ICON, toast, dialog, $ } from '../ui.js';
 import { byId, items, recs, depts, isSecretary, users, userName, groupText, KINDS, WHERES, versionsOf, canCreateVersion, reviewSoon, daysBetween, today, VERSION_OPEN, can } from '../data.js';
 import { navigate, refresh } from '../router.js';
@@ -14,6 +15,8 @@ import { statusDot } from './catalog.js';
 import { versionRow, vBadge } from './version.js';
 import { itemRecordsCard, wireItemRecords } from './records.js';
 import { canSubmitRecord, recordCheck } from '../data.js';
+import { itemRequestsCard, approvedCancelFor } from './docreq.js';
+import { itemDistCard } from './dist.js';
 
 const PERIOD_OF = (d) => {
   if (d === null || d === undefined || d === '') return 'EVENT';
@@ -107,12 +110,14 @@ export async function renderItem(view, { shell, params, query }) {
       ${await can('report.run') ? `<a class="small rp-link" href="#/reports?kind=VERSIONS&item=${encodeURIComponent(it.item_id)}">${ICON.reports} ${bi('rp.version_report')} ›</a>` : ''}
     </section>
     ${await itemRecordsCard(it)}
+    ${await itemRequestsCard(it)}
+    ${await itemDistCard(it)}
     <div class="row item-actions">
       ${canAttach ? `<a class="btn primary" href="#/version/new/${encodeURIComponent(it.item_id)}?attach=1">${ICON.upload}<span>${bi('ver.attach_btn')}</span></a>` : ''}
       ${canNew ? `<a class="btn${canAttach ? '' : ' primary'}" href="#/version/new/${encodeURIComponent(it.item_id)}">${ICON.edit}<span>${bi('item.new_version')}</span></a>` : ''}
       ${openV ? `<a class="btn primary" href="#/version/${encodeURIComponent(openV.version_id)}">${ICON.edit}<span>${bi('ver.open_it')}</span></a>` : ''}
       ${canRec ? `<a class="btn" href="#/record/new?item=${encodeURIComponent(it.item_id)}">${ICON.upload}<span>${bi('item.submit_record')}</span></a>` : ''}
-      <button type="button" class="btn" disabled title="${esc(biText('soon.tag'))}">${ICON.qr}<span>${bi('item.qr_label')}</span><span class="tag soon">${bi('soon.tag')}</span></button>
+      ${it.status === 'ISSUED' && (sec || Number(session.user && session.user.role_level) >= 2) ? `<a class="btn" href="#/labels?item=${encodeURIComponent(it.item_id)}">${ICON.qr}<span>${bi('item.qr_label')}</span></a>` : ''}
     </div>
     ${manage ? `<section class="card"><h3>${bi('item.manage')}</h3><div class="row">
       ${it.status === 'ISSUED' ? `<button type="button" class="btn small" id="it-review">${ICON.check}<span>${bi('item.review_btn')}</span></button>` : ''}
@@ -126,14 +131,15 @@ export async function renderItem(view, { shell, params, query }) {
   const again = async (key) => { await afterCommit(); toast(bi(key), 'ok'); refresh(); };
   const on = (id, fn) => { const b = $('#' + id, view); if (b) b.addEventListener('click', async () => { if (!navigator.onLine) { toast(bi('sync.need_network'), 'err'); return; } busy(b, true); try { await fn(); } finally { busy(b, false); } }); };
   on('it-na', async () => {
+    const rq = await approvedCancelFor(it.item_id);
     const reason = await dialog({
       title: bi('item.na_btn'),
-      body: `<p class="muted small">${bi('item.na_note')}</p><label class="fld"><span>${bi('field.reason')} <span class="req">*</span></span><textarea class="inp" rows="3" maxlength="300" id="na-reason"></textarea></label>`,
+      body: `<p class="muted small">${bi('item.na_note')}</p>${rq ? `<p class="banner info small">${bi('dr.na_by_req', { C: esc(rq.code) })}</p>` : ''}<label class="fld"><span>${bi('field.reason')}${rq ? '' : ' <span class="req">*</span>'}</span><textarea class="inp" rows="3" maxlength="300" id="na-reason"></textarea></label>`,
       actions: [{ label: bi('btn.cancel'), value: null }, { label: bi('item.na_btn'), kind: 'danger', read: (w) => $('#na-reason', w).value.trim() }]
     });
     if (reason === null || reason === undefined) return;
-    if (!reason) { toast(bi('field.required'), 'err'); return; }
-    const r = await writeWithPin('item.setNa', { item_id: it.item_id, na: true, reason }, { expected_version: it.record_version });
+    if (!reason && !rq) { toast(bi('field.required'), 'err'); return; }
+    const r = await writeWithPin('item.setNa', { item_id: it.item_id, na: true, reason, ...(rq ? { request_id: rq.request_id } : {}) }, { expected_version: it.record_version });
     if (r.ok) return again('item.na_done');
     writeFail(r);
   });
@@ -157,9 +163,12 @@ export async function renderItem(view, { shell, params, query }) {
 
 /* ---------------- Thêm / sửa thông tin biểu (Thư ký ISO, cấp 4) ---------------- */
 
-export async function renderItemForm(view, { shell, params }) {
+export async function renderItemForm(view, { shell, params, query }) {
   const isNew = !params.id;
   const it = isNew ? null : await byId('ITEM', params.id);
+  // Thêm tài liệu mới theo phiếu đề nghị ban hành mới đã chấp thuận (2d): điền sẵn mã, bộ phận, tên, loại
+  const rq = isNew && query && query.req ? await byId('DOCREQ', query.req) : null;
+  const fromReq = rq && rq.state === 'APPROVED' && rq.req_type === 'NEW' && !rq.item_id ? rq : null;
   const back = isNew ? '/catalog' : '/item/' + encodeURIComponent(params.id);
   shell.setScreen({ title: isNew ? 'cat.add' : ['Sửa thông tin biểu', '编辑表单信息'], back });
   if (!isSecretary()) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('err.forbidden')}</p></div>`; return; }
@@ -168,10 +177,12 @@ export async function renderItemForm(view, { shell, params }) {
   const deps = (await depts()).filter((d) => d.active !== false);
   const groups = (await recs('GROUP')).slice().sort((a, b) => String(a.group_key).localeCompare(String(b.group_key)));
   const um = await users();
-  const r = it || { kind: 'FORM', level: 'DEPT', where: 'MANUAL' };
+  const r = it || (fromReq ? { kind: fromReq.new_kind || 'FORM', level: fromReq.level || 'DEPT', where: 'MANUAL', dept_code: fromReq.dept_code, name_vi: fromReq.title_vi, name_zh: fromReq.title_zh, code: fromReq.new_code }
+    : { kind: 'FORM', level: 'DEPT', where: 'MANUAL' });
   const grpOpts = (dept) => groups.filter((g) => !dept || g.dept_code === dept).map((g) => [g.group_key, esc(g.group_key + ' · ' + groupText(g))]);
   view.innerHTML = `<form class="card form item-form" novalidate>
-    ${isNew ? textInput('code', 'cat.code', '', { required: true, maxlength: 40, upper: true, placeholder: 'BM-ISO-02-05', hint: biText('item.code_hint') }) : `<div class="kv"><span>${bi('cat.code')}</span><strong class="code">${esc(it.code)}</strong></div>`}
+    ${fromReq ? `<p class="banner info small">${bi('dr.add_item_note', { C: esc(fromReq.code) })}</p>` : ''}
+    ${isNew ? textInput('code', 'cat.code', r.code || '', { required: true, maxlength: 40, upper: true, placeholder: 'BM-ISO-02-05', hint: biText('item.code_hint') }) : `<div class="kv"><span>${bi('cat.code')}</span><strong class="code">${esc(it.code)}</strong></div>`}
     <div class="form-grid">
       ${selectInput('kind', 'cat.kind', KINDS.map((k) => [k, bi('kind.' + k)]), r.kind, { empty: '' })}
       ${selectInput('level', 'item.level', ['DEPT', 'COMPANY'].map((k) => [k, bi('level_doc.' + k)]), r.level, { empty: '' })}
@@ -227,6 +238,7 @@ export async function renderItemForm(view, { shell, params }) {
     if (errs.length) { showErrors(form, errs); return; }
     if (as.bases.length) p.i18n_assisted = as.bases;
     if (isNew && !p.group_key) delete p.group_key;
+    if (fromReq) p.request_id = fromReq.request_id;
     const btn = form.querySelector('#it-save');
     busy(btn, true);
     const res = await writeOnline('item.edit', p, { expected_version: isNew ? 0 : it.record_version });

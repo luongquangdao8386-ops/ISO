@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.3 (Đợt 2, phiên 2c — Báo cáo)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.4 (Đợt 2, phiên 2d — Đề nghị tài liệu, phân phối, tem QR)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -14,8 +14,69 @@ Phiên 2a thêm: **Kết nối M&E / Checksheet** — mỗi giờ app ISO hỏi 
 từ app có ô ✓ mà không ai phải nộp lại. Phiên 2b thêm: **Gmail nhắc hạn** — hồ sơ quá hạn (tóm tắt sáng thứ Hai), tài liệu đến hạn rà
 soát, phiên bản chờ duyệt / chờ ban hành quá 3 ngày; email người nhận do Quản trị nhập và xác nhận. Phiên 2c thêm: **Báo cáo** —
 Danh mục tài liệu hiện hành (thay BM-ISO-02-01), Tình trạng hồ sơ theo bộ phận và kỳ, Phủ điều khoản ISO 9001 và BRCGS, Lịch sử phiên
-bản; PDF A4 ngang có logo công ty + Excel, số báo cáo `BC-yymm-001`, khối Người lập / Người duyệt. Khắc phục, Đánh giá nội bộ (Đợt 3–4)
-vẫn mờ "Sắp có · 即将推出".
+bản; PDF A4 ngang có logo công ty + Excel, số báo cáo `BC-yymm-001`, khối Người lập / Người duyệt. Phiên 2d thêm: **Phiếu đề nghị
+ban hành / sửa đổi / hủy tài liệu** (`DN-yymm-001`, thay BM-ISO-02-02 / BM-CĐ-01-08) — gửi phiếu → trưởng bộ phận / Quản trị xem xét
+(PIN) → soạn phiên bản theo phiếu → ban hành thì phiếu tự thành Đã thực hiện; **Sổ phân phối & thu hồi bản in** (thay BM-ISO-02-03) —
+ban hành lần mới thì bản in lần cũ thành "Cần thu hồi", thu hồi (PIN) và phát luôn bản mới; **In tem QR** 70×37 / 105×74 mm trên tờ
+A4 + ảnh PNG của mã; 2 báo cáo mới (Phiếu đề nghị, Sổ phân phối & thu hồi). Khắc phục, Đánh giá nội bộ (Đợt 3–4) vẫn mờ "Sắp có · 即将推出".
+
+## CẬP NHẬT LÊN BẢN 2d (1.0.0-d2.4) — làm một lần, trên máy tính
+
+Bản 2d **thêm sheet `DocRequests`, `Distributions` và cột `Versions.request_id`** → phải chạy `migrateSchema`. **Không** hỏi quyền
+Google mới, **không** cần `installTriggers`. App 2d vẫn chạy với máy chủ 2c (chưa có thẻ Phiếu đề nghị / Bản in đang phát; In tem QR
+vẫn dùng được vì tem dựng ngay trên máy).
+
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký:
+   `migrateSchema xong. Thêm: Versions(request_id); DocRequests; Distributions. schema_version=1.0.6`.
+   (Nếu chưa cập nhật bản 2c thì dòng nhật ký có thêm `ReportRuns` và Google hỏi quyền Google Docs → **Cho phép**.)
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d2.4 de nghi phan phoi tem` →
+   **Triển khai**. Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` → **Tài khoản → Thông tin** ghi `1.0.0-d2.4` (màn báo lỗi thì bấm **Tải lại bản mới**). **Tài khoản → Quản trị →
+   Trạng thái hệ thống**: `schema_version` = **1.0.6**; dòng mới **Đề nghị tài liệu, phân phối** = `Phiếu đề nghị: chờ xem xét 0 · đã
+   chấp thuận chưa thực hiện 0 · đã thực hiện 0 · Bản in đang phát 0 nơi (0 bản) · cần thu hồi 0`, ĐẠT.
+
+### Thử phiên 2d (Thư ký ISO hoặc owner, danh mục đang toàn ○ ◐)
+
+Cần một biểu ◐ mà anh đã có bản PDF (vd một biểu trong bộ 15 file BM-CĐ) — các bước dưới **ban hành thật** biểu đó (lần 01).
+
+1. Trang chủ → ô **Đề nghị tài liệu** (máy tính: menu trái) → **Đề nghị mới**.
+2. Loại **Sửa đổi / ban hành** (chọn sẵn) → **Tài liệu, biểu mẫu**: chọn biểu ◐ đó → **Lý do đề nghị** (vd "Ban hành biểu đang dùng")
+   → **Nội dung cần sửa đổi / ban hành** → **Gửi phiếu** → phiếu **DN-2611-001 · Chờ xem xét** (bỏ trống Lý do thì ô báo đỏ, không gửi).
+3. **Chấp thuận** → ô ý kiến (bỏ trống được) → **Xác nhận** → nhập **PIN** → phiếu **Đã chấp thuận**, dòng "Việc tiếp theo: soạn phiên
+   bản theo phiếu…".
+4. **Soạn phiên bản theo phiếu** → ô **Soạn theo phiếu đề nghị** chọn sẵn DN-2611-001, **Tóm tắt thay đổi** điền sẵn từ phiếu → chọn
+   **PDF** (+ tệp gốc nếu có) → **Lưu và gửi duyệt** → **Duyệt** → **Xác nhận** → **Ban hành** → **Xác nhận** (hỏi PIN thì nhập) →
+   biểu thành ● lần 01. Mở lại phiếu (**Đề nghị tài liệu → Tất cả**): **Đã thực hiện** · "Ban hành lần 01".
+5. Chi tiết biểu đó → thẻ **Bản in đang phát** → **Phát bản in** → **Nơi nhận** (chọn sẵn bộ phận của biểu) → **Người / vị trí nhận**
+   (vd "Phòng cơ điện – kệ biểu mẫu") → **Số bản** → (**Thêm nơi nhận** nếu phát nhiều nơi) → **Ghi phát** → màn **Phân phối & thu
+   hồi**, thẻ **Đang dùng**.
+6. Chi tiết biểu → **Tem QR** → biểu đã chọn sẵn → cỡ **70 × 37 mm** → **Xem trước tờ đầu** → **In tem** (máy tính, Chrome: khổ A4,
+   Lề **Không**, Tỷ lệ **Mặc định**, bỏ tích Đầu trang/chân trang; in thử giấy thường, đặt lên tờ tem soi đèn cho khớp rồi mới in tem
+   thật) → **Tải ảnh PNG mã QR** → tệp `QR_<mã biểu>_lan01.png` (chèn vào đầu biểu Excel / Word).
+7. iPhone → nút **Quét** → quét tem vừa in → mở chi tiết biểu, dải xanh **Đang hiệu lực: lần 01**.
+8. **Báo cáo** → **Phiếu đề nghị tài liệu** → **Phiếu**: chọn DN-2611-001 → **Xem báo cáo** → **Tải PDF** (phiếu BM-ISO-02-02 có khối
+   ký **Người đề nghị / Người xem xét**). **Sổ phân phối & thu hồi** → **Xem báo cáo** → **Tải PDF / Excel** (BM-ISO-02-03).
+9. **Trạng thái hệ thống**: dòng **Đề nghị tài liệu, phân phối** = `… đã thực hiện 1 · Bản in đang phát N nơi (M bản) · cần thu hồi 0`.
+
+### Dùng phiếu đề nghị, sổ phân phối, tem QR
+
+- **Ai làm gì:** gửi phiếu — Nhân viên (cấp 2) trở lên, Thư ký ISO (nhập thay người không đăng nhập: ô **Người đề nghị**); đề nghị
+  sửa / hủy được mọi tài liệu mình xem được, đề nghị **Tài liệu mới** chỉ trong bộ phận mình. Xem xét — trưởng bộ phận (tài liệu cấp bộ
+  phận) hoặc Quản trị (cấp 4; tài liệu cấp công ty BM-ISO, BM-BRC, sổ tay, chính sách chỉ cấp 4); người gửi không tự xem xét (Quản trị
+  được). Phát, thu hồi, sửa sổ phân phối — Thư ký ISO, Quản trị.
+- **Phiếu Tài liệu mới:** chấp thuận xong → **Thêm vào danh mục theo phiếu** (form điền sẵn mã, tên, bộ phận) → **Lưu** → **Soạn
+  phiên bản theo phiếu** lần 01. **Phiếu Hủy:** chấp thuận xong → **Đặt Không áp dụng (✕) theo phiếu** (PIN) → phiếu Đã thực hiện.
+  Việc làm ngoài app: Thư ký bấm **Đã thực hiện (ghi chú)**. Rút lại: người gửi khi phiếu còn Chờ xem xét; Thư ký khi đã chấp thuận.
+- **Ban hành lần mới** (hoặc đặt ✕): mọi bản in lần cũ đang phát thành **Cần thu hồi** (hộp xác nhận Ban hành báo trước số nơi). Trang
+  chủ của Thư ký có dòng "N nơi giữ bản in lần cũ cần thu hồi" (đỏ khi quá `dist_recall_days` = 7 ngày). **Phân phối & thu hồi** →
+  thẻ **Cần thu hồi** → tích các dòng (hoặc **Chọn tất cả**) → **Thu hồi** → ngày, ghi chú, **Phát luôn bản lần đang hiệu lực cho đúng
+  các nơi này** (tích sẵn) → PIN. Bấm một dòng để xem, **Sửa dòng** hoặc **Bỏ dòng này (ghi nhầm)**.
+- **Tem QR** (menu **In tem QR** hoặc chi tiết biểu → **Tem QR**): chọn nhiều biểu ●, **Số tem mỗi biểu**, **Bắt đầu từ ô số** (tờ tem
+  đã dùng dở) → **In tem**. Tem ghi mã, tên Việt / Trung, lần ban hành, không có logo. Ban hành lần mới → in tem mới; tem lần cũ quét ra
+  dải đỏ **Bản in này đã lỗi thời**. Camera iPhone mở link tem bằng Safari ngoài app — quét bằng nút **Quét** của app.
+
 
 ## CẬP NHẬT LÊN BẢN 2c (1.0.0-d2.3) — làm một lần, trên máy tính
 
@@ -447,6 +508,15 @@ Mục 4 và 8 cần người cấp 1–3: tạo tạm hai tài khoản **Nhân v
 | 8 | Phạm vi bộ phận, không có quyền thì không hỏi PIN | Đăng nhập Nhân viên SX: Danh mục, Phủ điều khoản, Hồ sơ, mở hồ sơ thử ở mục 5. Đăng nhập Tra cứu KD | Nhân viên SX chỉ thấy biểu SX + tài liệu chung Ban ISO (Phủ điều khoản ghi "Chỉ đếm biểu của bộ phận SX…"), không có Excel, không có nút sửa, Duyệt, Trả lại. Tra cứu: trang chủ không có lịch tuần, ô Phủ điều khoản; nút **Hồ sơ** ở thanh dưới iPhone vẫn có nhưng bấm vào chỉ hiện lời giải thích (web: menu trái không có Hồ sơ, Phủ điều khoản). (Máy chủ trả **Không có quyền** trước khi hỏi PIN — Claude đã thử tự động cho mọi thao tác cần PIN.) |
 
 Xong thì khóa hai tài khoản thử. Chỗ nào chưa đạt: gửi Claude **ảnh màn hình** (không cần dán log dài).
+
+## Phần G2 — Nghiệm thu Đợt 2 (4 mục, làm trên THẬT sau khi lên bản 2d)
+
+| # | Mục nghiệm thu | Cách thử | Đạt khi | Tình trạng |
+| --- | --- | --- | --- | --- |
+| 1 | Ô ✓ từ M&E và Checksheet | Màn **Hồ sơ** / **Kết nối** | Ít nhất một biểu M&E và một biểu Checksheet có ô ✓ đến từ app kia | **ĐẠT 12/11/2026** (BM-CĐ-08-01, BM-CĐ-03-02 từ M&E; BM-CĐ-07-06 từ Checksheet) |
+| 2 | Email tóm tắt đến đúng trưởng bộ phận | Quản trị → Người dùng: đặt một trưởng bộ phận có email (Bộ phận → Trưởng bộ phận) → Gmail nhắc hạn → xác nhận email → **Gửi thử** người đó | Thư "hồ sơ quá hạn" của bộ phận đó đến hộp thư trưởng bộ phận (chưa có trưởng bộ phận thì thư đi Thư ký ISO — đúng thiết kế) | Đã thử trên giả lập; app thật chưa có trưởng bộ phận |
+| 3 | 4 báo cáo PDF có logo | Bước "Thử Báo cáo" của bản 2c (logo đã tải lên) | PDF Danh mục, Tình trạng hồ sơ, Phủ điều khoản, Lịch sử phiên bản có logo đầu trang, số BC | Chờ anh gửi ảnh PDF |
+| 4 | Tem bản cũ báo đỏ khi quét | Biểu ở bước "Thử phiên 2d" (đã in tem lần 01) → soạn lần 02 → ban hành → quét tem lần 01 bằng nút **Quét** | Dải đỏ **Bản in này đã lỗi thời: tem ghi lần 01, đang hiệu lực lần 02**; Sổ phân phối có dòng **Cần thu hồi** | Đã thử trên giả lập; trên THẬT cần ban hành lần 02 |
 
 ## Phần H — Cập nhật máy chủ khi có bản mới (phiên 1b, 1c, 1d, Đợt 2…)
 

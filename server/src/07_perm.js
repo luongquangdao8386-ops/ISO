@@ -50,6 +50,16 @@ var ACTION_TABLE_ = [
   'record.submit|2|offline|W',
   'record.return|2|pin|W',
   'record.status|2|net|R',
+  // Kiểm soát tài liệu (phiên 2d): phiếu đề nghị ban hành / sửa đổi / hủy (BM-ISO-02-02) — gửi, sửa, xem xét (PIN), rút lại, đã thực hiện;
+  // sổ phân phối & thu hồi bản in (BM-ISO-02-03) — phát, thu hồi (PIN), sửa / bỏ dòng ghi nhầm. Quyền theo phiếu kiểm ở PRECHECK_ (trước PIN)
+  'docreq.save|2|net|W',
+  'docreq.approve|3|pin|W',
+  'docreq.reject|3|pin|W',
+  'docreq.cancel|2|net|W',
+  'docreq.done|X|pin|W',
+  'dist.issue|X|net|W',
+  'dist.recall|X|pin|W',
+  'dist.edit|X|net|W',
   // Báo cáo (phiên 2c): xem trước (không lưu); lưu có mã BC-yymm-001 rồi tải PDF (máy chủ dựng) / Excel (app dựng); báo cáo đã lưu.
   // Loại báo cáo theo cấp kiểm trong 27_reports.js: Danh mục, Lịch sử phiên bản mọi cấp; Tình trạng hồ sơ, Phủ điều khoản cấp 2+ / Thư ký ISO
   'report.run|1|net|R',

@@ -5,18 +5,20 @@
  *             (✓ / ! / – với biểu một kỳ trong cột, "đúng hạn/số kỳ" với biểu ngày, tuần…; biểu khi phát sinh: số lần nộp).
  *  - COVERAGE Phủ điều khoản ISO 9001 và BRCGS (đếm như hai trang Phủ của file Excel tổng, js/coverage.js).
  *  - VERSIONS Lịch sử phiên bản của một tài liệu.
+ *  - DIST     Sổ phân phối & thu hồi bản in (phiên 2d, thay BM-ISO-02-03): theo nơi nhận, lần ban hành, đang dùng / cần thu hồi / đã thu hồi.
+ *  - DOCREQ   Phiếu đề nghị ban hành / sửa đổi / hủy tài liệu (phiên 2d, thay BM-ISO-02-02): một phiếu (request_id) hoặc sổ theo dõi theo năm.
  * report.run: xem trước (không ghi). report.save: lưu bản chụp (tệp JSON riêng tư trên Drive + dòng ReportRuns, mã BC-yymm-001) rồi
  * trả PDF (máy chủ dựng bằng Google Docs tạm, 28_report_pdf.js) hoặc bản chụp để app dựng Excel; gọi lại cùng report_run_id → cùng mã,
  * cùng số liệu. report.list: báo cáo đã lưu (người lập thấy của mình; Thư ký ISO, cấp 4 thấy tất cả).
  * Quyền: Danh mục, Lịch sử phiên bản — mọi cấp (trong phạm vi biểu); Tình trạng hồ sơ, Phủ điều khoản — cấp 2+ / Thư ký ISO
  * ("Xem tổng hợp, phủ điều khoản" ở bảng quyền). Cấp 1–3 chỉ có biểu trong bộ phận mình + tài liệu chung. */
 
-var REPORT_KINDS_ = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS'];
+var REPORT_KINDS_ = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ'];
 var REPORT_SNAPSHOT_MAX_ = 4 * 1024 * 1024;
 /** Biểu mẫu ISO mà báo cáo thay (in ở khối thông tin bên phải) */
-var REPORT_FORM_CODE_ = { CATALOG: 'BM-ISO-02-01' };
+var REPORT_FORM_CODE_ = { CATALOG: 'BM-ISO-02-01', DOCREQ: 'BM-ISO-02-02', DIST: 'BM-ISO-02-03' };
 /** Tên tệp tải về */
-var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban' };
+var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban', DIST: 'so-phan-phoi-thu-hoi', DOCREQ: 'de-nghi-tai-lieu' };
 var REPORT_GRAINS_ = { MONTH: { def: 6, max: 12 }, QUARTER: { def: 4, max: 8 } };
 
 /* ---------------- Quyền ---------------- */
@@ -24,7 +26,7 @@ var REPORT_GRAINS_ = { MONTH: { def: 6, max: 12 }, QUARTER: { def: 4, max: 8 } }
 /** Loại báo cáo người dùng được xem */
 function reportKindAllowed_(u, kind) {
   if (REPORT_KINDS_.indexOf(kind) < 0) return false;
-  if (kind === 'RECORDS' || kind === 'COVERAGE') return isSecretary_(u) || Number(u.role_level) >= 2;
+  if (kind === 'RECORDS' || kind === 'COVERAGE' || kind === 'DIST' || kind === 'DOCREQ') return isSecretary_(u) || Number(u.role_level) >= 2;
   return true;
 }
 
@@ -65,6 +67,10 @@ function reportFilters_(kind, f, today) {
   f = f || {};
   var out = {}, errs = [];
   var dept = trimStr_(f.dept || '');
+  if (kind === 'DOCREQ' && f.request_id) {
+    if (!isUuidV4_(f.request_id)) throw validationError_([fieldError_('filters.request_id', 'ID_INVALID')]);
+    return { request_id: String(f.request_id) };
+  }
   if (kind !== 'VERSIONS') {
     if (dept) {
       var d = findOne_('Depts', 'dept_code', dept);
@@ -95,6 +101,17 @@ function reportFilters_(kind, f, today) {
   } else if (kind === 'VERSIONS') {
     if (!isUuidV4_(f.item_id)) errs.push(fieldError_('filters.item_id', 'REQUIRED'));
     out.item_id = f.item_id || '';
+  } else if (kind === 'DIST') {
+    var ds = f.state || 'ALL';
+    if (['ALL', 'ACTIVE', 'DUE', 'RECALLED'].indexOf(ds) < 0) { errs.push(fieldError_('filters.state', 'INVALID_VALUE')); ds = 'ALL'; }
+    out.state = ds;
+  } else if (kind === 'DOCREQ') {
+    var y = f.year === undefined || f.year === null || f.year === '' ? Number(today.slice(0, 4)) : Number(f.year);
+    if (!(y >= 2000 && y <= Number(today.slice(0, 4))) || Math.floor(y) !== y) { errs.push(fieldError_('filters.year', 'INVALID_VALUE')); y = Number(today.slice(0, 4)); }
+    out.year = y;
+    var rs = f.state || 'ALL';
+    if (['ALL', 'OPEN', 'DONE', 'REJECTED'].indexOf(rs) < 0) { errs.push(fieldError_('filters.state', 'INVALID_VALUE')); rs = 'ALL'; }
+    out.state = rs;
   }
   if (errs.length) throw validationError_(errs);
   return out;
@@ -402,6 +419,120 @@ function reportVersions_(ctx, f) {
   };
 }
 
+/* ---------------- 5. Sổ phân phối & thu hồi (2d) ---------------- */
+
+function reportDist_(ctx, f, today) {
+  var items = {};
+  readRows_('Items').forEach(function (it) { items[it.item_id] = it; });
+  var dir = userDirectory_();
+  var days = Number(setting_('dist_recall_days')) || 7;
+  var cnt = { active: 0, copies: 0, due: 0, overdue: 0, recalled: 0, docs: {} };
+  var rows = [];
+  (sheetExists_('Distributions') ? readRows_('Distributions') : []).forEach(function (d) {
+    if (d.archived_at || d.state === 'VOID') return;
+    var it = items[d.item_id];
+    if (!canSeeRecords_(ctx.user, it)) return;
+    if (f.dept && d.dept_code !== f.dept) return;
+    var due = distDue_(d, it);
+    var since = due ? distDueSince_(it) : '';
+    var over = !!(due && since && addDaysIso_(since, days) < today);
+    var st = d.state === 'RECALLED' ? 'RECALLED' : (due ? 'DUE' : 'ACTIVE');
+    if (d.state === 'ACTIVE') { cnt.active++; cnt.copies += Number(d.copies) || 0; cnt.docs[d.item_id] = 1; }
+    if (due) cnt.due++;
+    if (over) cnt.overdue++;
+    if (d.state === 'RECALLED') cnt.recalled++;
+    if (f.state !== 'ALL' && f.state !== st) return;
+    rows.push({
+      dist_id: d.dist_id, item_id: d.item_id, dept_code: d.dept_code, code: it.code, name_vi: it.name_vi || '', name_zh: it.name_zh || '',
+      sort: Number(it.sort_order) || 0, rev: String(d.rev || ''), cur_rev: itemCurRev_(it), holder: d.holder || '', copies: Number(d.copies) || 0,
+      dist_date: String(d.dist_date || ''), dist_by: reportUserName_(dir, d.created_by), state: st, overdue: over, due_since: since,
+      recalled_date: String(d.recalled_date || ''), recalled_by: reportUserName_(dir, d.recalled_by), note: [d.note, d.recall_note].filter(function (x) { return x; }).join(' · ')
+    });
+  });
+  rows.sort(function (a, b) { return a.sort - b.sort || String(a.code).localeCompare(String(b.code)) || String(a.dist_date).localeCompare(String(b.dist_date)); });
+  return {
+    data: { depts: reportGroupByDept_(rows, reportDepts_()), counts: { active: cnt.active, copies: cnt.copies, due: cnt.due, overdue: cnt.overdue, recalled: cnt.recalled, docs: Object.keys(cnt.docs).length, shown: rows.length }, recall_days: days },
+    rows: rows.length,
+    tiles: [
+      { k: 'rpt.t.dist_docs', v: String(Object.keys(cnt.docs).length) },
+      { k: 'rpt.t.dist_copies', v: String(cnt.copies) },
+      { k: 'rpt.t.dist_due', v: String(cnt.due), tone: cnt.overdue ? 'red' : (cnt.due ? 'amber' : '') },
+      { k: 'rpt.t.dist_recalled', v: String(cnt.recalled) }
+    ]
+  };
+}
+
+/* ---------------- 6. Phiếu đề nghị tài liệu (2d) ---------------- */
+
+/** Một phiếu → dòng báo cáo (tên tài liệu, người, kết quả, thực hiện) */
+function reportReqRow_(r, items, vers, dir) {
+  var it = r.item_id ? items[r.item_id] : null;
+  var v = r.version_id ? vers[r.version_id] : null;
+  return {
+    request_id: r.request_id, code: r.code, req_type: r.req_type, dept_code: r.dept_code, level: r.level || 'DEPT', state: r.state,
+    submitted_at: String(r.submitted_at || ''), requester: r.requester_name || reportUserName_(dir, r.submitted_by), entered_by: r.requester_name ? reportUserName_(dir, r.submitted_by) : '',
+    item_code: it ? it.code : (r.new_code || ''), item_name_vi: it ? it.name_vi || '' : r.title_vi || '', item_name_zh: it ? it.name_zh || '' : r.title_zh || '',
+    cur_rev: it ? itemCurRev_(it) : '', new_kind: r.new_kind || '',
+    reason_vi: r.reason_vi || '', reason_zh: r.reason_zh || '', content_vi: r.content_vi || '', content_zh: r.content_zh || '', want_date: String(r.want_date || ''),
+    decided_by: reportUserName_(dir, r.decided_by), decided_at: String(r.decided_at || ''), decide_note: r.decide_note || '',
+    version_rev: v ? String(v.rev || '') : '', version_state: v ? v.state : '', done_at: String(r.done_at || ''), done_by: reportUserName_(dir, r.done_by), done_note: r.done_note || '',
+    cancelled_at: String(r.cancelled_at || ''), cancel_reason: r.cancel_reason || ''
+  };
+}
+
+function reportDocreq_(ctx, f) {
+  var items = {}, vers = {};
+  readRows_('Items').forEach(function (it) { items[it.item_id] = it; });
+  if (sheetExists_('Versions')) readRows_('Versions').forEach(function (v) { vers[v.version_id] = v; });
+  var dir = userDirectory_();
+  var all = (sheetExists_('DocRequests') ? readRows_('DocRequests') : []).filter(function (r) { return !r.archived_at && docreqVisible_(ctx.user, r); });
+  if (f.request_id) {
+    var one = all.filter(function (r) { return r.request_id === f.request_id; })[0];
+    if (!one) {
+      var ex = sheetExists_('DocRequests') ? findOne_('DocRequests', 'request_id', f.request_id) : null;
+      if (ex && !ex.archived_at) throw apiError_('FORBIDDEN');
+      throw validationError_([fieldError_('filters.request_id', 'NOT_FOUND')]);
+    }
+    var row = reportReqRow_(one, items, vers, dir);
+    return {
+      data: { one: row }, rows: 1,
+      tiles: [
+        { k: 'rpt.t.req_type', v: lab_('dr.type.' + row.req_type) },
+        { k: 'rpt.t.req_state', v: lab_('dr.state.' + row.state), tone: row.state === 'REJECTED' ? 'red' : (row.state === 'DONE' ? 'green' : (row.state === 'CANCELLED' ? 'muted' : 'amber')) },
+        { k: 'rpt.t.req_date', v: fmtDateVN_(row.submitted_at) },
+        { k: 'rpt.t.req_level', v: lab_('level_doc.' + row.level) }
+      ]
+    };
+  }
+  var y = String(f.year);
+  var cnt = { total: 0, open: 0, approved: 0, done: 0, rejected: 0 };
+  var rows = [];
+  all.forEach(function (r) {
+    if (String(r.submitted_at || '').slice(0, 4) !== y) return;
+    if (f.dept && r.dept_code !== f.dept) return;
+    if (r.state === 'CANCELLED' && f.state !== 'ALL') return;
+    cnt.total++;
+    if (r.state === 'SUBMITTED') cnt.open++;
+    if (r.state === 'APPROVED') cnt.approved++;
+    if (r.state === 'DONE') cnt.done++;
+    if (r.state === 'REJECTED') cnt.rejected++;
+    var grp = r.state === 'SUBMITTED' || r.state === 'APPROVED' ? 'OPEN' : r.state;
+    if (f.state !== 'ALL' && f.state !== grp) return;
+    rows.push(reportReqRow_(r, items, vers, dir));
+  });
+  rows.sort(function (a, b) { return String(a.code).localeCompare(String(b.code)); });
+  return {
+    data: { depts: reportGroupByDept_(rows, reportDepts_()), counts: cnt, year: f.year },
+    rows: rows.length,
+    tiles: [
+      { k: 'rpt.t.req_total', v: String(cnt.total) },
+      { k: 'rpt.t.req_open', v: String(cnt.open), tone: cnt.open ? 'amber' : '' },
+      { k: 'rpt.t.req_approved', v: String(cnt.approved), tone: cnt.approved ? 'amber' : '' },
+      { k: 'rpt.t.req_done', v: String(cnt.done), tone: cnt.done ? 'green' : '' }
+    ]
+  };
+}
+
 /* ---------------- Tính một báo cáo ---------------- */
 
 /**
@@ -415,7 +546,8 @@ function reportCompute_(ctx, kind, filters) {
   var today = todayVN_();
   var f = reportFilters_(kind, filters, today);
   var res = kind === 'CATALOG' ? reportCatalog_(ctx, f, today) : kind === 'RECORDS' ? reportRecords_(ctx, f, today)
-    : kind === 'COVERAGE' ? reportCoverage_(ctx, f) : reportVersions_(ctx, f);
+    : kind === 'COVERAGE' ? reportCoverage_(ctx, f) : kind === 'DIST' ? reportDist_(ctx, f, today)
+    : kind === 'DOCREQ' ? reportDocreq_(ctx, f) : reportVersions_(ctx, f);
   var t = LABELS['rpt.title.' + kind] || [kind, kind];
   var formCode = REPORT_FORM_CODE_[kind] || '';
   var formRev = '';
@@ -439,7 +571,8 @@ function reportCompute_(ctx, kind, filters) {
 
 /** Tên tệp tải về: BC-2611-001_danh-muc-tai-lieu.pdf (lịch sử phiên bản thêm mã biểu) */
 function reportFileName_(snap, ext) {
-  var tail = snap.kind === 'VERSIONS' && snap.data && snap.data.item ? '_' + String(snap.data.item.code).replace(/[\/\\:*?"<>|\s]+/g, '-') : '';
+  var tail = snap.kind === 'VERSIONS' && snap.data && snap.data.item ? '_' + String(snap.data.item.code).replace(/[\/\\:*?"<>|\s]+/g, '-')
+    : snap.kind === 'DOCREQ' && snap.data && snap.data.one ? '_' + String(snap.data.one.code) : '';
   return (snap.code ? snap.code + '_' : '') + REPORT_SLUG_[snap.kind] + tail + '.' + ext;
 }
 

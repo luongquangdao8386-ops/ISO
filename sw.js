@@ -1,8 +1,8 @@
 // Service Worker của app ISO — phạm vi thư mục của trang (/ISO/ THẬT, /ISO-thu/ THỬ); chỉ quản lý cache của chính trang này
 // (iso-shell-* ở /ISO/, iso_thu-shell-* ở /ISO-thu/ — cùng quy tắc storageNs trong js/core.js). Chung origin github.io với
 // M&E và Checksheet: tiền tố "iso" không đụng cache "me-*", "cs-*".
-const VERSION = '1.0.0-d2.3';
-const BUILD_HASH = 'ca38f6358445'; // tools/build.mjs ghi mã băm nội dung các tệp vỏ app
+const VERSION = '1.0.0-d2.4';
+const BUILD_HASH = '39b42dc62f5f'; // tools/build.mjs ghi mã băm nội dung các tệp vỏ app
 const NS = (() => {
   const m = /^\/([^/]+)\//.exec(self.location.pathname);
   const seg = m ? m[1].toLowerCase().replace(/[^a-z0-9]+/g, '_') : '';
@@ -14,10 +14,11 @@ const FILES = [
   './', 'index.html', 'config.js', 'manifest.webmanifest', 'css/app.css',
   'js/main.js', 'js/core.js', 'js/dict.js', 'js/auth.js', 'js/sync.js', 'js/ui.js', 'js/scan.js', 'js/media.js', 'js/qr-worker.js',
   'js/router.js', 'js/data.js', 'js/shell.js', 'js/app.js', 'js/form.js', 'js/xlsx.js', 'js/report-logo.js', 'js/catalog-xlsx.js',
-  'js/files.js', 'js/pending.js', 'js/periods.js', 'js/coverage.js', 'js/report-xlsx.js',
+  'js/files.js', 'js/pending.js', 'js/periods.js', 'js/coverage.js', 'js/report-xlsx.js', 'js/qr.js',
   'js/pages/home.js', 'js/pages/catalog.js', 'js/pages/item.js', 'js/pages/version.js', 'js/pages/links.js', 'js/pages/mail.js', 'js/pages/excel.js', 'js/pages/soon.js',
   'js/pages/account.js', 'js/pages/drafts.js', 'js/pages/admin.js', 'js/pages/records.js', 'js/pages/coverage.js', 'js/pages/reports.js',
-  'vendor/jsQR-1.4.0.js',
+  'js/pages/docreq.js', 'js/pages/dist.js', 'js/pages/labels.js',
+  'vendor/jsQR-1.4.0.js', 'vendor/qrcode-generator-1.4.4.js',
   'assets/brand/iso-tile.svg', 'assets/bg/factory.jpg', 'assets/bg/home.jpg', 'assets/icons/apple-touch-icon.png', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png'
 ];
 

@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d2.3';
+var SERVER_VERSION = '1.0.0-d2.4';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.5';
+var SCHEMA_VERSION = '1.0.6';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -74,6 +74,8 @@ var SETTINGS_DEFAULTS = [
   ['email_hour', 'INT', 7, false, 1, 'Giờ gửi Gmail nhắc hạn mỗi ngày (0–23) — đặt ở màn Gmail nhắc hạn', '每天发送提醒邮件的时间（0–23）——在邮件提醒页面设置'],
   ['version_wait_days', 'INT', 3, false, 1, 'Nhắc phiên bản chờ duyệt / chờ ban hành quá số ngày này', '版本待审批/待发布超过此天数时提醒'],
   ['mail_quota_reserve', 'INT', 10, false, 1, 'Chừa lại hạn mức Gmail cho M&E, Checksheet (số người nhận/ngày): còn bằng hoặc ít hơn thì ISO tạm dừng gửi', '为机电、点检表预留的邮件额度（收件人/天）：剩余不超过此数时ISO暂停发送'],
+  // Đợt 2 (phiên 2d): sổ phân phối & thu hồi — bản in của lần cũ chưa thu hồi quá số ngày này (kể từ ngày ban hành lần mới) thì báo đỏ
+  ['dist_recall_days', 'INT', 7, true, 1, 'Thu hồi bản in lần cũ trong (ngày) kể từ khi ban hành lần mới', '发布新版后收回旧版纸质文件的期限（天）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本']
 ];
@@ -102,7 +104,7 @@ var SYSTEM_STATE_INITIAL = [
 /** Mẫu mã hiển thị. yymm: true khi có phần năm-tháng (mục 3 đặc tả: HS, DN, KP, BC; DG theo năm ở Đợt 4). */
 var CODE_PATTERNS = {
   RECORD: { prefix: 'HS', digits: 4, yymm: true, sheet: 'Records', col: 'code' },
-  DOC_REQUEST: { prefix: 'DN', digits: 3, yymm: true, sheet: null, col: null },
+  DOC_REQUEST: { prefix: 'DN', digits: 3, yymm: true, sheet: 'DocRequests', col: 'code' },
   CAPA: { prefix: 'KP', digits: 3, yymm: true, sheet: null, col: null },
   REPORT: { prefix: 'BC', digits: 3, yymm: true, sheet: 'ReportRuns', col: 'code' }
 };
@@ -125,6 +127,15 @@ var VERSION_STATES_ = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'ISSUED', 'SUPERSEDED',
 /** Phiên bản đang mở (mỗi biểu chỉ một bản đang mở cùng lúc) */
 var VERSION_OPEN_ = { DRAFT: 1, IN_REVIEW: 1, APPROVED: 1 };
 var VERSION_TYPES_ = ['REVISION', 'ATTACH'];
+
+/** Phiếu đề nghị tài liệu (phiên 2d, BM-ISO-02-02): loại NEW ban hành mới · REVISE sửa đổi · CANCEL hủy (ngừng dùng);
+ *  SUBMITTED chờ xem xét → APPROVED chấp thuận (→ DONE khi ban hành / đặt ✕) | REJECTED không chấp thuận; CANCELLED rút lại */
+var DOCREQ_TYPES_ = ['NEW', 'REVISE', 'CANCEL'];
+var DOCREQ_STATES_ = ['SUBMITTED', 'APPROVED', 'REJECTED', 'DONE', 'CANCELLED'];
+/** Sổ phân phối & thu hồi (phiên 2d, BM-ISO-02-03): ACTIVE đang dùng · RECALLED đã thu hồi · VOID ghi nhầm (bỏ) */
+var DIST_STATES_ = ['ACTIVE', 'RECALLED', 'VOID'];
+var DIST_MAX_ROWS_ = 30;
+var DIST_MAX_RECALL_ = 100;
 
 /** Trường không dịch tự động. Tên trường gốc (không hậu tố _vi/_zh). */
 var NO_MT_FIELDS = {

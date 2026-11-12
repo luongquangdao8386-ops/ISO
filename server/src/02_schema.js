@@ -35,7 +35,19 @@ var SHEETS = {
     cols: 'version_id item_id vtype rev state change_summary_vi change_summary_zh effective_date author_id ' +
       'pdf_doc_id pdf_file_name pdf_size source_doc_id source_file_name source_size source_mime ' +
       'submitted_at submitted_by approved_at approved_by approve_note issued_at issued_by superseded_at superseded_by_id ' +
-      'returned_at returned_by return_reason cancelled_at cancelled_by cancel_reason item_status_before' },
+      'returned_at returned_by return_reason cancelled_at cancelled_by cancel_reason item_status_before request_id' },
+  // Phiếu đề nghị ban hành / sửa đổi / hủy tài liệu (phiên 2d, thay BM-ISO-02-02 / BM-CĐ-01-08), mã DN-yymm-001.
+  // req_type NEW | REVISE | CANCEL; item_id: tài liệu cần sửa / hủy (NEW: gắn khi Thư ký ISO thêm vào danh mục); level: cấp duyệt (DEPT trưởng
+  // bộ phận, COMPANY cấp 4); version_id: phiên bản soạn theo phiếu (ban hành → DONE); requester_name: tên người đề nghị khi Thư ký nhập thay
+  DocRequests: { book: 'B', dot: 1, key: 'request_id', c: true, i18n: true,
+    cols: 'request_id code req_type item_id dept_code level new_code new_kind title_vi title_zh reason_vi reason_zh content_vi content_zh ' +
+      'want_date requester_name state submitted_at submitted_by decided_at decided_by decide_note version_id item_linked_at ' +
+      'done_at done_by done_note cancelled_at cancelled_by cancel_reason' },
+  // Sổ phân phối & thu hồi bản in (phiên 2d, BM-ISO-02-03): một dòng = một nơi nhận của một lần ban hành (rev). Bản của lần cũ còn
+  // ACTIVE khi đã ban hành lần mới (hoặc biểu ✕) là "cần thu hồi" (tính, không lưu). replaced_by_id: dòng phát bản mới thay bản thu hồi
+  Distributions: { book: 'B', dot: 1, key: 'dist_id', c: true,
+    cols: 'dist_id item_id version_id rev dept_code holder copies dist_date note state recalled_date recalled_at recalled_by recall_note ' +
+      'replaced_by_id void_at void_by void_reason' },
   // Hồ sơ đã nộp (phiên 1c): một lần nộp phủ một kỳ hoặc một khoảng ngày [period_from, period_to] (kỳ nào giao với khoảng đó là có hồ sơ).
   // Ghi nhận ngay (SUBMITTED), trưởng bộ phận / Thư ký ISO trả lại (RETURNED) thì kỳ đó tính lại như chưa có.
   // files_json: [{document_id, kind PHOTO|FILE, mime_type, file_name, size_bytes, page_no}] — tệp tải lên sau (doc.upload, làm được khi mất mạng)
@@ -104,7 +116,7 @@ var TYPE_OVERRIDES_ = {
   record_version: 'INT', sync_revision: 'INT', role_level: 'INT', auth_version: 'INT', failed_attempts: 'INT',
   size_bytes: 'INT', sort_order: 'INT', expected_version: 'INT', priority: 'INT', period_days: 'INT', row_number: 'INT', page_no: 'INT',
   total_rows: 'INT', add_count: 'INT', update_count: 'INT', same_count: 'INT', error_count: 'INT', clause_count: 'INT', committed_rows: 'INT',
-  attempt_count: 'INT', row_count: 'INT', generated_by: 'STRING',
+  attempt_count: 'INT', row_count: 'INT', generated_by: 'STRING', copies: 'INT', holder: 'STRING', req_type: 'STRING', new_code: 'STRING', new_kind: 'STRING', level: 'STRING', state: 'STRING', requester_name: 'STRING',
   active: 'BOOL', owned_by_app: 'BOOL', must_change_pin: 'BOOL', is_system_owner: 'BOOL', iso_secretary: 'BOOL', auditor: 'BOOL',
   file_missing: 'BOOL', mandatory_record: 'BOOL',
   i18n_meta: 'JSON', schema_version: 'STRING', email: 'STRING', note: 'STRING', where: 'STRING',

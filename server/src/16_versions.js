@@ -153,6 +153,9 @@ function versionSave_(ctx) {
   if (isNew && !isUuidV4_(p.item_id)) errs.push(fieldError_('item_id', 'ID_INVALID'));
   var eff = p.effective_date === undefined ? undefined : trimStr_(p.effective_date);
   if (eff && !isDateStr_(eff)) errs.push(fieldError_('effective_date', 'INVALID_DATE'));
+  // Soạn theo phiếu đề nghị đã chấp thuận (2d): chỉ khi tạo bản REVISION mới
+  var reqId = isNew && vtype === 'REVISION' && p.request_id ? String(p.request_id) : '';
+  if (reqId && !isUuidV4_(reqId)) errs.push(fieldError_('request_id', 'ID_INVALID'));
   if (errs.length) throw validationError_(errs);
   var cur = null, it;
   if (isNew) {
@@ -195,8 +198,9 @@ function versionSave_(ctx) {
           author_id: ctx.user.user_id, pdf_doc_id: '', pdf_file_name: '', pdf_size: null, source_doc_id: '', source_file_name: '',
           source_size: null, source_mime: '', submitted_at: '', submitted_by: '', approved_at: '', approved_by: '', approve_note: '',
           issued_at: '', issued_by: '', superseded_at: '', superseded_by_id: '', returned_at: '', returned_by: '', return_reason: '',
-          cancelled_at: '', cancelled_by: '', cancel_reason: '', item_status_before: item.status
+          cancelled_at: '', cancelled_by: '', cancel_reason: '', item_status_before: item.status, request_id: reqId
         });
+        if (reqId) writes.push(docreqLinkVersion_(ctx, reqId, item.item_id, p.version_id));
         if (vtype === 'REVISION' && item.status === 'NONE') {
           item.status = 'DRAFTING';
           cUpdate_(ctx, item);
@@ -312,13 +316,15 @@ function versionCancel_(ctx) {
       row.cancelled_by = ctx.user.user_id;
       row.cancel_reason = pre.reason;
       var item = lockedItem_(row.item_id);
+      var rq = docreqUnlinkVersion_(ctx, row.request_id, row.version_id);
+      var extra = rq ? [rq] : [];
       if (row.item_status_before === 'NONE' && item.status === 'DRAFTING' && !item.current_version_id &&
         !openVersionOf_(versionsOf_(item.item_id), row.version_id)) {
         item.status = 'NONE';
         cUpdate_(ctx, item);
-        return { item: item, reason: pre.reason };
+        return { item: item, extra: extra, reason: pre.reason };
       }
-      return { reason: pre.reason };
+      return { extra: extra, reason: pre.reason };
     }
   });
 }
@@ -377,7 +383,10 @@ function versionIssue_(ctx) {
       item.na_reason = '';
       item.na_prev_status = '';
       cUpdate_(ctx, item);
-      return { item: item, extra: extra, audit_after: { superseded: superseded, review_due: item.review_due, vtype: row.vtype } };
+      // Phiếu đề nghị soạn phiên bản này (2d) → Đã thực hiện
+      var rq = docreqOnIssue_(ctx, row.request_id, row);
+      if (rq) extra.push(rq);
+      return { item: item, extra: extra, audit_after: { superseded: superseded, review_due: item.review_due, vtype: row.vtype, request_id: row.request_id || '' } };
     }
   });
 }
@@ -392,6 +401,13 @@ function itemSetNa_(ctx) {
   var p = ctx.req.payload || {};
   if (!isUuidV4_(p.item_id)) throw validationError_([fieldError_('item_id', 'ID_INVALID')]);
   var na = p.na !== false;
+  // Theo phiếu đề nghị hủy đã chấp thuận (2d): phiếu → Đã thực hiện; lý do mặc định lấy mã phiếu
+  var reqId = na && p.request_id ? String(p.request_id) : '';
+  if (reqId && !isUuidV4_(reqId)) throw validationError_([fieldError_('request_id', 'ID_INVALID')]);
+  if (reqId && !trimStr_(p.reason)) {
+    var rq0 = sheetExists_('DocRequests') ? findOne_('DocRequests', 'request_id', reqId) : null;
+    if (rq0) p = Object.assign({}, p, { reason: lab_('dr.na_reason', { C: rq0.code }) });
+  }
   var reason = na ? reasonText_(p, 'reason', true, 300) : '';
   var it0 = findOne_('Items', 'item_id', p.item_id);
   if (!it0) throw apiError_('NOT_FOUND');
@@ -417,11 +433,13 @@ function itemSetNa_(ctx) {
         row.na_prev_status = '';
       }
       cUpdate_(ctx, row);
+      var writes = [{ sheet: 'Items', mode: 'update', row: row }];
+      if (reqId) writes.push(docreqOnNa_(ctx, reqId, row.item_id));
       return {
-        writes: [{ sheet: 'Items', mode: 'update', row: row }],
+        writes: writes,
         result: { entity_type: 'ITEM', entity_id: row.item_id, record_version: row.record_version, record: projectRow_(ctx, row) },
         record_version: row.record_version,
-        audit: { entity_type: 'ITEM', entity_id: row.item_id, before_json: { status: before }, after_json: { status: row.status }, reason: reason }
+        audit: { entity_type: 'ITEM', entity_id: row.item_id, before_json: { status: before }, after_json: { status: row.status, request_id: reqId }, reason: reason }
       };
     }
   });

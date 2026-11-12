@@ -35,6 +35,11 @@ function reportPctText_(v) { return v === null || v === undefined ? '—' : Stri
 function reportMetaLeft_(snap) {
   var f = snap.filters || {}, d = snap.data || {};
   var out = [];
+  if (snap.kind === 'DOCREQ' && d.one) {
+    out.push([lab_('rpt.f.req'), d.one.code]);
+    out.push([lab_('rpt.f.dept'), d.one.dept_code]);
+    return out;
+  }
   if (snap.kind === 'VERSIONS') {
     var it = d.item || {};
     out.push([lab_('rpt.f.item'), it.code + ' · ' + (it.name_vi || it.name_zh || '')]);
@@ -49,6 +54,8 @@ function reportMetaLeft_(snap) {
       ' (' + lab_('rpt.grain.' + d.grain) + ')']);
   }
   if (snap.kind === 'COVERAGE') out.push([lab_('rpt.f.std'), lab_('rpt.std.' + f.std)]);
+  if (snap.kind === 'DIST') out.push([lab_('rpt.f.dist_state'), lab_('rpt.dist_state.' + f.state)]);
+  if (snap.kind === 'DOCREQ') { out.push([lab_('rpt.f.year'), String(f.year)]); out.push([lab_('rpt.f.req_state'), lab_('rpt.req_state.' + f.state)]); }
   if (snap.scope_depts) out.push([lab_('rpt.f.scope_depts'), snap.scope_depts]);
   return out;
 }
@@ -204,20 +211,103 @@ function layoutVersions_(snap) {
   return { sections: [{ heading: lab_('rpt.sec.item'), kv: kv }, { heading: lab_('rpt.sec.history'), table: rptTable_(head, types, rows, tones) }], notes: [] };
 }
 
+var DIST_TONE_ = { ACTIVE: 'green', DUE: 'red', RECALLED: 'muted' };
+
+function layoutDist_(snap) {
+  var d = snap.data;
+  var head = [labNl_('rpt.col.code'), labNl_('rpt.col.name'), labNl_('rpt.col.rev'), labNl_('rpt.col.holder'), labNl_('rpt.col.copies'), labNl_('rpt.col.dist_date'),
+    labNl_('rpt.col.dist_by'), labNl_('rpt.col.status'), labNl_('rpt.col.recalled'), labNl_('rpt.col.note')];
+  var types = ['code', 'text', 'mid', 'text', 'num', 'date', 'text', 'text', 'text', 'text'];
+  var secs = [];
+  d.depts.forEach(function (g) {
+    var tones = [];
+    var copies = 0;
+    var rows = g.rows.map(function (r) {
+      copies += r.state === 'RECALLED' ? 0 : r.copies;
+      var stTxt = labNl_('dist.state.' + r.state);
+      if (r.state === 'DUE') stTxt += '\n' + lab_('rpt.dist_due_rev', { N: r.cur_rev }) + (r.overdue ? ' !' : '');
+      tones.push(['', '', '', '', '', '', '', r.state === 'DUE' ? (r.overdue ? 'red' : 'amber') : DIST_TONE_[r.state], '', '']);
+      return [r.code, biNl_(r.name_vi, r.name_zh), r.rev, r.holder, String(r.copies), dmy_(r.dist_date), r.dist_by, stTxt,
+        r.recalled_date ? biNl_(dmy_(r.recalled_date), r.recalled_by) : '', r.note];
+    });
+    secs.push({ heading: g.dept_code + ' · ' + biText_(g.name_vi, g.name_zh) + ' — ' + lab_('rpt.dist_rows_n', { N: g.rows.length, C: copies }), table: rptTable_(head, types, rows, tones) });
+  });
+  if (!secs.length) secs.push({ table: rptTable_(head, types, [], null) });
+  return { sections: secs, notes: [lab_('rpt.note.dist', { N: d.recall_days })] };
+}
+
+/** Kết quả thực hiện của một phiếu (một dòng chữ) */
+function reqDoneText_(r) {
+  if (r.state === 'DONE') return [dmy_(r.done_at), r.done_by, r.done_note].filter(function (x) { return x; }).join(' · ');
+  if (r.state === 'CANCELLED') return lab_('dr.state.CANCELLED') + (r.cancel_reason ? ': ' + r.cancel_reason : '');
+  if (r.state === 'APPROVED' && r.version_rev) return lab_('rpt.req_drafting', { N: r.version_rev });
+  return '';
+}
+
+var REQ_TONE_ = { SUBMITTED: 'amber', APPROVED: 'navy', REJECTED: 'red', DONE: 'green', CANCELLED: 'muted' };
+
+function layoutDocreq_(snap) {
+  var d = snap.data;
+  if (d.one) {
+    var r = d.one;
+    var kv = [
+      [lab_('rpt.kv.req_no'), r.code],
+      [lab_('rpt.kv.req_date'), dmy_(r.submitted_at)],
+      [lab_('rpt.kv.req_type'), lab_('dr.type.' + r.req_type)],
+      [lab_('rpt.col.dept'), r.dept_code],
+      [lab_(r.req_type === 'NEW' ? 'rpt.kv.req_new_doc' : 'rpt.kv.req_doc'), [r.item_code, biText_(r.item_name_vi, r.item_name_zh)].filter(function (x) { return x; }).join(' · ')],
+      [lab_('rpt.kv.req_level'), lab_('level_doc.' + r.level)]
+    ];
+    if (r.cur_rev && r.req_type !== 'NEW') kv.push([lab_('rpt.t.current_rev'), r.cur_rev]);
+    if (r.new_kind) kv.push([lab_('rpt.col.kind'), lab_('kind.' + r.new_kind)]);
+    kv.push([lab_('rpt.kv.req_reason'), biNl_(r.reason_vi, r.reason_zh)]);
+    if (r.content_vi || r.content_zh) kv.push([lab_('rpt.kv.req_content'), biNl_(r.content_vi, r.content_zh)]);
+    if (r.want_date) kv.push([lab_('rpt.kv.req_want'), dmy_(r.want_date)]);
+    kv.push([lab_('rpt.kv.requester'), r.requester + (r.entered_by ? ' (' + lab_('rpt.kv.entered_by', { U: r.entered_by }) + ')' : '')]);
+    var res = [[lab_('rpt.col.status'), lab_('dr.state.' + r.state)]];
+    if (r.decided_at) res.push([lab_(r.state === 'REJECTED' ? 'rpt.kv.rejected' : 'rpt.kv.decided'), [r.decided_by, dmy_(r.decided_at)].join(' · ') + (r.decide_note ? '\n' + r.decide_note : '')]);
+    if (r.version_rev) res.push([lab_('rpt.kv.req_version'), lab_('rpt.rev_n', { N: r.version_rev }) + ' · ' + lab_('vstate.' + r.version_state)]);
+    var dt = reqDoneText_(r);
+    if (dt && r.state !== 'APPROVED') res.push([lab_(r.state === 'DONE' ? 'rpt.kv.req_done' : 'rpt.kv.req_note'), dt]);
+    return {
+      sections: [{ heading: lab_('rpt.sec.req'), kv: kv }, { heading: lab_('rpt.sec.req_result'), kv: res }], notes: [],
+      sign: { prepared: lab_('rpt.sign.requester'), approved: lab_('rpt.sign.decider'), prepared_name: r.requester, approved_name: r.decided_by }
+    };
+  }
+  var head = [labNl_('rpt.col.req_no'), labNl_('rpt.col.req_date'), labNl_('rpt.col.req_type'), labNl_('rpt.col.doc'), labNl_('rpt.col.req_reason'),
+    labNl_('rpt.col.requester'), labNl_('rpt.col.decided'), labNl_('rpt.col.status'), labNl_('rpt.col.req_done')];
+  var types = ['code', 'date', 'text', 'text', 'text', 'text', 'text', 'text', 'text'];
+  var secs = [];
+  d.depts.forEach(function (g) {
+    var tones = [];
+    var rows = g.rows.map(function (r) {
+      tones.push(['', '', '', '', '', '', '', REQ_TONE_[r.state] || '', '']);
+      return [r.code, dmy_(r.submitted_at), labNl_('dr.type.' + r.req_type), [r.item_code, r.item_name_vi || r.item_name_zh].filter(function (x) { return x; }).join('\n'),
+        biNl_(r.reason_vi, r.reason_zh), r.requester, r.decided_at ? biNl_(r.decided_by, dmy_(r.decided_at)) : '', labNl_('dr.state.' + r.state), reqDoneText_(r)];
+    });
+    secs.push({ heading: g.dept_code + ' · ' + biText_(g.name_vi, g.name_zh) + ' — ' + lab_('rpt.req_n', { N: g.rows.length }), table: rptTable_(head, types, rows, tones) });
+  });
+  if (!secs.length) secs.push({ table: rptTable_(head, types, [], null) });
+  return { sections: secs, notes: [] };
+}
+
 /**
  * Bố cục chung của một bản chụp: {title_vi, title_zh, meta_left, meta_right, tiles: [{label, value, tone}], sections: [{heading?, note?,
  * kv?: [[nhãn, giá trị]], table?: {head, types, rows, tones}}], notes: [chữ], sign: {prepared, approved, hint, prepared_name}, footer}.
  */
 function reportLayout_(snap) {
   var body = snap.kind === 'CATALOG' ? layoutCatalog_(snap) : snap.kind === 'RECORDS' ? layoutRecords_(snap)
-    : snap.kind === 'COVERAGE' ? layoutCoverage_(snap) : layoutVersions_(snap);
+    : snap.kind === 'COVERAGE' ? layoutCoverage_(snap) : snap.kind === 'DIST' ? layoutDist_(snap)
+    : snap.kind === 'DOCREQ' ? layoutDocreq_(snap) : layoutVersions_(snap);
+  var sg = body.sign || {};
   var gen = String(snap.generated_at || '');
   return {
     title_vi: snap.title_vi, title_zh: snap.title_zh, code: snap.code || '',
     meta_left: reportMetaLeft_(snap), meta_right: reportMetaRight_(snap),
     tiles: (snap.tiles || []).map(function (t) { return { label: lab_(t.k), value: t.v, tone: t.tone || '' }; }),
     sections: body.sections, notes: body.notes, none: lab_('rpt.none'),
-    sign: { prepared: lab_('rpt.prepared_by'), approved: lab_('rpt.approved_by'), hint: lab_('rpt.sign_hint'), prepared_name: snap.generated_by_name || '' },
+    sign: { prepared: sg.prepared || lab_('rpt.prepared_by'), approved: sg.approved || lab_('rpt.approved_by'), hint: lab_('rpt.sign_hint'),
+      prepared_name: sg.prepared ? sg.prepared_name || '' : snap.generated_by_name || '', approved_name: sg.approved_name || '' },
     footer: 'ISO · 体系管理 · ' + (snap.form_code ? snap.form_code + ' · ' : '') + snap.title_vi + (snap.code ? ' · ' + snap.code : '') + ' · ' +
       lab_('rpt.generated_at') + ' ' + dmy_(gen) + ' ' + gen.slice(11, 16)
   };
@@ -476,7 +566,7 @@ function pdfSign_(pd, sign) {
     [sign.prepared, sign.approved],
     [sign.hint, sign.hint],
     ['\n\n\n', '\n\n\n'],
-    [sign.prepared_name || '', '']
+    [sign.prepared_name || '', sign.approved_name || '']
   ]));
   var half = Math.floor(pd.width / 2);
   t.setColumnWidth(0, half).setColumnWidth(1, pd.width - half);

@@ -332,5 +332,5 @@ test('dán Code.gs 2c chưa chạy migrateSchema: xem trước chạy; lưu báo
   env2.g.dbReset_();
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  assert.ok(env2.logs.some((l) => /migrateSchema xong\. Thêm: ReportRuns\. schema_version=1\.0\.5/.test(l)), env2.logs.join('\n'));
+  assert.ok(env2.logs.some((l) => /migrateSchema xong\. Thêm: ReportRuns\. schema_version=1\.0\.\d+/.test(l)), env2.logs.join('\n'));
 });

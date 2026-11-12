@@ -113,7 +113,8 @@ export function layoutSheet(X, lay, { top = 0 } = {}) {
   merges.push({ s: { r, c: 0 }, e: { r, c: sc - 1 } }, { s: { r, c: sc }, e: { r, c: width - 1 } }); r++;
   r += 3;
   put(r, 0, text(lay.sign.prepared_name || ''), 'rpt_sign_name');
-  merges.push({ s: { r, c: 0 }, e: { r, c: sc - 1 } }); r++;
+  if (lay.sign.approved_name) put(r, sc, text(lay.sign.approved_name), 'rpt_sign_name');
+  merges.push({ s: { r, c: 0 }, e: { r, c: sc - 1 } }, { s: { r, c: sc }, e: { r, c: width - 1 } }); r++;
   r++;
   note(lay.footer || '', 'rpt_note');
   ws['!ref'] = X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, r - 1), c: width - 1 } });

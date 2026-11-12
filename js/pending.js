@@ -2,9 +2,11 @@
 // Phiên 1b: phiên bản chờ tôi duyệt, chờ ban hành, bị trả lại, nháp của tôi; biểu ● chưa có tệp; tài liệu sắp/quá hạn rà soát.
 // Phiên 1c: hồ sơ của tôi bị trả lại (chưa nộp lại kỳ đó, trong 60 ngày).
 // Phiên 1d: biểu có kỳ gần nhất quá hạn hồ sơ mà tôi nộp được; tài liệu tôi phụ trách sắp/quá hạn rà soát; thao tác gửi không được.
+// Phiên 2d: phiếu đề nghị chờ tôi xem xét, phiếu đã chấp thuận chờ thực hiện (Thư ký ISO; người đề nghị soạn phiên bản theo phiếu),
+// phiếu của tôi không được chấp thuận (30 ngày), bản in cần thu hồi (Thư ký ISO).
 import { session } from './core.js';
 import { recs, items, isSecretary, canApprove, versionEditable, reviewSoon, today, addDaysIso, canSeeRecords, canSubmitRecord, recordCheck,
-  recordStatusMap, recordsOn } from './data.js';
+  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue } from './data.js';
 import { queueItems } from './sync.js';
 import { covers } from './periods.js';
 
@@ -42,7 +44,16 @@ export async function pendingFor() {
     out.rec_late = list.filter((x) => sm.get(x.item_id) && sm.get(x.item_id).overdue && canSubmitRecord(x) && !recordCheck(x));
   }
   out.send_problems = (await queueItems().catch(() => [])).filter((o) => o.user_id === uid && o.dataset_epoch === session.epoch && (o.state === 'CONFLICT' || o.state === 'REJECTED'));
+  const reqs = (await recs('DOCREQ')).filter((r) => !r.archived_at);
+  const cut30 = addDaysIso(today(), -30);
+  out.req_review = reqs.filter((r) => canDecideReq(r));
+  out.req_todo = reqs.filter((r) => r.state === 'APPROVED' && (sec || (r.submitted_by === uid && r.req_type !== 'CANCEL' && !r.version_id)));
+  out.req_rejected = reqs.filter((r) => r.state === 'REJECTED' && r.submitted_by === uid && String(r.decided_at).slice(0, 10) >= cut30);
+  const dists = sec ? (await recs('DIST')).filter((d) => d.state === 'ACTIVE' && distDue(d, byId.get(d.item_id))) : [];
+  out.dist_due = dists;
+  out.dist_overdue = dists.filter((d) => distOverdue(d, byId.get(d.item_id)));
   out.total = out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
-    (out.nofile.length ? 1 : 0) + (out.review_due.length ? 1 : 0) + (out.rec_late.length ? 1 : 0);
+    out.req_review.length + out.req_todo.length + out.req_rejected.length +
+    (out.nofile.length ? 1 : 0) + (out.review_due.length ? 1 : 0) + (out.rec_late.length ? 1 : 0) + (out.dist_due.length ? 1 : 0);
   return out;
 }

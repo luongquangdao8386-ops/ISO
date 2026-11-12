@@ -112,7 +112,23 @@ thay mặt bạn") → `installTriggers` → Phiên bản mới (Hướng dẫn 
   hằng ngày lúc `email_hour`. Cột mới: `Users.email_confirmed_at/_by`, `NotificationLogs.kind/via/detail_json` (schema 1.0.4).
 - Trạng thái hệ thống: dòng **Gmail nhắc hạn** (ON/OFF, số người nhận đã xác nhận, lần chạy, hạn mức còn lại, thư lỗi).
 
-Tiếp: Đợt 2 — báo cáo PDF (2c), đề nghị tài liệu / phân phối / in tem (2d) · Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
+### Đợt 2 phiên 2d (1.0.0-d2.4) — Đề nghị tài liệu, phân phối & thu hồi, tem QR
+
+- **Phiếu đề nghị ban hành / sửa đổi / hủy** (`server/src/29_docreq.js`, `js/pages/docreq.js`; thay BM-ISO-02-02 / BM-CĐ-01-08), mã
+  `DN-yymm-001`: Chờ xem xét → Chấp thuận / Không chấp thuận (PIN; trưởng bộ phận với tài liệu cấp bộ phận, cấp 4 với cấp công ty, người
+  gửi không tự xem xét trừ cấp 4) → soạn phiên bản theo phiếu (`version.save request_id`), tài liệu mới theo phiếu (`item.edit
+  request_id`), đặt ✕ theo phiếu (`item.setNa request_id`) → ban hành / đặt ✕ thì phiếu tự **Đã thực hiện**; Thư ký đánh dấu đã thực
+  hiện (ghi chú), rút lại.
+- **Sổ phân phối & thu hồi** (`server/src/30_dist.js`, `js/pages/dist.js`; thay BM-ISO-02-03): phát bản in của lần đang hiệu lực cho
+  nhiều nơi nhận; ban hành lần mới / đặt ✕ → dòng lần cũ **Cần thu hồi** (tính theo lần ban hành, quá `dist_recall_days` báo đỏ); thu
+  hồi nhiều dòng (PIN) + phát luôn bản mới cho cùng nơi nhận; sửa / bỏ dòng ghi nhầm.
+- **In tem QR** (`js/qr.js`, `js/pages/labels.js`, thư viện `vendor/qrcode-generator-1.4.4.js` MIT): tờ A4 70×37 mm (3 × 8) hoặc
+  105×74 mm (2 × 4), số tem mỗi biểu, bắt đầu từ ô; ảnh PNG của mã. QR = `…/#/f/<qr_key>?r=<lần>`.
+- Báo cáo mới: **Phiếu đề nghị tài liệu** (một phiếu có khối ký Người đề nghị / Người xem xét, hoặc sổ theo năm) và **Sổ phân phối &
+  thu hồi**. Chờ bạn xử lý: phiếu chờ xem xét / chờ thực hiện / không được chấp thuận, bản in cần thu hồi. Trạng thái hệ thống dòng
+  **Đề nghị tài liệu, phân phối**. Sheet mới `DocRequests`, `Distributions`, cột `Versions.request_id` (schema 1.0.6).
+
+Tiếp: Đợt 3 khắc phục (3a–3c) · Đợt 4 đánh giá nội bộ (4a–4c).
 
 ## Cấu trúc
 

@@ -271,6 +271,8 @@ function healthRows_() {
   // Báo cáo (2c): số báo cáo đã lưu (mã BC), thiếu sheet ReportRuns → chạy migrateSchema
   var rh = reportHealth_();
   add('reports', rh[0], rh[1], rh[2]);
+  var dc = docControlHealth_();
+  add('doc_control', dc[0], dc[1], dc[2]);
   var cells = 0;
   [prop_('BUSINESS_SPREADSHEET_ID'), prop_('SECURITY_SPREADSHEET_ID')].forEach(function (id) {
     if (!id) return;

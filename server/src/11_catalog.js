@@ -323,6 +323,9 @@ function itemEdit_(ctx) {
   if (p.owner_user_id && !isUuidV4_(p.owner_user_id)) errs.push(fieldError_('owner_user_id', 'ID_INVALID'));
   var cur = isNew ? null : findOne_('Items', 'item_id', p.item_id);
   if (!isNew && !cur) throw apiError_('NOT_FOUND');
+  // Thêm tài liệu mới theo phiếu đề nghị ban hành mới đã chấp thuận (2d)
+  var reqId = isNew && p.request_id ? String(p.request_id) : '';
+  if (reqId && !isUuidV4_(reqId)) errs.push(fieldError_('request_id', 'ID_INVALID'));
   requireOneLang_(errs, p, cur, 'name');
   if (errs.length) throw validationError_(errs);
   var tr = applyTranslations_('Items', ITEM_I18N_, p, cur); // dịch ngoài khóa ghi
@@ -359,6 +362,7 @@ function itemEdit_(ctx) {
       Object.keys(tr.values).forEach(function (k) { row[k] = tr.values[k]; });
       row.i18n_meta = tr.meta;
       var writes = [{ sheet: 'Items', mode: isNew ? 'insert' : 'update', row: row }];
+      if (reqId) writes.push(docreqLinkItem_(ctx, reqId, row.item_id));
       // Nhóm chưa có: tạo theo mã (tên nhóm sửa sau ở file Excel hoặc màn nhóm)
       if (row.group_key && !findRowNums_('Groups', 'group_key', row.group_key).length) {
         writes.push({ sheet: 'Groups', mode: 'insert', row: cNew_(ctx, { group_key: row.group_key, dept_code: row.group_key.split('-')[0], name_vi: '', name_zh: '', label: '', sort_order: 0, active: true }) });
