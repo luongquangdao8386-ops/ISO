@@ -2,7 +2,7 @@
 // (iso-shell-* ở /ISO/, iso_thu-shell-* ở /ISO-thu/ — cùng quy tắc storageNs trong js/core.js). Chung origin github.io với
 // M&E và Checksheet: tiền tố "iso" không đụng cache "me-*", "cs-*".
 const VERSION = '1.0.0-d2.2';
-const BUILD_HASH = '393d3cb0e81f'; // tools/build.mjs ghi mã băm nội dung các tệp vỏ app
+const BUILD_HASH = 'c05159078fcf'; // tools/build.mjs ghi mã băm nội dung các tệp vỏ app
 const NS = (() => {
   const m = /^\/([^/]+)\//.exec(self.location.pathname);
   const seg = m ? m[1].toLowerCase().replace(/[^a-z0-9]+/g, '_') : '';
