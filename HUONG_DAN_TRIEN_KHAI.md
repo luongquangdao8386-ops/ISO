@@ -48,44 +48,23 @@ Bản 3a **thêm 2 sheet `Capas`, `CapaActions` và 3 cài đặt** (`capa_form_
    - `schema_version` = **1.0.8**;
    - dòng mới **Khắc phục** = `Đang xử lý 0 · chờ kiểm tra hiệu lực 0 · đã đóng 0 · hành động quá hạn 0 · quá hạn kiểm tra hiệu lực 0`.
 
-### Thử bản 3a (Thư ký ISO hoặc owner — iPhone hoặc máy tính)
+### Sau khi cập nhật bản 3a
 
-Phiếu thử sẽ **hủy ở bước cuối** (phiếu không xóa được; số `KP-2611-001` dùng cho phiếu thử, phiếu thật bắt đầu từ `KP-2611-002`).
+**Nên kiểm (vài phút — phần máy giả lập không kiểm được):**
+1. **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.8** và có dòng **Khắc phục** (bước 4 ở trên) → máy chủ thật
+   đã lên đúng bản.
+2. PDF thật của Google Docs: **Khắc phục → Lập phiếu khắc phục** → nhập Mô tả `Phiếu thử` → **Lập phiếu** → cuối màn phiếu **In phiếu
+   khắc phục (PDF / Excel)** → **Tải PDF** → **Mở / lưu tệp** → xem chữ Việt / Trung, logo công ty, mã biểu BM-CĐ-14-02 hiện đúng →
+   quay lại phiếu → **Hủy phiếu** → Lý do `Phiếu thử` → **Đúng** → nhập PIN. (Phiếu thử chiếm số KP-2611-001; phiếu thật bắt đầu từ 002.)
 
-1. **Trang chủ** → ô **Khắc phục** (hết "Sắp có"; máy tính: menu trái **Khắc phục**) → "Chưa có phiếu khắc phục nào…" →
-   **Lập phiếu khắc phục**.
-2. Nguồn phát hiện: **Sự cố, hỏng thiết bị** (chọn sẵn); Bộ phận chịu trách nhiệm: **CĐ · Cơ điện** (chọn sẵn); Ngày phát hiện: hôm nay
-   (sẵn); **Biểu / tài liệu liên quan**: chọn một biểu cơ điện, vd `BM-CĐ-04-03 · Sổ dừng máy`; **Tóm tắt**: `Thử khắc phục`;
-   **Mô tả sự không phù hợp**: `Máy nén khí số 2 dừng do quá nhiệt (phiếu thử)`; **Xử lý tức thời**: `Chuyển sang máy nén số 1`;
-   Người phụ trách: tên anh (sẵn); Hạn hoàn thành: sau 30 ngày (sẵn) → **Lập phiếu** → màn phiếu số **KP-2611-001**, **Đang xử lý**.
-3. Thẻ **Nguyên nhân gốc** → **Ghi nguyên nhân gốc** → ô Tiếng Việt: `Két giải nhiệt bám bụi, chưa có trong lịch bảo trì tuần` → **Lưu**
-   (vài giây sau có thêm dòng tiếng Trung, nhãn "dịch máy").
-4. Thẻ **Hành động khắc phục / phòng ngừa** → **Thêm hành động** → Nội dung (Tiếng Việt): `Vệ sinh két giải nhiệt` (người phụ trách: anh,
-   hạn: sau 14 ngày — để sẵn) → **Lưu**. **Thêm hành động** lần nữa → `Lắp cảm biến báo nhiệt`; Người phụ trách: chọn
-   **— Người ngoài app (ghi tên bên dưới) —**; Người thực hiện: `Tổ cơ điện ca 2` → **Lưu**. Nút **Gửi kiểm tra hiệu lực** còn mờ
-   (dòng chữ: còn hành động chưa xong).
-5. Hành động 1 → **Báo xong** → ngày hoàn thành hôm nay (sẵn), Kết quả: `Đã vệ sinh két` → **Báo xong**. Hành động 2 → **Báo xong** →
-   `Đã lắp cảm biến` → **Báo xong**. Cả hai có dải xanh "Hoàn thành …".
-6. Thẻ **Ảnh / tệp** → **Thêm ảnh / tệp** → chọn 1 ảnh (iPhone: Chụp ảnh hoặc Thư viện) → vài giây sau có nút **Xem ảnh**.
-7. **Gửi kiểm tra hiệu lực** → hộp thoại: hạn kiểm tra hiệu lực sau 30 ngày (sẵn) → **Gửi kiểm tra hiệu lực** → phiếu thành **Chờ kiểm
-   tra hiệu lực**.
-8. **Kiểm tra hiệu lực** → chọn **Không hiệu lực** → Nhận xét: `Thử: chưa đạt` → **Lưu kết quả** → nhập PIN → phiếu về **Đang xử lý**,
-   dải đỏ "Lần kiểm tra 1 (…) không hiệu lực — thêm hành động bổ sung…"; thẻ **Kiểm tra hiệu lực** ghi lần 1.
-   (Người phụ trách phiếu không tự kiểm tra hiệu lực, trừ Quản trị cấp 4 — Thư ký ISO cấp 4 làm được. Báo "Không có quyền" thì đăng nhập
-   owner để kiểm tra.)
-9. Cuối màn phiếu → **In phiếu khắc phục (PDF / Excel)** → màn Báo cáo, loại **Khắc phục** đã chọn sẵn phiếu KP-2611-001, bản xem trước
-   **PHIẾU YÊU CẦU HÀNH ĐỘNG KHẮC PHỤC**, mã biểu **BM-CĐ-14-02**, 4 mục (Sự không phù hợp · Phân tích nguyên nhân · Hành động · Kiểm tra
-   hiệu lực), khối ký Người phụ trách / Người kiểm tra hiệu lực → **Tải PDF** → "Đã có PDF BC-2611-…" → **Mở / lưu tệp** → xem PDF có
-   logo công ty. (Muốn mã biểu khác, vd BM-ISO-04-01 khi mở rộng toàn công ty: Quản trị → Cấu hình → `capa_form_code`.)
-10. Ô **Phiếu khắc phục** chọn **Sổ theo dõi khắc phục (cả năm)** → **Xem báo cáo** → **SỔ THEO DÕI HÀNH ĐỘNG KHẮC PHỤC** có dòng
-    KP-2611-001.
-11. Quay lại **Khắc phục** → phiếu KP-2611-001 → **Hủy phiếu** → Lý do: `Phiếu thử nghiệm` → **Đúng** (hỏi PIN nếu đã quá 5 phút)
-    → phiếu **Đã hủy**.
-12. **Tài khoản → Quản trị → Trạng thái hệ thống**: dòng **Khắc phục** lại về `Đang xử lý 0 · … · đã đóng 0 …` (phiếu hủy không tính).
-13. (Gmail đang bật) **Tài khoản → Quản trị → Gmail nhắc hạn** → thẻ Lịch nhắc có 2 dòng mới **Khắc phục**, **Kiểm tra hiệu lực**.
+**Đã thử trên giả lập — anh không cần làm:** toàn bộ luồng trên iPhone 390×844 và máy tính 1440×900 (`tests/ui/capa.test.mjs`, 3 test):
+lập phiếu → nguyên nhân gốc → 2 hành động (một người ngoài app) → báo xong → thêm ảnh → gửi kiểm tra hiệu lực → Không hiệu lực (PIN)
+→ hành động bổ sung → Có hiệu lực → Đã đóng; nhân viên bộ phận khác được giao hành động thấy ở Chờ bạn xử lý; người phụ trách phiếu
+không tự kiểm tra; In phiếu, Sổ theo dõi; Hủy phiếu (PIN); Trạng thái hệ thống; app mới với máy chủ cũ. Máy chủ (`tests/server/capa.test.mjs`,
+5 test): quyền, phạm vi Cơ điện, mã KP, Gmail mốc 7 / 1 / 0 ngày và quá hạn mỗi 7 ngày, báo cáo, quên `migrateSchema`.
 
-Máy giả lập đã chạy đúng 12 bước trên (iPhone 390×844). Không thử được: iPhone thật (chụp ảnh, hộp in PDF), PDF thật của Google Docs
-(phông Việt / Trung), thư Gmail thật.
+Không kiểm được ở đâu cả trước khi dùng thật: thư Gmail thật (chỉ khi có hành động còn ≤ 7 ngày tới hạn và người phụ trách có email
+đã xác nhận), chụp ảnh bằng camera iPhone thật.
 
 Dùng thật: khi có sự cố / phát hiện cần khắc phục — lập phiếu ngay (có thể ghi nguyên nhân, hành động sau); người phụ trách hành động
 có tài khoản app thì thấy ở **Chờ bạn xử lý** khi còn ≤ 7 ngày tới hạn và nhận Gmail (nếu đã có email xác nhận); người không dùng app
