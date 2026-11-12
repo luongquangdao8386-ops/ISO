@@ -84,6 +84,14 @@ for (const f of shellFiles) {
   h.update(fs.readFileSync(fp));
 }
 const hash = h.digest('hex').slice(0, 12);
-const sw2 = sw.replace(/const BUILD_HASH = '[^']*';/, `const BUILD_HASH = '${hash}';`);
+// Mã băm từng tệp vỏ app: Service Worker kiểm từng tệp tải về khi cài bản mới — tệp cũ (CDN / bộ nhớ đệm còn bản trước) thì tải
+// lại, vẫn cũ thì không cài (giữ nguyên bản cũ đủ bộ), không bao giờ chạy lẫn tệp hai bản (12/11/2026: dict.js mới + docreq.js cũ)
+const fileSha = {};
+for (const f of listSrc.match(/'([^']+)'/g).map((x) => x.slice(1, -1))) {
+  fileSha[f] = crypto.createHash('sha256').update(fs.readFileSync(path.join(root, f === './' ? 'index.html' : f))).digest('hex').slice(0, 16);
+}
+let sw2 = sw.replace(/const BUILD_HASH = '[^']*';/, `const BUILD_HASH = '${hash}';`);
+sw2 = sw2.replace(/const FILE_SHA = \{[^\n]*\};/, `const FILE_SHA = ${JSON.stringify(fileSha)};`);
+if (!/const FILE_SHA = \{/.test(sw2)) { console.error('sw.js thiếu dòng const FILE_SHA = {…};'); process.exit(1); }
 if (sw2 !== sw) fs.writeFileSync(swPath, sw2);
 console.log(`Code.gs: ${files.length} tệp, ${out.length} ký tự · phiên bản ${ver} · vỏ app ${hash}`);

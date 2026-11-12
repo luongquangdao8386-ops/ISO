@@ -1,6 +1,6 @@
 // Tài khoản: hồ sơ (cấp, bộ phận, Thư ký ISO, Đánh giá viên), đồng bộ và nháp, bảo mật (đổi PIN, phiên, đăng xuất), lối vào các
 // màn khác trên iPhone (Excel, Phủ điều khoản, Báo cáo, Khắc phục, Đánh giá nội bộ), quản trị theo quyền, thông tin phiên bản
-import { bi, biText, esc, fmtDateTime, badge, session, api, resMsg, nameText, BUILD_VERSION, API_CONTRACT_VERSION } from '../core.js';
+import { bi, biText, esc, fmtDateTime, badge, session, api, resMsg, nameText, BUILD_VERSION, API_CONTRACT_VERSION, NS } from '../core.js';
 import { ICON, toast, dialog, askPin } from '../ui.js';
 import { getMeta, queueItems, exportBackup } from '../sync.js';
 import { reauth } from '../auth.js';
@@ -64,6 +64,9 @@ export async function renderAccount(view, { shell }) {
   const mine = myDepts();
   const sec = isSecretary();
   const dcOn = await docControlOn();
+  // Mã vỏ app đang chạy (tên cache của Service Worker …-shell-<bản>-<mã>): so với mã Claude báo khi phát hành để biết máy đã nhận đủ bản mới
+  let shellHash = '';
+  try { const k = (await caches.keys()).filter((x) => /-shell-/.test(x) && x.startsWith(NS + '-shell-')).pop(); if (k) shellHash = k.split('-').pop(); } catch (e) { /* bỏ qua */ }
   const admin = [];
   if (await can('user.view')) admin.push(['admin.users', '/admin/users']);
   if (await can('dept.edit')) admin.push(['admin.depts', '/admin/depts']);
@@ -116,7 +119,7 @@ export async function renderAccount(view, { shell }) {
     ${online ? '' : `<p class="muted small">${bi('sync.need_network')}</p>`}
   </section>` : ''}
   <section class="card"><h2>${bi('account.info')}</h2>
-    ${row(bi('account.app_version'), esc(BUILD_VERSION))}
+    ${row(bi('account.app_version'), esc(BUILD_VERSION) + (shellHash ? ` <span class="muted small">· ${bi('account.shell')} ${esc(shellHash)}</span>` : ''))}
     ${row(bi('account.api_version'), esc(API_CONTRACT_VERSION))}
     ${row(bi('account.server_version'), esc(b.server_version || '—'))}
   </section>`;

@@ -1375,4 +1375,5 @@ export const DICT = {"account.add_home":["Thêm app vào Màn hình chính: tron
 "dr.doc_n":["Tài liệu, biểu mẫu ({N} biểu)","文件、表单（{N}个）"],
 "dr.pick_item":["— Bấm để chọn biểu —","— 点击选择表单 —"],
 "dr.pick_none":["— Không có biểu nào theo bộ lọc —","— 无符合筛选的表单 —"],
-"dr.pick_hint":["Lọc Bộ phận và Tình trạng cho danh sách ngắn lại, rồi bấm ô chọn biểu. Cách khác: Danh mục → mở biểu → thẻ Phiếu đề nghị → Đề nghị sửa đổi (biểu được chọn sẵn).","先筛选部门和状态缩短列表，再点击选择表单。也可：目录→打开表单→申请单卡片→申请修订（自动选中该表单）。"]};
+"dr.pick_hint":["Lọc Bộ phận và Tình trạng cho danh sách ngắn lại, rồi bấm ô chọn biểu. Cách khác: Danh mục → mở biểu → thẻ Phiếu đề nghị → Đề nghị sửa đổi (biểu được chọn sẵn).","先筛选部门和状态缩短列表，再点击选择表单。也可：目录→打开表单→申请单卡片→申请修订（自动选中该表单）。"],
+"account.shell":["mã vỏ app","外壳编号"]};
