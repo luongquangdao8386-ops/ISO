@@ -11,7 +11,16 @@
  *  Hủy phiếu lập nhầm: Thư ký ISO, người lập (PIN, lý do).
  * Gmail (19_mail.js): CAPA_DUE hành động đến hạn → người phụ trách hành động 7, 1, 0 ngày trước hạn, quá hạn mỗi 7 ngày (phiếu chưa có
  * hành động đang mở → người phụ trách phiếu theo hạn của phiếu); CAPA_VERIFY hạn kiểm tra hiệu lực → trưởng bộ phận / Thư ký ISO.
- * Báo cáo (27_reports.js, loại CAPA): một phiếu để in ký, hoặc sổ theo dõi khắc phục theo năm. */
+ * Báo cáo (27_reports.js, loại CAPA): một phiếu để in ký, hoặc sổ theo dõi khắc phục theo năm.
+ *
+ * Phiên 3b — khiếu nại khách hàng (8D) và yêu cầu khắc phục nhà cung cấp (SCAR) là phiếu khắc phục có nguồn COMPLAINT / SUPPLIER (cùng số
+ * KP-yymm-001, cùng luồng). Người dùng chốt 12/11/2026 giữ phạm vi Cơ điện: phiếu thuộc bộ phận trong phạm vi (khiếu nại do lỗi thiết bị;
+ * SCAR gửi nhà cung cấp vật tư, nhà thầu thuê ngoài của cơ điện), in theo mẫu BM-KD-02-01 / BM-KD-02-02 / BM-MH-01-06 (Settings
+ * complaint_form_code, d8_form_code, scar_form_code). Thêm đối tác (khách hàng / nhà cung cấp), sản phẩm / vật tư, lô, số lượng, mức độ,
+ * nhóm 8D (D1), nguyên nhân lọt (D4), ngày gửi SCAR, hạn phản hồi (mặc định ngày tiếp nhận + capa_reply_days). capa.reply ghi phản hồi
+ * khách hàng / trả lời của nhà cung cấp — bắt buộc trước khi đóng phiếu (kiểm tra hiệu lực Có hiệu lực). Khiếu nại kết luận không có cơ sở
+ * (complaint_valid NO): không bắt buộc hành động khắc phục, vẫn ghi kết luận (nguyên nhân), phản hồi khách hàng và xác nhận đóng.
+ * Gmail CAPA_REPLY: hạn phản hồi → người phụ trách phiếu 7, 1, 0 ngày trước hạn, quá hạn mỗi 7 ngày. */
 
 /* ---------------- Quyền ---------------- */
 
@@ -60,12 +69,25 @@ function canCancelCapa_(u, c) {
 
 /* ---------------- Tiện ích ---------------- */
 
-/** Dán Code.gs 3a mà chưa chạy migrateSchema: lần ghi đầu tiên tự thêm sheet Capas, CapaActions */
+/** Bảng tính đã có sheet Capas, CapaActions và cột của 3b (Capas.reply_due) */
+function capaSchemaReady_() {
+  try { return sheetExists_('Capas') && sheetExists_('CapaActions') && hdr_('Capas').idx.reply_due !== undefined; } catch (e) { return false; }
+}
+
+/** Dán Code.gs 3a / 3b mà chưa chạy migrateSchema: lần ghi đầu tiên tự thêm sheet Capas, CapaActions, cột khiếu nại / SCAR */
 function ensureCapaSchema_() {
-  if (sheetExists_('Capas') && sheetExists_('CapaActions')) return;
+  if (capaSchemaReady_()) return;
   autoMigrate_();
   dbReset_();
-  if (!sheetExists_('Capas') || !sheetExists_('CapaActions')) throw apiError_('SYSTEM_NOT_READY');
+  if (!capaSchemaReady_()) throw apiError_('SYSTEM_NOT_READY');
+}
+
+/** Phiếu có đối tác bên ngoài: khiếu nại khách hàng (8D), SCAR nhà cung cấp */
+function capaIsParty_(source) { return CAPA_PARTY_SOURCES_.indexOf(String(source || '')) >= 0; }
+
+/** Khiếu nại / SCAR chưa phản hồi mà quá hạn phản hồi (phiếu chưa đóng) */
+function capaReplyLate_(c, today) {
+  return capaIsParty_(c.source) && (c.state === 'OPEN' || c.state === 'VERIFYING') && !c.reply_date && !!c.reply_due && String(c.reply_due) < today;
 }
 
 function capaActionsOf_(capaId) {
@@ -167,6 +189,9 @@ function capaName_(c) {
  * capa.save {capa_id, source, dept_code, item_id?, ref_text?, found_date, found_by_name?, title_vi/zh?, problem_vi/zh (bắt buộc một thứ
  * tiếng), correction_vi/zh?, cause_vi/zh?, owner_user_id?, due_date}. expected_version 0 = lập phiếu (máy chủ cấp mã KP-yymm-001, Đang xử lý);
  * khác 0 = sửa phiếu đang xử lý. Người phụ trách mặc định = người lập.
+ * Khiếu nại / SCAR (3b) thêm: party_name (bắt buộc), party_contact?, product_text?, lot_text?, qty_text?, severity? MINOR | MAJOR | CRITICAL,
+ * complaint_valid? '' | YES | NO (chỉ khiếu nại), team_text? (nhóm 8D), escape_vi/zh? (nguyên nhân lọt), sent_date? (ngày gửi SCAR),
+ * reply_due? (trống = ngày tiếp nhận + capa_reply_days).
  */
 function capaSave_(ctx) {
   ensureCapaSchema_();
@@ -205,15 +230,38 @@ function capaSave_(ctx) {
   capaTextLen_(errs, p, 'ref_text', 200);
   capaTextLen_(errs, p, 'found_by_name', 120);
   ['title_vi', 'title_zh'].forEach(function (k) { capaTextLen_(errs, p, k, 300); });
-  ['problem_vi', 'problem_zh', 'correction_vi', 'correction_zh', 'cause_vi', 'cause_zh'].forEach(function (k) { capaTextLen_(errs, p, k, 3000); });
+  ['problem_vi', 'problem_zh', 'correction_vi', 'correction_zh', 'cause_vi', 'cause_zh', 'escape_vi', 'escape_zh'].forEach(function (k) { capaTextLen_(errs, p, k, 3000); });
   requireOneLang_(errs, p, cur, 'problem');
+  // Khiếu nại / SCAR: đối tác, sản phẩm, lô, số lượng, mức độ, kết luận có cơ sở, nhóm 8D, ngày gửi SCAR, hạn phản hồi
+  var party = capaIsParty_(source);
+  var px = {};
+  [['party_name', 200], ['party_contact', 200], ['product_text', 200], ['lot_text', 200], ['qty_text', 100], ['team_text', 500]].forEach(function (f) {
+    var v = p[f[0]] === undefined || p[f[0]] === null ? (cur ? String(cur[f[0]] || '') : '') : trimStr_(p[f[0]]);
+    if (v.length > f[1]) errs.push(fieldError_(f[0], 'TOO_LONG'));
+    px[f[0]] = v;
+  });
+  if (party && !px.party_name) errs.push(fieldError_('party_name', 'REQUIRED'));
+  var sev = p.severity === undefined || p.severity === null ? (cur ? String(cur.severity || '') : '') : String(p.severity || '');
+  if (sev && CAPA_SEVERITIES_.indexOf(sev) < 0) errs.push(fieldError_('severity', 'INVALID_VALUE'));
+  var valid = p.complaint_valid === undefined || p.complaint_valid === null ? (cur ? String(cur.complaint_valid || '') : '') : String(p.complaint_valid || '');
+  if (CAPA_VALIDS_.indexOf(valid) < 0) errs.push(fieldError_('complaint_valid', 'INVALID_VALUE'));
+  if (source !== 'COMPLAINT') valid = '';
+  var sent = capaDateIn_(errs, p, 'sent_date');
+  if (sent === undefined) sent = cur ? String(cur.sent_date || '') : '';
+  if (sent && (sent > today || (found && sent < found))) errs.push(fieldError_('sent_date', 'CAPA_DATE'));
+  var rdue = capaDateIn_(errs, p, 'reply_due');
+  if (rdue === undefined) rdue = cur ? String(cur.reply_due || '') : '';
+  if (party && !rdue && found && isDateStr_(found) && !errs.some(function (e) { return e.field === 'reply_due'; })) {
+    rdue = addDaysIso_(found, Math.max(1, Number(setting_('capa_reply_days')) || 7));
+  }
+  if (rdue && found && rdue < found) errs.push(fieldError_('reply_due', 'RANGE_INVALID'));
   if (errs.length) throw validationError_(errs);
   if (isNew) {
     if (!canCreateCapa_(u, dept)) throw apiError_('FORBIDDEN');
   } else if (!canEditCapa_(u, cur) || (dept !== cur.dept_code && !canCreateCapa_(u, dept))) {
     throw apiError_('FORBIDDEN');
   }
-  var tr = applyTranslations_('Capas', ['title', 'problem', 'correction', 'cause'], p, cur); // dịch ngoài khóa ghi
+  var tr = applyTranslations_('Capas', ['title', 'problem', 'correction', 'cause', 'escape'], p, cur); // dịch ngoài khóa ghi
   return executeWrite_(ctx, {
     entity_type: 'CAPA', entity_id: p.capa_id,
     build: function (st) {
@@ -225,7 +273,9 @@ function capaSave_(ctx) {
           title_vi: '', title_zh: '', problem_vi: '', problem_zh: '', correction_vi: '', correction_zh: '', cause_vi: '', cause_zh: '',
           owner_user_id: '', due_date: '', state: 'OPEN', files_json: [], completed_at: '', completed_by: '', verify_due: '', verify_count: 0,
           verified_at: '', verified_by: '', verify_date: '', verify_result: '', verify_note_vi: '', verify_note_zh: '', verify_history_json: [],
-          closed_at: '', cancelled_at: '', cancelled_by: '', cancel_reason: ''
+          closed_at: '', cancelled_at: '', cancelled_by: '', cancel_reason: '', party_name: '', party_contact: '', product_text: '', lot_text: '',
+          qty_text: '', severity: '', complaint_valid: '', team_text: '', escape_vi: '', escape_zh: '', sent_date: '', reply_due: '', reply_date: '',
+          reply_note_vi: '', reply_note_zh: '', reply_at: '', reply_by: ''
         });
       } else {
         row = lockedCapa_(ctx, p.capa_id, true);
@@ -236,13 +286,16 @@ function capaSave_(ctx) {
       row.source = source; row.dept_code = dept; row.item_id = itemId || ''; row.found_date = found; row.due_date = due; row.owner_user_id = owner;
       if (p.ref_text !== undefined) row.ref_text = trimStr_(p.ref_text);
       if (p.found_by_name !== undefined) row.found_by_name = trimStr_(p.found_by_name);
+      Object.keys(px).forEach(function (k) { row[k] = px[k]; });
+      row.severity = sev; row.complaint_valid = valid; row.sent_date = sent; row.reply_due = rdue;
       Object.keys(tr.values).forEach(function (k) { row[k] = tr.values[k]; });
       row.i18n_meta = Object.assign({}, row.i18n_meta || {}, tr.meta);
       return {
         writes: [{ sheet: 'Capas', mode: isNew ? 'insert' : 'update', row: row }], state: su,
         result: capaResult_(ctx, row), record_version: row.record_version,
         audit: { entity_type: 'CAPA', entity_id: row.capa_id, before_json: before,
-          after_json: { code: row.code, source: row.source, dept_code: row.dept_code, due_date: row.due_date, owner_user_id: row.owner_user_id, created: isNew } }
+          after_json: { code: row.code, source: row.source, dept_code: row.dept_code, due_date: row.due_date, owner_user_id: row.owner_user_id, created: isNew,
+            party_name: party ? row.party_name : undefined, reply_due: party ? row.reply_due : undefined, complaint_valid: row.complaint_valid || undefined } }
       };
     }
   });
@@ -395,13 +448,22 @@ function capaActionCancel_(ctx) {
 
 /* ---------------- Gửi kiểm tra hiệu lực, kiểm tra hiệu lực, hủy ---------------- */
 
-/** Phiếu đủ điều kiện gửi kiểm tra hiệu lực: có nguyên nhân gốc, không còn hành động đang mở, có ít nhất một hành động đã xong */
+/** Phiếu đủ điều kiện gửi kiểm tra hiệu lực: có nguyên nhân gốc, không còn hành động đang mở, có ít nhất một hành động đã xong (khiếu nại kết
+ *  luận không có cơ sở: không bắt buộc hành động — nguyên nhân là kết luận điều tra) */
 function capaCompleteErrors_(c, acts) {
   var errs = [];
   if (!trimStr_(c.cause_vi) && !trimStr_(c.cause_zh)) errs.push(fieldError_('cause', 'CAPA_NO_CAUSE'));
   if (acts.some(function (a) { return a.state === 'OPEN'; })) errs.push(fieldError_('actions', 'CAPA_ACTIONS_OPEN'));
-  else if (!acts.some(function (a) { return a.state === 'DONE'; })) errs.push(fieldError_('actions', 'CAPA_NO_ACTION'));
+  else if (!capaNoActionOk_(c) && !acts.some(function (a) { return a.state === 'DONE'; })) errs.push(fieldError_('actions', 'CAPA_NO_ACTION'));
   return errs;
+}
+
+/** Khiếu nại kết luận không có cơ sở: đóng được không cần hành động khắc phục */
+function capaNoActionOk_(c) { return c.source === 'COMPLAINT' && c.complaint_valid === 'NO'; }
+
+/** Đóng phiếu (Có hiệu lực) khiếu nại / SCAR cần đã ghi phản hồi */
+function capaCloseErrors_(c, result) {
+  return result === 'EFFECTIVE' && capaIsParty_(c.source) && !c.reply_date ? [fieldError_('reply', 'CAPA_NO_REPLY')] : [];
 }
 
 /**
@@ -445,9 +507,12 @@ function capaComplete_(ctx) {
 }
 
 function precheckCapaVerify_(ctx) {
-  var x = loadCapa_(ctx, (ctx.req.payload || {}).capa_id);
+  var p = ctx.req.payload || {};
+  var x = loadCapa_(ctx, p.capa_id);
   if (!canVerifyCapa_(ctx.user, x.c)) throw apiError_('FORBIDDEN');
   if (x.c.state !== 'VERIFYING') throw stateInvalid_();
+  var e = capaCloseErrors_(x.c, String(p.result || '')); // chưa phản hồi khách hàng / nhà cung cấp: báo trước khi hỏi PIN
+  if (e.length) throw validationError_(e);
 }
 
 function precheckCapaCancel_(ctx) {
@@ -475,6 +540,7 @@ function capaVerify_(ctx) {
   var input = { verify_note_vi: p.note_vi, verify_note_zh: p.note_zh };
   ['verify_note_vi', 'verify_note_zh'].forEach(function (k) { capaTextLen_(errs, input, k, 2000); });
   requireOneLang_(errs, input, null, 'verify_note');
+  errs = errs.concat(capaCloseErrors_(c, result));
   if (errs.length) throw validationError_(errs);
   var tr = applyTranslations_('Capas', ['verify_note'], input, null);
   return executeWrite_(ctx, {
@@ -482,6 +548,8 @@ function capaVerify_(ctx) {
     build: function () {
       var row = lockedCapa_(ctx, c.capa_id, true);
       if (row.state !== 'VERIFYING') throw stateInvalid_();
+      var e2 = capaCloseErrors_(row, result);
+      if (e2.length) throw validationError_(e2);
       cUpdate_(ctx, row);
       var nowIso = isoVN_(now_());
       var hist = Array.isArray(row.verify_history_json) ? row.verify_history_json.slice() : [];
@@ -520,6 +588,57 @@ function capaCancel_(ctx) {
       return {
         writes: [{ sheet: 'Capas', mode: 'update', row: row }], result: capaResult_(ctx, row), record_version: row.record_version,
         audit: { entity_type: 'CAPA', entity_id: row.capa_id, before_json: { state: before }, after_json: { state: 'CANCELLED', code: row.code }, reason: reason }
+      };
+    }
+  });
+}
+
+/* ---------------- Phản hồi khiếu nại / trả lời SCAR (3b) ---------------- */
+
+/**
+ * capa.reply {capa_id, reply_date, note_vi/zh} — khiếu nại: ngày và nội dung phản hồi khách hàng (gửi báo cáo 8D, kết luận); SCAR: ngày và
+ * tóm tắt trả lời của nhà cung cấp (nguyên nhân, hành động họ cam kết — ghi tiếp vào nguyên nhân / hành động của phiếu).
+ * {capa_id, undo: true} — bỏ phản hồi đã ghi (ghi nhầm). Phiếu Đang xử lý / Chờ kiểm tra hiệu lực; người sửa được phiếu.
+ */
+function capaReply_(ctx) {
+  var p = ctx.req.payload || {};
+  var x = loadCapa_(ctx, p.capa_id);
+  var c = x.c;
+  if (!canEditCapa_(ctx.user, c)) throw apiError_('FORBIDDEN');
+  if (c.state !== 'OPEN' && c.state !== 'VERIFYING') throw stateInvalid_();
+  if (!capaIsParty_(c.source)) throw validationError_([fieldError_('source', 'CAPA_NOT_PARTY')]);
+  var undo = p.undo === true;
+  if (undo && !c.reply_date) throw stateInvalid_();
+  var errs = [], date = '', tr = null;
+  if (!undo) {
+    date = capaDateIn_(errs, p, 'reply_date');
+    if (!date && !errs.length) errs.push(fieldError_('reply_date', 'REQUIRED'));
+    else if (date && (date > todayVN_() || (c.found_date && date < c.found_date) || (c.sent_date && date < c.sent_date))) errs.push(fieldError_('reply_date', 'CAPA_DATE'));
+    var input = { reply_note_vi: p.note_vi, reply_note_zh: p.note_zh };
+    ['reply_note_vi', 'reply_note_zh'].forEach(function (k) { capaTextLen_(errs, input, k, 3000); });
+    requireOneLang_(errs, input, null, 'reply_note');
+    if (errs.length) throw validationError_(errs);
+    tr = applyTranslations_('Capas', ['reply_note'], input, null);
+  }
+  return executeWrite_(ctx, {
+    entity_type: 'CAPA', entity_id: c.capa_id,
+    build: function () {
+      var row = lockedCapa_(ctx, c.capa_id, true);
+      if (row.state !== 'OPEN' && row.state !== 'VERIFYING') throw stateInvalid_();
+      if (undo && !row.reply_date) throw stateInvalid_();
+      var before = { reply_date: row.reply_date || '' };
+      cUpdate_(ctx, row);
+      if (undo) {
+        row.reply_date = ''; row.reply_note_vi = ''; row.reply_note_zh = ''; row.reply_at = ''; row.reply_by = '';
+        if (row.i18n_meta) { row.i18n_meta = clone_(row.i18n_meta); delete row.i18n_meta.reply_note; }
+      } else {
+        row.reply_date = date; row.reply_at = isoVN_(now_()); row.reply_by = ctx.user.user_id;
+        row.reply_note_vi = tr.values.reply_note_vi || ''; row.reply_note_zh = tr.values.reply_note_zh || '';
+        row.i18n_meta = Object.assign({}, row.i18n_meta || {}, tr.meta);
+      }
+      return {
+        writes: [{ sheet: 'Capas', mode: 'update', row: row }], result: capaResult_(ctx, row), record_version: row.record_version,
+        audit: { entity_type: 'CAPA', entity_id: row.capa_id, before_json: before, after_json: { code: row.code, reply_date: row.reply_date || '', undo: undo || undefined } }
       };
     }
   });
@@ -585,7 +704,7 @@ function capaVerifiers_(mc, c) {
   return (others.length ? others : pool).map(function (u) { return u.user_id; });
 }
 
-/** Việc cần nhắc của khắc phục (thêm vào mailDesired_): CAPA_DUE, CAPA_VERIFY */
+/** Việc cần nhắc của khắc phục (thêm vào mailDesired_): CAPA_DUE, CAPA_VERIFY, CAPA_REPLY (3b) */
 function capaMailNotes_(mc, out) {
   if (!sheetExists_('Capas') || !sheetExists_('CapaActions')) return;
   var today = mc.today;
@@ -602,6 +721,17 @@ function capaMailNotes_(mc, out) {
       return d;
     };
     var list = byCapa[c.capa_id] || [];
+    // Khiếu nại / SCAR chưa phản hồi → người phụ trách phiếu theo hạn phản hồi (3b)
+    if (capaIsParty_(c.source) && !c.reply_date && isDateStr_(String(c.reply_due || ''))) {
+      var st4 = capaStage_(daysBetweenIso_(today, c.reply_due));
+      if (st4) {
+        out.push({
+          kind: 'CAPA_REPLY', entity_type: 'CAPA', entity_id: c.capa_id, stage: c.reply_due + ':' + st4, due_date: c.reply_due,
+          to: act(c.owner_user_id) ? [c.owner_user_id] : secIds, queue: true,
+          detail: base({ due: c.reply_due, owner: userName_(mc, c.owner_user_id), mark: st4, source: c.source, party: c.party_name || '' })
+        });
+      }
+    }
     if (c.state === 'OPEN') {
       var open = list.filter(function (a) { return a.state === 'OPEN'; });
       open.forEach(function (a) {
@@ -638,8 +768,10 @@ function capaMailNotes_(mc, out) {
 
 /* ---------------- Báo cáo (27_reports.js, loại CAPA) ---------------- */
 
-/** Phiếu quá hạn: đang xử lý mà quá hạn phiếu hoặc có hành động đang mở quá hạn; chờ kiểm tra hiệu lực mà quá hạn kiểm tra */
+/** Phiếu quá hạn: đang xử lý mà quá hạn phiếu hoặc có hành động đang mở quá hạn; chờ kiểm tra hiệu lực mà quá hạn kiểm tra; khiếu nại /
+ *  SCAR chưa phản hồi mà quá hạn phản hồi (3b) */
 function capaOverdue_(c, acts, today) {
+  if (capaReplyLate_(c, today)) return true;
   if (c.state === 'OPEN') {
     if (c.due_date && c.due_date < today) return true;
     return acts.some(function (a) { return a.state === 'OPEN' && a.due_date && a.due_date < today; });
@@ -670,11 +802,33 @@ function reportCapaRow_(c, acts, items, dir, today) {
     verify: (c.verify_history_json || []).map(function (h) {
       return { n: h.n, date: String(h.date || ''), by: reportUserName_(dir, h.by), result: h.result, note_vi: h.note_vi || '', note_zh: h.note_zh || '' };
     }),
-    last_result: last ? last.result : '', last_by: last ? reportUserName_(dir, last.by) : '', last_date: last ? String(last.date || '') : ''
+    last_result: last ? last.result : '', last_by: last ? reportUserName_(dir, last.by) : '', last_date: last ? String(last.date || '') : '',
+    // Khiếu nại / SCAR (3b)
+    party_name: c.party_name || '', party_contact: c.party_contact || '', product_text: c.product_text || '', lot_text: c.lot_text || '',
+    qty_text: c.qty_text || '', severity: c.severity || '', complaint_valid: c.complaint_valid || '', team_text: c.team_text || '',
+    escape_vi: c.escape_vi || '', escape_zh: c.escape_zh || '', sent_date: String(c.sent_date || ''), reply_due: String(c.reply_due || ''),
+    reply_date: String(c.reply_date || ''), reply_note_vi: c.reply_note_vi || '', reply_note_zh: c.reply_note_zh || '',
+    reply_by: reportUserName_(dir, c.reply_by), reply_late: capaReplyLate_(c, today)
   };
 }
 
-/** Báo cáo CAPA: {capa_id} → một phiếu (in ký); {dept, year, state ALL | OPEN | OVERDUE | VERIFYING | CLOSED} → sổ theo dõi khắc phục */
+/** Lọc sổ theo loại: ALL · INTERNAL (khắc phục nội bộ) · COMPLAINT · SUPPLIER */
+function capaSourceMatch_(src, filter) {
+  if (!filter || filter === 'ALL') return true;
+  if (filter === 'INTERNAL') return !capaIsParty_(src);
+  return src === filter;
+}
+
+/** Ô "Phản hồi" của khiếu nại / SCAR: ngày phản hồi, hoặc Chưa · hạn */
+function capaReplyTile_(r) {
+  if (r.reply_date) return { k: 'rpt.t.capa_reply.' + r.source, v: dmy_(r.reply_date), tone: 'green' };
+  return { k: 'rpt.t.capa_reply.' + r.source, v: lab_('rpt.capa_no_reply', { D: dmy_(r.reply_due) || '—' }), tone: r.reply_late ? 'red' : 'amber' };
+}
+
+/**
+ * Báo cáo CAPA: {capa_id, form CAR | RECEIPT | D8 | SCAR} → một phiếu (in ký theo mẫu); {dept, year, state ALL | OPEN | OVERDUE | VERIFYING |
+ * CLOSED, source ALL | INTERNAL | COMPLAINT | SUPPLIER} → sổ theo dõi khắc phục / khiếu nại / SCAR
+ */
 function reportCapa_(ctx, f, today) {
   var items = {};
   readRows_('Items').forEach(function (it) { items[it.item_id] = it; });
@@ -691,12 +845,15 @@ function reportCapa_(ctx, f, today) {
       if (ex && !ex.archived_at) throw apiError_('FORBIDDEN');
       throw validationError_([fieldError_('filters.capa_id', 'NOT_FOUND')]);
     }
+    if (!capaFormOk_(f.form || 'CAR', one.source)) throw validationError_([fieldError_('filters.form', 'INVALID_VALUE')]);
     var r = reportCapaRow_(one, byCapa[one.capa_id] || [], items, dir, today);
+    var stTile = { k: 'rpt.t.capa_state', v: lab_('capa.state.' + r.state), tone: r.state === 'CLOSED' ? 'green' : r.state === 'CANCELLED' ? 'muted' : (r.overdue ? 'red' : 'amber') };
+    var dueTile = { k: 'rpt.t.capa_due', v: fmtDateVN_(r.due_date), tone: r.overdue && r.state === 'OPEN' ? 'red' : '' };
     return {
       data: { one: r }, rows: 1,
       tiles: [
-        { k: 'rpt.t.capa_state', v: lab_('capa.state.' + r.state), tone: r.state === 'CLOSED' ? 'green' : r.state === 'CANCELLED' ? 'muted' : (r.overdue ? 'red' : 'amber') },
-        { k: 'rpt.t.capa_due', v: fmtDateVN_(r.due_date), tone: r.overdue && r.state === 'OPEN' ? 'red' : '' },
+        stTile,
+        capaIsParty_(r.source) ? capaReplyTile_(r) : dueTile,
         { k: 'rpt.t.capa_actions', v: r.acts_done + '/' + r.acts_total },
         { k: 'rpt.t.capa_verify', v: r.last_result ? lab_('capa.result.' + r.last_result) : (r.verify_due ? fmtDateVN_(r.verify_due) : '—'),
           tone: r.last_result === 'EFFECTIVE' && r.state === 'CLOSED' ? 'green' : (r.last_result === 'NOT_EFFECTIVE' ? 'red' : '') }
@@ -709,6 +866,7 @@ function reportCapa_(ctx, f, today) {
   all.forEach(function (c) {
     if (String(c.found_date || c.created_at || '').slice(0, 4) !== y) return;
     if (f.dept && c.dept_code !== f.dept) return;
+    if (!capaSourceMatch_(c.source, f.source)) return;
     if (c.state === 'CANCELLED' && f.state !== 'ALL') return;
     var acts = byCapa[c.capa_id] || [];
     var od = capaOverdue_(c, acts, today);
@@ -722,7 +880,7 @@ function reportCapa_(ctx, f, today) {
   });
   rows.sort(function (a, b) { return String(a.code).localeCompare(String(b.code)); });
   return {
-    data: { depts: reportGroupByDept_(rows, reportDepts_()), counts: cnt, year: f.year },
+    data: { depts: reportGroupByDept_(rows, reportDepts_()), counts: cnt, year: f.year, source: f.source || 'ALL' },
     rows: rows.length,
     tiles: [
       { k: 'rpt.t.capa_total', v: String(cnt.total) },
@@ -743,11 +901,118 @@ function capaVerifyText_(r) {
   return '';
 }
 
+/** Phản hồi khiếu nại / trả lời SCAR (một ô): ngày + nội dung, hoặc Chưa · hạn */
+function capaReplyText_(r) {
+  if (r.reply_date) return dmy_(r.reply_date) + (r.reply_by ? ' · ' + r.reply_by : '') + (r.reply_note_vi || r.reply_note_zh ? '\n' + biNl_(r.reply_note_vi, r.reply_note_zh) : '');
+  return lab_('rpt.capa_no_reply', { D: dmy_(r.reply_due) || '—' });
+}
+
+/** Bảng hành động của phiếu (lọc loại: '' tất cả · CORRECTIVE · PREVENTIVE) */
+function capaActsTable_(r, atype) {
+  var head = [labNl_('rpt.col.capa_type'), labNl_('rpt.col.capa_action'), labNl_('rpt.col.capa_owner'), labNl_('rpt.col.capa_due'),
+    labNl_('rpt.col.capa_done'), labNl_('rpt.col.capa_result'), labNl_('rpt.col.status')];
+  var types = ['text', 'text', 'text', 'date', 'date', 'text', 'text'];
+  var tones = [];
+  var rows = r.actions.filter(function (a) { return !atype || a.atype === atype; }).map(function (a) {
+    tones.push(['', '', '', a.overdue ? 'red' : '', '', '', a.state === 'DONE' ? 'green' : (a.overdue ? 'red' : 'amber')]);
+    return [labNl_('capa.atype.' + a.atype) + (a.round ? '\n' + lab_('capa.round_n', { N: a.round }) : ''), biNl_(a.content_vi, a.content_zh),
+      a.owner + (a.assignee ? '\n' + a.assignee : ''), dmy_(a.due_date), dmy_(a.done_date), biNl_(a.result_vi, a.result_zh), labNl_('capa.astate.' + a.state)];
+  });
+  return rptTable_(head, types, rows, tones);
+}
+
+/** Các dòng kiểm tra hiệu lực / đóng / hủy của phiếu */
+function capaVerifyKv_(r) {
+  var ver = [];
+  r.verify.forEach(function (h) {
+    ver.push([lab_('capa.verify_n', { N: h.n }), lab_('capa.result.' + h.result) + ' · ' + [dmy_(h.date), h.by].filter(function (x) { return x; }).join(' · ') +
+      (h.note_vi || h.note_zh ? '\n' + biNl_(h.note_vi, h.note_zh) : '')]);
+  });
+  if (r.state === 'VERIFYING') ver.push([lab_('capa.verify_due'), dmy_(r.verify_due)]);
+  if (r.state === 'CLOSED') ver.push([lab_('rpt.kv.capa_closed'), dmy_(r.closed_at)]);
+  if (r.state === 'CANCELLED') ver.push([lab_('capa.state.CANCELLED'), dmy_(r.cancelled_at) + (r.cancel_reason ? ' · ' + r.cancel_reason : '')]);
+  if (!ver.length) ver.push([lab_('rpt.col.status'), lab_('capa.state.' + r.state)]);
+  return ver;
+}
+
+/** Thông tin đối tác của khiếu nại / SCAR (các dòng kv, bỏ dòng trống) */
+function capaPartyKv_(r) {
+  var src = r.source;
+  var kv = [[lab_('capa.party.' + src), r.party_name], [lab_('capa.party_contact'), r.party_contact], [lab_('capa.product.' + src), r.product_text],
+    [lab_('capa.lot.' + src), r.lot_text], [lab_('capa.qty'), r.qty_text], [lab_('capa.severity'), r.severity ? lab_('capa.sev.' + r.severity) : '']];
+  return kv.filter(function (x) { return x[1]; });
+}
+
 /** Bố cục báo cáo CAPA (28_report_pdf.js reportLayout_) */
 function layoutCapa_(snap) {
   var d = snap.data;
   if (d.one) {
     var r = d.one;
+    var form = (snap.filters || {}).form || 'CAR';
+    var lastVer = r.verify.length ? r.verify[r.verify.length - 1] : null;
+    var notes = r.files ? [lab_('rpt.capa_files', { N: r.files })] : [];
+    var valid = r.complaint_valid ? lab_('capa.valid.' + r.complaint_valid) : lab_('capa.valid.PENDING');
+    if (form === 'RECEIPT') {
+      var info = [[lab_('rpt.kv.capa_no'), r.code], [lab_('capa.found_date.COMPLAINT'), dmy_(r.found_date)]].concat(capaPartyKv_(r));
+      if (r.ref_text) info.push([lab_('capa.ref.COMPLAINT'), r.ref_text]);
+      info.push([lab_('capa.found_by.COMPLAINT'), r.found_by_name || r.created_by]);
+      info.push([lab_('capa.dept'), r.dept_code]);
+      return {
+        sections: [
+          { heading: lab_('rpt.sec.rcpt_info'), kv: info },
+          { heading: lab_('rpt.sec.rcpt_problem'), kv: [[lab_('capa.problem.COMPLAINT'), biNl_(r.problem_vi, r.problem_zh)]] },
+          { heading: lab_('rpt.sec.rcpt_first'), kv: [[lab_('capa.correction.COMPLAINT'), biNl_(r.correction_vi, r.correction_zh) || '—'], [lab_('capa.valid'), valid],
+            [lab_('capa.owner'), r.owner], [lab_('capa.reply_due.COMPLAINT'), dmy_(r.reply_due)], [lab_('capa.due_date'), dmy_(r.due_date)]] }
+        ],
+        notes: notes,
+        sign: { prepared: lab_('rpt.sign.rcpt_by'), approved: lab_('rpt.sign.rcpt_owner'), prepared_name: r.found_by_name || r.created_by, approved_name: r.owner }
+      };
+    }
+    if (form === 'D8') {
+      var d0 = [[lab_('rpt.kv.capa_no'), r.code], [lab_('capa.found_date.COMPLAINT'), dmy_(r.found_date)]].concat(capaPartyKv_(r));
+      if (r.ref_text) d0.push([lab_('capa.ref.COMPLAINT'), r.ref_text]);
+      d0.push([lab_('capa.valid'), valid]);
+      var d4 = [[lab_('capa.cause'), biNl_(r.cause_vi, r.cause_zh) || '—']];
+      if (r.escape_vi || r.escape_zh) d4.push([lab_('capa.escape'), biNl_(r.escape_vi, r.escape_zh)]);
+      var d8 = capaVerifyKv_(r);
+      d8.unshift([lab_('capa.reply.COMPLAINT'), capaReplyText_(r)]);
+      return {
+        sections: [
+          { heading: lab_('rpt.sec.d0'), kv: d0 },
+          { heading: lab_('rpt.sec.d1'), kv: [[lab_('capa.team_lead'), r.owner], [lab_('capa.team'), r.team_text || '—']] },
+          { heading: lab_('rpt.sec.d2'), kv: [[lab_('capa.problem.COMPLAINT'), biNl_(r.problem_vi, r.problem_zh)]] },
+          { heading: lab_('rpt.sec.d3'), kv: [[lab_('capa.correction.COMPLAINT'), biNl_(r.correction_vi, r.correction_zh) || '—']] },
+          { heading: lab_('rpt.sec.d4'), kv: d4 },
+          { heading: lab_('rpt.sec.d56'), table: capaActsTable_(r, 'CORRECTIVE') },
+          { heading: lab_('rpt.sec.d7'), table: capaActsTable_(r, 'PREVENTIVE') },
+          { heading: lab_('rpt.sec.d8'), kv: d8 }
+        ],
+        notes: notes,
+        sign: { prepared: lab_('rpt.sign.d8_lead'), approved: lab_('rpt.sign.capa_verifier'), prepared_name: r.owner, approved_name: lastVer ? lastVer.by : '' }
+      };
+    }
+    if (form === 'SCAR') {
+      var s1 = [[lab_('rpt.kv.scar_no'), r.code]].concat(capaPartyKv_(r));
+      s1.push([lab_('capa.found_date'), dmy_(r.found_date)]);
+      s1.push([lab_('capa.sent_date'), dmy_(r.sent_date) || '—']);
+      s1.push([lab_('capa.reply_due.SUPPLIER'), dmy_(r.reply_due)]);
+      if (r.ref_text) s1.push([lab_('capa.ref'), r.ref_text]);
+      var s3 = [[lab_('capa.reply.SUPPLIER'), capaReplyText_(r)], [lab_('capa.cause'), biNl_(r.cause_vi, r.cause_zh) || '—']];
+      if (r.escape_vi || r.escape_zh) s3.push([lab_('capa.escape'), biNl_(r.escape_vi, r.escape_zh)]);
+      return {
+        sections: [
+          { heading: lab_('rpt.sec.scar_info'), kv: s1 },
+          { heading: lab_('rpt.sec.scar_nc'), kv: [[lab_('capa.problem'), biNl_(r.problem_vi, r.problem_zh)], [lab_('capa.correction.SUPPLIER'), biNl_(r.correction_vi, r.correction_zh) || '—'],
+            [lab_('rpt.kv.scar_request'), lab_('rpt.scar_request', { D: dmy_(r.reply_due) || '—' })]] },
+          { heading: lab_('rpt.sec.scar_reply'), kv: s3 },
+          { heading: lab_('rpt.sec.scar_actions'), table: capaActsTable_(r, '') },
+          { heading: lab_('rpt.sec.scar_verify'), kv: capaVerifyKv_(r) }
+        ],
+        notes: notes,
+        sign: { prepared: lab_('rpt.sign.scar_by'), middle: lab_('rpt.sign.scar_supplier'), approved: lab_('rpt.sign.capa_verifier'),
+          prepared_name: r.owner, middle_name: r.party_contact || r.party_name, approved_name: lastVer ? lastVer.by : '' }
+      };
+    }
     var nc = [
       [lab_('rpt.kv.capa_no'), r.code],
       [lab_('capa.found_date'), dmy_(r.found_date)],
@@ -755,6 +1020,7 @@ function layoutCapa_(snap) {
       [lab_('rpt.col.dept'), r.dept_code],
       [lab_('capa.found_by'), r.found_by_name || r.created_by]
     ];
+    if (capaIsParty_(r.source)) nc = nc.concat(capaPartyKv_(r));
     if (r.item_code) nc.push([lab_('capa.item'), r.item_code + ' · ' + biText_(r.item_name_vi, r.item_name_zh)]);
     if (r.ref_text) nc.push([lab_('capa.ref'), r.ref_text]);
     if (r.title_vi || r.title_zh) nc.push([lab_('capa.title_f'), biNl_(r.title_vi, r.title_zh)]);
@@ -762,53 +1028,54 @@ function layoutCapa_(snap) {
     nc.push([lab_('capa.correction'), biNl_(r.correction_vi, r.correction_zh) || '—']);
     nc.push([lab_('capa.owner'), r.owner]);
     nc.push([lab_('capa.due_date'), dmy_(r.due_date)]);
-    var head = [labNl_('rpt.col.capa_type'), labNl_('rpt.col.capa_action'), labNl_('rpt.col.capa_owner'), labNl_('rpt.col.capa_due'),
-      labNl_('rpt.col.capa_done'), labNl_('rpt.col.capa_result'), labNl_('rpt.col.status')];
-    var types = ['text', 'text', 'text', 'date', 'date', 'text', 'text'];
-    var tones = [];
-    var rows = r.actions.map(function (a) {
-      tones.push(['', '', '', a.overdue ? 'red' : '', '', '', a.state === 'DONE' ? 'green' : (a.overdue ? 'red' : 'amber')]);
-      return [labNl_('capa.atype.' + a.atype) + (a.round ? '\n' + lab_('capa.round_n', { N: a.round }) : ''), biNl_(a.content_vi, a.content_zh),
-        a.owner + (a.assignee ? '\n' + a.assignee : ''), dmy_(a.due_date), dmy_(a.done_date), biNl_(a.result_vi, a.result_zh), labNl_('capa.astate.' + a.state)];
-    });
-    var ver = [];
-    r.verify.forEach(function (h) {
-      ver.push([lab_('capa.verify_n', { N: h.n }), lab_('capa.result.' + h.result) + ' · ' + [dmy_(h.date), h.by].filter(function (x) { return x; }).join(' · ') +
-        (h.note_vi || h.note_zh ? '\n' + biNl_(h.note_vi, h.note_zh) : '')]);
-    });
-    if (r.state === 'VERIFYING') ver.push([lab_('capa.verify_due'), dmy_(r.verify_due)]);
-    if (r.state === 'CLOSED') ver.push([lab_('rpt.kv.capa_closed'), dmy_(r.closed_at)]);
-    if (r.state === 'CANCELLED') ver.push([lab_('capa.state.CANCELLED'), dmy_(r.cancelled_at) + (r.cancel_reason ? ' · ' + r.cancel_reason : '')]);
-    if (!ver.length) ver.push([lab_('rpt.col.status'), lab_('capa.state.' + r.state)]);
-    var lastVer = r.verify.length ? r.verify[r.verify.length - 1] : null;
+    var cause = [[lab_('capa.cause'), biNl_(r.cause_vi, r.cause_zh) || '—']];
+    if (r.escape_vi || r.escape_zh) cause.push([lab_('capa.escape'), biNl_(r.escape_vi, r.escape_zh)]);
+    var ver = capaVerifyKv_(r);
+    if (capaIsParty_(r.source)) ver.unshift([lab_('capa.reply.' + r.source), capaReplyText_(r)]);
     return {
       sections: [
         { heading: lab_('rpt.sec.capa_nc'), kv: nc },
-        { heading: lab_('rpt.sec.capa_cause'), kv: [[lab_('capa.cause'), biNl_(r.cause_vi, r.cause_zh) || '—']] },
-        { heading: lab_('rpt.sec.capa_actions'), table: rptTable_(head, types, rows, tones) },
+        { heading: lab_('rpt.sec.capa_cause'), kv: cause },
+        { heading: lab_('rpt.sec.capa_actions'), table: capaActsTable_(r, '') },
         { heading: lab_('rpt.sec.capa_verify'), kv: ver }
       ],
-      notes: r.files ? [lab_('rpt.capa_files', { N: r.files })] : [],
+      notes: notes,
       sign: { prepared: lab_('rpt.sign.capa_owner'), approved: lab_('rpt.sign.capa_verifier'), prepared_name: r.owner, approved_name: lastVer ? lastVer.by : '' }
     };
   }
-  var headL = [labNl_('rpt.col.capa_no'), labNl_('capa.found_date'), labNl_('capa.source'), labNl_('capa.problem'), labNl_('rpt.col.capa_cause'),
-    labNl_('rpt.col.capa_owner'), labNl_('rpt.col.capa_due'), labNl_('rpt.col.capa_progress'), labNl_('rpt.col.status'), labNl_('rpt.col.capa_verify')];
-  var typesL = ['code', 'date', 'text', 'text', 'text', 'text', 'date', 'mid', 'text', 'text'];
+  var party = d.source === 'COMPLAINT' || d.source === 'SUPPLIER';
+  var headL, typesL;
+  if (party) {
+    headL = [labNl_('rpt.col.capa_no'), labNl_('capa.found_date.' + d.source), labNl_('capa.party.' + d.source), labNl_('capa.problem'), labNl_('rpt.col.capa_cause'),
+      labNl_('rpt.col.capa_owner'), labNl_('capa.reply_due.' + d.source), labNl_('capa.reply.' + d.source), labNl_('rpt.col.capa_progress'), labNl_('rpt.col.status'), labNl_('rpt.col.capa_verify')];
+    typesL = ['code', 'date', 'text', 'text', 'text', 'text', 'date', 'text', 'mid', 'text', 'text'];
+  } else {
+    headL = [labNl_('rpt.col.capa_no'), labNl_('capa.found_date'), labNl_('capa.source'), labNl_('capa.problem'), labNl_('rpt.col.capa_cause'),
+      labNl_('rpt.col.capa_owner'), labNl_('rpt.col.capa_due'), labNl_('rpt.col.capa_progress'), labNl_('rpt.col.status'), labNl_('rpt.col.capa_verify')];
+    typesL = ['code', 'date', 'text', 'text', 'text', 'text', 'date', 'mid', 'text', 'text'];
+  }
   var secs = [];
   d.depts.forEach(function (g) {
     var tonesL = [];
     var rowsL = g.rows.map(function (r2) {
-      tonesL.push(['', '', '', '', '', '', r2.overdue && r2.state === 'OPEN' ? 'red' : '', '', r2.overdue ? 'red' : (CAPA_TONE_[r2.state] || ''),
-        r2.last_result === 'NOT_EFFECTIVE' && r2.state !== 'CLOSED' ? 'red' : (r2.state === 'CLOSED' ? 'green' : '')]);
       var what = (r2.title_vi || r2.title_zh) ? biNl_(r2.title_vi, r2.title_zh) : biNl_(r2.problem_vi, r2.problem_zh);
-      return [r2.code, dmy_(r2.found_date), labNl_('capa.src.' + r2.source), what, biNl_(r2.cause_vi, r2.cause_zh), r2.owner, dmy_(r2.due_date),
-        r2.acts_done + '/' + r2.acts_total, labNl_('capa.state.' + r2.state) + (r2.overdue ? '\n' + lab_('capa.overdue') : ''), capaVerifyText_(r2)];
+      var stTone = r2.overdue ? 'red' : (CAPA_TONE_[r2.state] || '');
+      var verTone = r2.last_result === 'NOT_EFFECTIVE' && r2.state !== 'CLOSED' ? 'red' : (r2.state === 'CLOSED' ? 'green' : '');
+      var stText = labNl_('capa.state.' + r2.state) + (r2.overdue ? '\n' + lab_('capa.overdue') : '');
+      if (party) {
+        tonesL.push(['', '', '', '', '', '', r2.reply_late ? 'red' : '', r2.reply_date ? 'green' : (r2.reply_late ? 'red' : 'amber'), '', stTone, verTone]);
+        return [r2.code, dmy_(r2.found_date), [r2.party_name, r2.product_text, r2.lot_text].filter(function (x) { return x; }).join('\n'), what,
+          biNl_(r2.cause_vi, r2.cause_zh), r2.owner, dmy_(r2.reply_due), r2.reply_date ? dmy_(r2.reply_date) : lab_('rpt.capa_not_yet'),
+          r2.acts_done + '/' + r2.acts_total, stText, capaVerifyText_(r2)];
+      }
+      tonesL.push(['', '', '', '', '', '', r2.overdue && r2.state === 'OPEN' ? 'red' : '', '', stTone, verTone]);
+      return [r2.code, dmy_(r2.found_date), labNl_('capa.src.' + r2.source) + (r2.party_name ? '\n' + r2.party_name : ''), what, biNl_(r2.cause_vi, r2.cause_zh),
+        r2.owner, dmy_(r2.due_date), r2.acts_done + '/' + r2.acts_total, stText, capaVerifyText_(r2)];
     });
     secs.push({ heading: g.dept_code + ' · ' + biText_(g.name_vi, g.name_zh) + ' — ' + lab_('rpt.capa_n', { N: g.rows.length }), table: rptTable_(headL, typesL, rowsL, tonesL) });
   });
   if (!secs.length) secs.push({ table: rptTable_(headL, typesL, [], null) });
-  return { sections: secs, notes: [lab_('rpt.note.capa')] };
+  return { sections: secs, notes: [lab_(party ? 'rpt.note.capa_party' : 'rpt.note.capa')] };
 }
 
 /* ---------------- Trạng thái hệ thống ---------------- */
@@ -824,6 +1091,11 @@ function capaHealth_() {
   var late = readRows_('CapaActions').filter(function (a) { return !a.archived_at && a.state === 'OPEN' && open[a.capa_id] && a.due_date && a.due_date < today; }).length;
   var cnt = function (s) { return cs.filter(function (c) { return c.state === s; }).length; };
   var vlate = cs.filter(function (c) { return c.state === 'VERIFYING' && c.verify_due && c.verify_due < today; }).length;
-  return [true, 'Đang xử lý ' + cnt('OPEN') + ' · chờ kiểm tra hiệu lực ' + cnt('VERIFYING') + ' · đã đóng ' + cnt('CLOSED') +
-    ' · hành động quá hạn ' + late + ' · quá hạn kiểm tra hiệu lực ' + vlate, late || vlate ? 'Khắc phục → Quá hạn' : ''];
+  var live = cs.filter(function (c) { return c.state === 'OPEN' || c.state === 'VERIFYING'; });
+  var nSrc = function (src) { return live.filter(function (c) { return c.source === src; }).length; };
+  var rlate = cs.filter(function (c) { return capaReplyLate_(c, today); }).length;
+  var cols = capaSchemaReady_() ? '' : 'Thiếu cột khiếu nại / SCAR — chạy migrateSchema';
+  return [!cols, 'Đang xử lý ' + cnt('OPEN') + ' · chờ kiểm tra hiệu lực ' + cnt('VERIFYING') + ' · đã đóng ' + cnt('CLOSED') +
+    ' · hành động quá hạn ' + late + ' · quá hạn kiểm tra hiệu lực ' + vlate + ' · khiếu nại đang mở ' + nSrc('COMPLAINT') + ' · SCAR đang mở ' + nSrc('SUPPLIER') +
+    ' · quá hạn phản hồi ' + rlate, cols || (late || vlate || rlate ? 'Khắc phục → Quá hạn' : '')];
 }

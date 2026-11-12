@@ -77,7 +77,7 @@ export async function updateSyncStatus() {
     app.shell.setBadge('records', p.rec_returned.length);
     app.shell.setBadge('requests', p.req_review.length + p.req_todo.length);
     app.shell.setBadge('dist', p.dist_due.length);
-    app.shell.setBadge('capa', p.capa_acts.length + p.capa_verify.length + p.capa_owner.length);
+    app.shell.setBadge('capa', p.capa_acts.length + p.capa_verify.length + p.capa_owner.length + p.capa_reply.length);
   } catch (e) { /* không chặn */ }
 }
 

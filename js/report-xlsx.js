@@ -104,17 +104,22 @@ export function layoutSheet(X, lay, { top = 0 } = {}) {
   }
   r++;
   (lay.notes || []).forEach((n) => note(n));
-  // Khối ký: Người lập (tên người lập) · Người duyệt
+  // Khối ký: Người lập (tên người lập) · Người duyệt; SCAR (3b) thêm ô giữa Đại diện nhà cung cấp
   r += 1;
-  const sc = Math.max(half, 2);
-  put(r, 0, text(lay.sign.prepared), 'rpt_sign_h'); put(r, sc, text(lay.sign.approved), 'rpt_sign_h');
-  merges.push({ s: { r, c: 0 }, e: { r, c: sc - 1 } }, { s: { r, c: sc }, e: { r, c: width - 1 } }); r++;
-  put(r, 0, text(lay.sign.hint), 'rpt_sign_hint'); put(r, sc, text(lay.sign.hint), 'rpt_sign_hint');
-  merges.push({ s: { r, c: 0 }, e: { r, c: sc - 1 } }, { s: { r, c: sc }, e: { r, c: width - 1 } }); r++;
+  const sg = lay.sign;
+  const cols = sg.middle ? [[sg.prepared, sg.prepared_name], [sg.middle, sg.middle_name], [sg.approved, sg.approved_name]] : [[sg.prepared, sg.prepared_name], [sg.approved, sg.approved_name]];
+  const n = cols.length;
+  const span = Math.max(1, Math.floor(width / n));
+  const starts = cols.map((_, i) => (n === 2 ? (i === 0 ? 0 : Math.max(half, 2)) : i * span));
+  const ends = starts.map((st, i) => (i === n - 1 ? width - 1 : starts[i + 1] - 1));
+  const signRow = (vals, style, skipEmpty) => {
+    cols.forEach((_, i) => { const v = vals[i]; if (!skipEmpty || v) put(r, starts[i], text(v || ''), style); merges.push({ s: { r, c: starts[i] }, e: { r, c: Math.max(starts[i], ends[i]) } }); });
+    r++;
+  };
+  signRow(cols.map((x) => x[0]), 'rpt_sign_h');
+  signRow(cols.map(() => sg.hint), 'rpt_sign_hint');
   r += 3;
-  put(r, 0, text(lay.sign.prepared_name || ''), 'rpt_sign_name');
-  if (lay.sign.approved_name) put(r, sc, text(lay.sign.approved_name), 'rpt_sign_name');
-  merges.push({ s: { r, c: 0 }, e: { r, c: sc - 1 } }, { s: { r, c: sc }, e: { r, c: width - 1 } }); r++;
+  signRow(cols.map((x) => x[1] || ''), 'rpt_sign_name', true);
   r++;
   note(lay.footer || '', 'rpt_note');
   ws['!ref'] = X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, r - 1), c: width - 1 } });

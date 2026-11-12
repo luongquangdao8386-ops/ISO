@@ -69,12 +69,17 @@ var SHEETS = {
   // liên quan (tùy chọn); ref_text tham chiếu (số phiếu sửa chữa M&E, thiết bị, đợt đánh giá…); problem mô tả sự không phù hợp; correction xử lý
   // tức thời; cause nguyên nhân gốc (bắt buộc trước khi kiểm tra hiệu lực); owner_user_id người phụ trách phiếu; due_date hạn hoàn thành;
   // state OPEN | VERIFYING | CLOSED | CANCELLED; files_json ảnh / tệp như Records; verify_count số lần kiểm tra không hiệu lực;
-  // verify_history_json mọi lần kiểm tra [{date, at, by, result, note_vi, note_zh}]
+  // verify_history_json mọi lần kiểm tra [{date, at, by, result, note_vi, note_zh}].
+  // Phiên 3b (source COMPLAINT khiếu nại khách hàng / SUPPLIER SCAR): party_name khách hàng / nhà cung cấp, party_contact người liên hệ,
+  // product_text sản phẩm / vật tư, lot_text số lô / đơn hàng / PO, qty_text số lượng bị ảnh hưởng, severity MINOR | MAJOR | CRITICAL,
+  // complaint_valid '' | YES | NO (khiếu nại có cơ sở), team_text nhóm 8D (D1), escape nguyên nhân lọt / không phát hiện (D4), sent_date ngày
+  // gửi SCAR cho nhà cung cấp, reply_due hạn phản hồi, reply_date + reply_note ngày và nội dung phản hồi khách hàng / trả lời của nhà cung cấp
   Capas: { book: 'B', dot: 1, key: 'capa_id', c: true, i18n: true,
     cols: 'capa_id code source dept_code item_id ref_text found_date found_by_name title_vi title_zh problem_vi problem_zh ' +
       'correction_vi correction_zh cause_vi cause_zh owner_user_id due_date state files_json completed_at completed_by verify_due ' +
       'verify_count verified_at verified_by verify_date verify_result verify_note_vi verify_note_zh verify_history_json closed_at ' +
-      'cancelled_at cancelled_by cancel_reason' },
+      'cancelled_at cancelled_by cancel_reason party_name party_contact product_text lot_text qty_text severity complaint_valid team_text ' +
+      'escape_vi escape_zh sent_date reply_due reply_date reply_note_vi reply_note_zh reply_at reply_by' },
   // Hành động khắc phục / phòng ngừa của phiếu: owner_user_id người phụ trách trong app (nhận Gmail nhắc 7, 1, 0 ngày trước hạn), assignee_name
   // tên người thực hiện ngoài app; round = lần kiểm tra hiệu lực lúc thêm (0: kế hoạch đầu, 1: bổ sung sau lần kiểm tra không hiệu lực thứ nhất…)
   CapaActions: { book: 'B', dot: 1, key: 'action_id', c: true, i18n: true,

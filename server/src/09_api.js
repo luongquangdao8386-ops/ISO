@@ -60,6 +60,7 @@ var HANDLERS_ = {
   'capa.complete': function (ctx) { return capaComplete_(ctx); },
   'capa.verify': function (ctx) { return capaVerify_(ctx); },
   'capa.cancel': function (ctx) { return capaCancel_(ctx); },
+  'capa.reply': function (ctx) { return capaReply_(ctx); },
   'tpl.upload': function (ctx) { return tplUpload_(ctx); },
   'tpl.edit': function (ctx) { return tplEdit_(ctx); },
   'tpl.delete': function (ctx) { return tplDelete_(ctx); },

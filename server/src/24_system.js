@@ -57,6 +57,9 @@ function auditView_(ctx) {
 
 /** Khóa không sửa trong màn Cấu hình (logo sửa ở màn riêng) */
 var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, backup_mirror_email: 1, evidence_sources: 1, gmail_enabled: 1, email_hour: 1 };
+/** Cài đặt là mã biểu in trên phiếu / sổ (viết hoa, bỏ dấu cách, đúng dạng mã biểu) */
+var FORM_CODE_SETTINGS_ = ['capa_form_code', 'capa_log_form_code', 'complaint_form_code', 'd8_form_code', 'scar_form_code'];
+
 var SETTINGS_BOUNDS_ = {
   session_days: [1, 90], session_warn_days: [0, 30], change_pin_session_minutes: [5, 60], reauth_window_minutes: [1, 30], temp_pin_hours: [1, 168],
   max_sessions_per_user: [1, 50], login_fail_limit: [3, 20], login_fail_window_minutes: [1, 120], login_lock_minutes: [1, 1440],
@@ -66,7 +69,7 @@ var SETTINGS_BOUNDS_ = {
   client_timeout_seconds: [10, 60], client_long_timeout_seconds: [20, 300],
   sync_page_size: [100, 2000], doc_max_bytes: [1048576, 52428800], doc_mobile_upload_max_bytes: [1048576, 52428800],
   photo_max_edge_px: [640, 4096], photo_jpeg_quality: [0.5, 0.95], photo_thumb_edge_px: [120, 1024], backup_hour: [0, 23], backup_keep_count: [2, 52],
-  doc_review_months: [1, 60], record_grace_days: [0, 60], version_wait_days: [1, 30], mail_quota_reserve: [0, 90], capa_verify_days: [0, 365]
+  doc_review_months: [1, 60], record_grace_days: [0, 60], version_wait_days: [1, 30], mail_quota_reserve: [0, 90], capa_verify_days: [0, 365], capa_reply_days: [1, 90]
 };
 var SETTINGS_ENUMS_ = {
   backup_weekday: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
@@ -106,8 +109,8 @@ function parseSettingInput_(def, v) {
   if (key === 'min_client_version' && !/^\d+\.\d+\.\d+$/.test(s)) throw bad();
   if (key === 'records_start_date' && s && !isDateStr_(s)) throw bad();
   if (key === 'scope_depts') return normScopeDepts_(s);
-  if ((key === 'capa_form_code' || key === 'capa_log_form_code') && s && !ITEM_CODE_RE_.test(s.toUpperCase().replace(/\s+/g, ''))) throw bad();
-  if (key === 'capa_form_code' || key === 'capa_log_form_code') return s.toUpperCase().replace(/\s+/g, '');
+  if (FORM_CODE_SETTINGS_.indexOf(key) >= 0 && s && !ITEM_CODE_RE_.test(s.toUpperCase().replace(/\s+/g, ''))) throw bad();
+  if (FORM_CODE_SETTINGS_.indexOf(key) >= 0) return s.toUpperCase().replace(/\s+/g, '');
   if (s.length > 500) throw bad();
   return s;
 }

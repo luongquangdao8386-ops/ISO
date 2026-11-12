@@ -8,7 +8,7 @@
 // phiếu tôi phụ trách chưa có hành động đang mở (cần lập kế hoạch, hoặc đã xong hành động — gửi kiểm tra hiệu lực).
 import { session } from './core.js';
 import { recs, items, isSecretary, canApprove, versionEditable, reviewSoon, today, addDaysIso, canSeeRecords, canSubmitRecord, recordCheck,
-  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa } from './data.js';
+  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa, capaIsParty } from './data.js';
 import { queueItems } from './sync.js';
 import { covers } from './periods.js';
 
@@ -61,8 +61,10 @@ export async function pendingFor() {
   out.capa_acts = capaActs.filter((a) => a.state === 'OPEN' && a.owner_user_id === uid && openCapa.has(a.capa_id) && a.due_date && a.due_date <= soon);
   out.capa_verify = capas.filter((c) => c.state === 'VERIFYING' && canVerifyCapa(c) && (!c.verify_due || c.verify_due <= soon));
   out.capa_owner = capas.filter((c) => c.state === 'OPEN' && c.owner_user_id === uid && !capaActs.some((a) => a.capa_id === c.capa_id && a.state === 'OPEN'));
+  // Khiếu nại / SCAR (3b) của tôi chưa phản hồi, hạn phản hồi trong 7 ngày hoặc đã quá
+  out.capa_reply = capas.filter((c) => capaIsParty(c) && (c.state === 'OPEN' || c.state === 'VERIFYING') && c.owner_user_id === uid && !c.reply_date && c.reply_due && c.reply_due <= soon);
   out.total = out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
-    out.req_review.length + out.req_todo.length + out.req_rejected.length + out.capa_acts.length + out.capa_verify.length + out.capa_owner.length +
+    out.req_review.length + out.req_todo.length + out.req_rejected.length + out.capa_acts.length + out.capa_verify.length + out.capa_owner.length + out.capa_reply.length +
     (out.nofile.length ? 1 : 0) + (out.review_due.length ? 1 : 0) + (out.rec_late.length ? 1 : 0) + (out.dist_due.length ? 1 : 0);
   return out;
 }

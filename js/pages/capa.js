@@ -4,10 +4,11 @@
 // tra hiệu lực, kiểm tra hiệu lực (PIN), hủy phiếu (PIN), in phiếu (báo cáo PDF / Excel); /capa/:id/edit: sửa phiếu.
 // Ghi cần mạng (ảnh / tệp vào hàng chờ như hồ sơ, có mạng tự gửi). Quyền phía app chỉ để ẩn/hiện nút (data.js); máy chủ kiểm lại và trả
 // FORBIDDEN trước khi hỏi PIN.
-import { bi, biText, esc, fmtDate, fmtDateTime, badge, nameText, uuid, session, blobToB64, b64ToBytes } from '../core.js';
+import { bi, biText, esc, fmtDate, fmtDateTime, badge, nameText, uuid, session, blobToB64, b64ToBytes, hasLabel } from '../core.js';
 import { ICON, toast, dialog, $ } from '../ui.js';
 import { byId, recs, items, depts, users, userName, isSecretary, roleLevel, today, addDaysIso, can, capaOn, CAPA_SOURCES, canCreateCapa,
-  canEditCapa, canDoCapaAction, canVerifyCapa, canCancelCapa, canCapaFiles, capaOverdue, capaActsOf } from '../data.js';
+  canEditCapa, canDoCapaAction, canVerifyCapa, canCancelCapa, canCapaFiles, capaOverdue, capaActsOf, CAPA_PARTY_SOURCES, CAPA_SEVERITIES,
+  capaIsParty, capaReplyLate, capaForms, CAPA_FORM_SETTING, complaintOn } from '../data.js';
 import { navigate, refresh } from '../router.js';
 import { app, afterCommit, syncNow, updateSyncStatus } from '../app.js';
 import { enqueue, queueItems } from '../sync.js';
@@ -52,10 +53,12 @@ export function capaRow(c, acts, um) {
   const live = acts.filter((a) => a.state !== 'CANCELLED');
   const done = live.filter((a) => a.state === 'DONE').length;
   const due = c.state === 'VERIFYING' ? bi('capa.verify_due_short', { D: esc(fmtDate(c.verify_due)) }) : c.state === 'OPEN' ? bi('capa.due_short', { D: esc(fmtDate(c.due_date)) }) : '';
+  const reply = capaIsParty(c) && !c.reply_date && (c.state === 'OPEN' || c.state === 'VERIFYING') && c.reply_due
+    ? `<span class="${capaReplyLate(c) ? 't-red-text' : ''}">${bi('capa.reply_due_short.' + c.source, { D: esc(fmtDate(c.reply_due)) })}</span>` : '';
   return `<li><a class="cat-row capa-row" href="#/capa/${encodeURIComponent(c.capa_id)}">
     <span class="cat-top"><span class="code">${esc(c.code)}</span>${capaBadges(c, acts)}</span>
     <span class="cat-name">${esc(capaTitle(c))}</span>
-    <span class="cat-meta muted">${esc(c.dept_code)} · ${esc(fmtDate(c.found_date))} · ${bi('capa.src_short.' + c.source)}${c.owner_user_id ? ' · ' + esc(userName(um, c.owner_user_id)) : ''}${due ? ' · ' + due : ''}${live.length ? ' · ' + bi('capa.acts_n', { D: done, N: live.length }) : ''}</span>
+    <span class="cat-meta muted">${esc(c.dept_code)} · ${esc(fmtDate(c.found_date))} · ${bi('capa.src_short.' + c.source)}${c.party_name && capaIsParty(c) ? ': ' + esc(c.party_name) : ''}${c.owner_user_id ? ' · ' + esc(userName(um, c.owner_user_id)) : ''}${due ? ' · ' + due : ''}${reply ? ' · ' + reply : ''}${live.length ? ' · ' + bi('capa.acts_n', { D: done, N: live.length }) : ''}</span>
     ${ICON.chevron}</a></li>`;
 }
 
@@ -95,13 +98,20 @@ async function capaActMap() {
 /* ====================== Sổ khắc phục (/capa) ====================== */
 
 const TABS = ['mine', 'open', 'verify', 'overdue', 'closed', 'all'];
+/** Lọc loại phiếu (3b): '' tất cả · INTERNAL khắc phục nội bộ · COMPLAINT khiếu nại khách hàng · SUPPLIER SCAR */
+const KINDS = ['', 'INTERNAL', 'COMPLAINT', 'SUPPLIER'];
 let curTab = '';
+let curKind = '';
+const kindOf = (c) => (capaIsParty(c) ? c.source : 'INTERNAL');
 
 export async function renderCapas(view, { shell, query }) {
   shell.setScreen({ title: 'nav.capa', back: '/' });
   if (!(await capaOn())) { view.innerHTML = `<div class="card empty-state">${ICON.repairs}<p class="muted">${bi('capa.server_old')}</p></div>`; return; }
   if (!isSecretary() && roleLevel() < 2) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('err.forbidden')}</p></div>`; return; }
-  const all = (await recs('CAPA')).filter((c) => !c.archived_at);
+  const every = (await recs('CAPA')).filter((c) => !c.archived_at);
+  if (query && query.k !== undefined && KINDS.includes(query.k)) curKind = query.k;
+  const kindN = (k) => (k ? every.filter((c) => kindOf(c) === k).length : every.length);
+  const all = curKind ? every.filter((c) => kindOf(c) === curKind) : every;
   const am = await capaActMap();
   const actsOf = (c) => am.get(c.capa_id) || [];
   const uid = myId();
@@ -122,16 +132,30 @@ export async function renderCapas(view, { shell, query }) {
     ? String(b.code).localeCompare(String(a.code))
     : String(dueOf(a)).localeCompare(String(dueOf(b))) || String(a.code).localeCompare(String(b.code))));
   const canNew = isSecretary() || (await depts()).some((d) => d.active !== false && canCreateCapa(d.dept_code));
-  view.innerHTML = `<div class="row list-head">${canNew ? `<a class="btn primary" href="#/capa/new" id="capa-new">${ICON.plus}<span>${bi('capa.new')}</span></a>` : ''}
-      ${await can('report.run') ? `<a class="btn" href="#/reports?kind=CAPA">${ICON.reports}<span>${bi('capa.log_report')}</span></a>` : ''}</div>
+  const cOn = await complaintOn();
+  view.innerHTML = `<div class="row list-head capa-head">${canNew ? `<a class="btn primary" href="#/capa/new" id="capa-new">${ICON.plus}<span>${bi('capa.new')}</span></a>
+      ${cOn ? `<a class="btn" href="#/capa/new?source=COMPLAINT" id="capa-new-complaint">${ICON.plus}<span>${bi('capa.new.COMPLAINT')}</span></a>
+      <a class="btn" href="#/capa/new?source=SUPPLIER" id="capa-new-scar">${ICON.plus}<span>${bi('capa.new.SUPPLIER')}</span></a>` : ''}` : ''}
+      ${await can('report.run') ? `<a class="btn" href="#/reports?kind=CAPA${curKind && curKind !== 'INTERNAL' ? '&source=' + curKind : ''}">${ICON.reports}<span>${bi(curKind && curKind !== 'INTERNAL' ? 'capa.log_report.' + curKind : 'capa.log_report')}</span></a>` : ''}</div>
+    ${cOn || every.some(capaIsParty) ? `<div class="chips capa-kinds" role="radiogroup">${KINDS.map((k) => `<button type="button" class="chip${k === curKind ? ' on' : ''}" data-kind="${k}" role="radio" aria-checked="${k === curKind}">${bi('capa.kind.' + (k || 'ALL'))} <b>${kindN(k)}</b></button>`).join('')}</div>` : ''}
     <div class="chips tabs">${TABS.filter((t) => t === 'all' || t === curTab || by[t].length).map((t) => `<button type="button" class="chip${t === curTab ? ' on' : ''}" data-tab="${t}">${bi('capa.tab.' + t)} <b>${by[t].length}</b></button>`).join('')}</div>
     ${shown.length ? `<ul class="cat-list">${shown.map((c) => capaRow(c, actsOf(c), um)).join('')}</ul>`
-      : `<div class="card empty-state">${ICON.check}<p class="muted">${bi(all.length ? 'capa.none_tab' : 'capa.none')}</p></div>`}
-    <p class="muted small">${bi('capa.how')}</p>`;
+      : `<div class="card empty-state">${ICON.check}<p class="muted">${bi(all.length ? 'capa.none_tab' : (curKind && curKind !== 'INTERNAL' ? 'capa.none.' + curKind : 'capa.none'))}</p></div>`}
+    <p class="muted small">${bi(curKind && curKind !== 'INTERNAL' ? 'capa.how.' + curKind : 'capa.how')}</p>`;
   view.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { curTab = b.dataset.tab; renderCapas(view, { shell, query: {} }); }));
+  view.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', () => { curKind = b.dataset.kind; curTab = ''; renderCapas(view, { shell, query: {} }); }));
 }
 
 /* ====================== Lập / sửa phiếu (/capa/new, /capa/:id/edit) ====================== */
+
+/** Nhãn theo loại phiếu: capa.<key>.COMPLAINT / .SUPPLIER khi có, không thì capa.<key> */
+const lk = (key, kind) => (kind && kind !== 'INTERNAL' && hasLabel(`${key}.${kind}`) ? `${key}.${kind}` : key);
+
+/** Nhóm chip chọn một (bấm lại chip đang chọn thì bỏ chọn khi allowNone) */
+const chipGroup = (name, opts, val, { allowNone = false } = {}) => `<div class="chips" role="radiogroup" data-chips="${name}"${allowNone ? ' data-none="1"' : ''}>${opts.map(([v, lab]) => `<button type="button" class="chip${v === val ? ' on' : ''}" data-v="${esc(v)}" role="radio" aria-checked="${v === val}">${bi(lab)}</button>`).join('')}</div>`;
+
+const PARTY_TEXT = ['party_name', 'party_contact', 'product_text', 'lot_text', 'qty_text', 'team_text'];
+const BI_FIELDS = ['title', 'problem', 'correction', 'cause', 'escape'];
 
 export async function renderCapaForm(view, { shell, params, query }) {
   const editing = !!(params && params.id);
@@ -139,85 +163,152 @@ export async function renderCapaForm(view, { shell, params, query }) {
   const q = query || {};
   const it0 = !editing && q.item ? await byId('ITEM', q.item) : null;
   const backTo = editing ? '/capa/' + encodeURIComponent(params.id) : it0 ? '/item/' + encodeURIComponent(it0.item_id) : '/capa';
-  shell.setScreen({ title: editing ? 'capa.edit' : 'capa.new', back: backTo });
-  if (!(await capaOn())) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.server_old')}</p></div>`; return; }
-  if (editing && !c) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.not_found')}</p></div>`; return; }
-  if (editing && (!canEditCapa(c) || c.state !== 'OPEN')) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.no_edit')}</p></div>`; return; }
-  if (needNet(view)) return;
+  if (!(await capaOn())) { shell.setScreen({ title: 'capa.new', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.server_old')}</p></div>`; return; }
+  if (editing && !c) { shell.setScreen({ title: 'capa.edit', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.not_found')}</p></div>`; return; }
+  if (editing && (!canEditCapa(c) || c.state !== 'OPEN')) { shell.setScreen({ title: 'capa.edit', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.no_edit')}</p></div>`; return; }
+  if (needNet(view)) { shell.setScreen({ title: editing ? 'capa.edit' : 'capa.new', back: backTo }); return; }
   const deps = (await depts()).filter((d) => d.active !== false && (canCreateCapa(d.dept_code) || (c && c.dept_code === d.dept_code)));
-  if (!deps.length) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('err.forbidden')}</p></div>`; return; }
+  if (!deps.length) { shell.setScreen({ title: 'capa.new', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('err.forbidden')}</p></div>`; return; }
   const list = await items();
-  let source = c ? c.source : (CAPA_SOURCES.includes(q.source) ? q.source : 'EQUIPMENT');
-  let dept = c ? c.dept_code : (it0 && deps.some((d) => d.dept_code === it0.dept_code) ? it0.dept_code : (deps.length === 1 ? deps[0].dept_code : ''));
-  const uOpts = await userOptions();
+  const st = session.settings || {};
   const t = today();
+  // Giá trị đang sửa (giữ chữ đã gõ khi đổi loại phiếu)
+  let kind = c ? kindOf(c) : (CAPA_PARTY_SOURCES.includes(q.source) ? q.source : 'INTERNAL');
+  let source = c && !capaIsParty(c) ? c.source : (CAPA_SOURCES.includes(q.source) ? q.source : 'EQUIPMENT');
+  const v = {
+    dept_code: c ? c.dept_code : (it0 && deps.some((d) => d.dept_code === it0.dept_code) ? it0.dept_code : (deps.length === 1 ? deps[0].dept_code : '')),
+    found_date: c ? c.found_date : t, found_by_name: c ? c.found_by_name || '' : '', ref_text: c ? c.ref_text || '' : '',
+    item_id: c ? c.item_id || '' : (it0 ? it0.item_id : ''), owner_user_id: c ? c.owner_user_id : myId(), due_date: c ? c.due_date : addDaysIso(t, 30),
+    severity: c ? c.severity || '' : '', complaint_valid: c ? c.complaint_valid || '' : '', sent_date: c ? c.sent_date || '' : '',
+    reply_due: c ? c.reply_due || '' : '', i18n_meta: c ? c.i18n_meta : null
+  };
+  PARTY_TEXT.forEach((k) => { v[k] = c ? c[k] || '' : ''; });
+  BI_FIELDS.forEach((b) => { v[b + '_vi'] = c ? c[b + '_vi'] || '' : ''; v[b + '_zh'] = c ? c[b + '_zh'] || '' : ''; });
+  const replyDays = Number(st.capa_reply_days || 7);
+  const cOn = await complaintOn();
+  if (!cOn && kind !== 'INTERNAL' && !c) kind = 'INTERNAL';
+  const uOpts = await userOptions();
   const itemOpts = (dp) => list.filter((x) => !dp || x.dept_code === dp).map((x) => [x.item_id, `${esc(x.code)} · ${esc(x.name_vi || x.name_zh || '')}`]);
-  view.innerHTML = `<form class="card form capa-form" novalidate>
-    <div class="fld" data-field="source"><label>${bi('capa.source')} <span class="req">*</span></label>
-      <div class="chips" role="radiogroup">${CAPA_SOURCES.map((s) => `<button type="button" class="chip${s === source ? ' on' : ''}" data-src="${s}" role="radio" aria-checked="${s === source}">${bi('capa.src.' + s)}</button>`).join('')}</div><div class="ferr"></div></div>
-    <div class="form-grid">
-      ${selectInput('dept_code', 'capa.dept', deps.map((d) => [d.dept_code, esc(d.dept_code + ' · ' + nameText(d))]), dept, { required: true })}
-      ${dateInput('found_date', 'capa.found_date', c ? c.found_date : t, { required: true })}
-      ${textInput('found_by_name', 'capa.found_by', c ? c.found_by_name : '', { maxlength: 120, hint: biText('capa.found_by_hint') })}
-      ${textInput('ref_text', 'capa.ref', c ? c.ref_text : '', { maxlength: 200, hint: biText('capa.ref_hint') })}
-    </div>
-    <div id="capa-item">${selectInput('item_id', 'capa.item', itemOpts(dept), c ? c.item_id : (it0 ? it0.item_id : ''), { empty: 'capa.item_none', hint: biText('capa.item_hint') })}</div>
-    ${bilingualInputs('title', c, { labelKey: 'capa.title_f', maxlength: 300, required: false })}
-    ${bilingualInputs('problem', c, { labelKey: 'capa.problem', area: true, maxlength: 3000 })}
-    ${bilingualInputs('correction', c, { labelKey: 'capa.correction', area: true, maxlength: 3000, required: false })}
-    ${bilingualInputs('cause', c, { labelKey: 'capa.cause', area: true, maxlength: 3000, required: false })}
-    <p class="muted small">${bi('capa.cause_hint')}</p>
-    <div class="form-grid">
-      ${selectInput('owner_user_id', 'capa.owner', uOpts, c ? c.owner_user_id : myId(), { empty: '' })}
-      ${dateInput('due_date', 'capa.due_date', c ? c.due_date : addDaysIso(t, 30), { required: true })}
-    </div>
-    <p class="form-err err"></p>
-    <div class="row"><a class="btn" href="#${backTo}">${bi('btn.cancel')}</a>
-      <button type="submit" class="btn primary" id="capa-save">${ICON.check}<span>${bi(editing ? 'btn.save' : 'capa.create')}</span></button></div>
-    ${editing ? '' : `<p class="muted small">${bi('capa.flow_note')}</p>`}
-  </form>`;
-  const form = $('form', view);
-  wireForm(form);
-  form.querySelectorAll('[data-src]').forEach((b) => b.addEventListener('click', () => {
-    source = b.dataset.src;
-    form.querySelectorAll('[data-src]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); });
-  }));
-  $('#f-dept_code', form).addEventListener('change', (e) => {
-    dept = e.target.value;
-    const cur = readField(form, 'item_id');
-    const box = $('#capa-item', form);
-    const keep = list.some((x) => x.item_id === cur && (!dept || x.dept_code === dept)) ? cur : '';
-    box.innerHTML = selectInput('item_id', 'capa.item', itemOpts(dept), keep, { empty: 'capa.item_none', hint: biText('capa.item_hint') });
-  });
-  form.addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-    const p = { capa_id: editing ? c.capa_id : uuid(), source };
-    const errs = [];
-    p.dept_code = readField(form, 'dept_code');
-    if (!p.dept_code) errs.push({ field: 'dept_code', key: 'field.required' });
-    p.item_id = readField(form, 'item_id') || '';
-    p.owner_user_id = readField(form, 'owner_user_id') || '';
-    ['found_by_name', 'ref_text', 'title_vi', 'title_zh', 'problem_vi', 'problem_zh', 'correction_vi', 'correction_zh', 'cause_vi', 'cause_zh'].forEach((k) => { p[k] = readField(form, k) || ''; });
-    if (!p.problem_vi && !p.problem_zh) errs.push({ field: 'problem', key: 'field.one_lang' });
-    const found = readField(form, 'found_date');
-    const due = readField(form, 'due_date');
-    if (!found) errs.push({ field: 'found_date', key: found === null ? 'field.invalid_date' : 'field.required' }); else p.found_date = found;
-    if (!due) errs.push({ field: 'due_date', key: due === null ? 'field.invalid_date' : 'field.required' }); else p.due_date = due;
-    if (found && due && due < found) errs.push({ field: 'due_date', key: 'capa.due_before_found' });
-    if (errs.length) { showErrors(form, errs); return; }
-    const btn = $('#capa-save', form);
-    busy(btn, true);
-    const r = await writeOnline('capa.save', p, { expected_version: editing ? c.record_version : 0 });
-    busy(btn, false);
-    if (r.ok) {
-      await afterCommit();
-      toast(editing ? bi('form.saved') : bi('capa.created_ok', { C: esc((r.data && r.data.record && r.data.record.code) || '') }), 'ok');
-      navigate('/capa/' + encodeURIComponent(p.capa_id), { replace: true });
-      return;
-    }
-    if (r.code === 'VALIDATION_ERROR') { showErrors(form, r.errors); return; }
-    writeFail(r);
-  });
+
+  const grab = (form) => {
+    ['dept_code', 'found_by_name', 'ref_text', 'item_id', 'owner_user_id', ...PARTY_TEXT].forEach((k) => { const x = readField(form, k); if (x !== undefined) v[k] = x || ''; });
+    ['found_date', 'due_date', 'sent_date', 'reply_due'].forEach((k) => { const x = readField(form, k); if (x !== undefined && x !== null) v[k] = x; });
+    BI_FIELDS.forEach((b) => ['vi', 'zh'].forEach((l) => { const x = readField(form, b + '_' + l); if (x !== undefined) v[b + '_' + l] = x; }));
+    ['severity', 'complaint_valid'].forEach((k) => { const g = form.querySelector(`[data-chips="${k}"]`); if (g) { const on = g.querySelector('.chip.on'); v[k] = on ? on.dataset.v : ''; } });
+  };
+
+  const draw = () => {
+    const party = kind !== 'INTERNAL';
+    shell.setScreen({ title: editing ? lk('capa.edit', kind) : lk('capa.new', kind), back: backTo });
+    view.innerHTML = `<form class="card form capa-form" novalidate>
+      ${cOn ? `<div class="fld" data-field="kind"><label>${bi('capa.kind')}</label>${chipGroup('kind', ['INTERNAL', 'COMPLAINT', 'SUPPLIER'].map((k) => [k, 'capa.kind.' + k]), kind)}</div>` : ''}
+      ${party ? `<p class="muted small">${bi('capa.kind_note.' + kind)}</p>` : `<div class="fld" data-field="source"><label>${bi('capa.source')} <span class="req">*</span></label>
+        <div class="chips" role="radiogroup">${CAPA_SOURCES.map((s) => `<button type="button" class="chip${s === source ? ' on' : ''}" data-src="${s}" role="radio" aria-checked="${s === source}">${bi('capa.src.' + s)}</button>`).join('')}</div><div class="ferr"></div></div>`}
+      <div class="form-grid">
+        ${selectInput('dept_code', 'capa.dept', deps.map((d) => [d.dept_code, esc(d.dept_code + ' · ' + nameText(d))]), v.dept_code, { required: true })}
+        ${dateInput('found_date', lk('capa.found_date', kind), v.found_date, { required: true })}
+        ${textInput('found_by_name', lk('capa.found_by', kind), v.found_by_name, { maxlength: 120, hint: biText('capa.found_by_hint') })}
+        ${textInput('ref_text', lk('capa.ref', kind), v.ref_text, { maxlength: 200, hint: biText(lk('capa.ref_hint', kind)) })}
+      </div>
+      ${party ? `<fieldset class="capa-party"><legend>${bi('capa.party.' + kind)}</legend>
+        <div class="form-grid">
+          ${textInput('party_name', 'capa.party_name.' + kind, v.party_name, { maxlength: 200, required: true })}
+          ${textInput('party_contact', 'capa.party_contact', v.party_contact, { maxlength: 200, hint: biText('capa.party_contact_hint') })}
+          ${textInput('product_text', 'capa.product.' + kind, v.product_text, { maxlength: 200 })}
+          ${textInput('lot_text', 'capa.lot.' + kind, v.lot_text, { maxlength: 200 })}
+          ${textInput('qty_text', 'capa.qty', v.qty_text, { maxlength: 100, hint: biText('capa.qty_hint') })}
+          ${kind === 'SUPPLIER' ? dateInput('sent_date', 'capa.sent_date', v.sent_date, { hint: biText('capa.sent_date_hint') }) : ''}
+          ${dateInput('reply_due', 'capa.reply_due.' + kind, v.reply_due || addDaysIso(v.found_date || t, replyDays), { hint: biText('capa.reply_due_hint.' + kind, { N: replyDays }) })}
+        </div>
+        <div class="fld" data-field="severity"><label>${bi('capa.severity')}</label>${chipGroup('severity', CAPA_SEVERITIES.map((x) => [x, 'capa.sev.' + x]), v.severity, { allowNone: true })}<div class="ferr"></div></div>
+        ${kind === 'COMPLAINT' ? `<div class="fld" data-field="complaint_valid"><label>${bi('capa.valid')}</label>${chipGroup('complaint_valid', [['', 'capa.valid.PENDING'], ['YES', 'capa.valid.YES'], ['NO', 'capa.valid.NO']], v.complaint_valid)}<div class="hint">${bi('capa.valid_hint')}</div><div class="ferr"></div></div>
+          ${textInput('team_text', 'capa.team', v.team_text, { maxlength: 500, hint: biText('capa.team_hint') })}` : ''}
+      </fieldset>` : ''}
+      <div id="capa-item">${selectInput('item_id', 'capa.item', itemOpts(v.dept_code), v.item_id, { empty: 'capa.item_none', hint: biText('capa.item_hint') })}</div>
+      ${bilingualInputs('title', v, { labelKey: 'capa.title_f', maxlength: 300, required: false })}
+      ${bilingualInputs('problem', v, { labelKey: lk('capa.problem', kind), area: true, maxlength: 3000 })}
+      ${bilingualInputs('correction', v, { labelKey: lk('capa.correction', kind), area: true, maxlength: 3000, required: false })}
+      ${bilingualInputs('cause', v, { labelKey: lk('capa.cause', kind), area: true, maxlength: 3000, required: false })}
+      ${party ? bilingualInputs('escape', v, { labelKey: 'capa.escape', area: true, maxlength: 3000, required: false }) : ''}
+      <p class="muted small">${bi(lk('capa.cause_hint', kind))}</p>
+      <div class="form-grid">
+        ${selectInput('owner_user_id', lk('capa.owner', kind), uOpts, v.owner_user_id, { empty: '' })}
+        ${dateInput('due_date', 'capa.due_date', v.due_date, { required: true })}
+      </div>
+      <p class="form-err err"></p>
+      <div class="row"><a class="btn" href="#${backTo}">${bi('btn.cancel')}</a>
+        <button type="submit" class="btn primary" id="capa-save">${ICON.check}<span>${bi(editing ? 'btn.save' : 'capa.create')}</span></button></div>
+      ${editing ? '' : `<p class="muted small">${bi('capa.flow_note')}</p>`}
+    </form>`;
+    wire();
+  };
+
+  const wire = () => {
+    const form = $('form', view);
+    wireForm(form);
+    form.querySelectorAll('[data-chips]').forEach((g) => g.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => {
+      const off = g.dataset.none === '1' && b.classList.contains('on');
+      g.querySelectorAll('[data-v]').forEach((x) => { const on = !off && x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
+      if (g.dataset.chips === 'kind' && b.dataset.v !== kind) { grab(form); kind = b.dataset.v; draw(); }
+    })));
+    form.querySelectorAll('[data-src]').forEach((b) => b.addEventListener('click', () => {
+      source = b.dataset.src;
+      form.querySelectorAll('[data-src]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); });
+    }));
+    $('#f-dept_code', form).addEventListener('change', (e) => {
+      v.dept_code = e.target.value;
+      const cur = readField(form, 'item_id');
+      const box = $('#capa-item', form);
+      const keep = list.some((x) => x.item_id === cur && (!v.dept_code || x.dept_code === v.dept_code)) ? cur : '';
+      box.innerHTML = selectInput('item_id', 'capa.item', itemOpts(v.dept_code), keep, { empty: 'capa.item_none', hint: biText('capa.item_hint') });
+    });
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const party = kind !== 'INTERNAL';
+      const p = { capa_id: editing ? c.capa_id : uuid(), source: party ? kind : source };
+      const errs = [];
+      p.dept_code = readField(form, 'dept_code');
+      if (!p.dept_code) errs.push({ field: 'dept_code', key: 'field.required' });
+      p.item_id = readField(form, 'item_id') || '';
+      p.owner_user_id = readField(form, 'owner_user_id') || '';
+      ['found_by_name', 'ref_text', 'title_vi', 'title_zh', 'problem_vi', 'problem_zh', 'correction_vi', 'correction_zh', 'cause_vi', 'cause_zh'].forEach((k) => { p[k] = readField(form, k) || ''; });
+      if (!p.problem_vi && !p.problem_zh) errs.push({ field: 'problem', key: 'field.one_lang' });
+      const found = readField(form, 'found_date');
+      const due = readField(form, 'due_date');
+      if (!found) errs.push({ field: 'found_date', key: found === null ? 'field.invalid_date' : 'field.required' }); else p.found_date = found;
+      if (!due) errs.push({ field: 'due_date', key: due === null ? 'field.invalid_date' : 'field.required' }); else p.due_date = due;
+      if (found && due && due < found) errs.push({ field: 'due_date', key: 'capa.due_before_found' });
+      if (party) {
+        PARTY_TEXT.forEach((k) => { const x = readField(form, k); if (x !== undefined) p[k] = x || ''; });
+        ['escape_vi', 'escape_zh'].forEach((k) => { p[k] = readField(form, k) || ''; });
+        if (!p.party_name) errs.push({ field: 'party_name', key: 'field.required' });
+        const sev = form.querySelector('[data-chips="severity"] .chip.on');
+        p.severity = sev ? sev.dataset.v : '';
+        const val = form.querySelector('[data-chips="complaint_valid"] .chip.on');
+        if (kind === 'COMPLAINT') p.complaint_valid = val ? val.dataset.v : '';
+        for (const k of ['reply_due', 'sent_date']) {
+          const x = readField(form, k);
+          if (x === undefined) continue;
+          if (x === null) errs.push({ field: k, key: 'field.invalid_date' }); else p[k] = x;
+        }
+        if (p.reply_due && found && p.reply_due < found) errs.push({ field: 'reply_due', key: 'capa.due_before_found' });
+      }
+      if (errs.length) { showErrors(form, errs); return; }
+      const btn = $('#capa-save', form);
+      busy(btn, true);
+      const r = await writeOnline('capa.save', p, { expected_version: editing ? c.record_version : 0 });
+      busy(btn, false);
+      if (r.ok) {
+        await afterCommit();
+        toast(editing ? bi('form.saved') : bi('capa.created_ok', { C: esc((r.data && r.data.record && r.data.record.code) || '') }), 'ok');
+        navigate('/capa/' + encodeURIComponent(p.capa_id), { replace: true });
+        return;
+      }
+      if (r.code === 'VALIDATION_ERROR') { showErrors(form, r.errors); return; }
+      writeFail(r);
+    });
+  };
+  draw();
 }
 
 /* ====================== Chi tiết phiếu (/capa/:id) ====================== */
@@ -264,16 +355,43 @@ async function doneDialog(a, prev) {
   });
 }
 
-/** Hộp thoại ghi nguyên nhân gốc */
+/** Hộp thoại ghi nguyên nhân gốc (khiếu nại / SCAR thêm nguyên nhân lọt — vì sao không phát hiện) */
 async function causeDialog(c) {
+  const K = capaIsParty(c) ? c.source : '';
   return dialog({
-    title: bi('capa.cause_btn'),
+    title: bi(lk('capa.cause_btn', K)),
     wide: true,
-    body: `<p class="muted small">${bi('capa.cause_hint')}</p>
+    body: `<p class="muted small">${bi(lk('capa.cause_hint', K))}</p>
+      <fieldset class="bi-pair"><legend>${bi(lk('capa.cause', K))}</legend>
       <label class="fld"><span>${bi('i18n.lang_vi')}</span><textarea class="inp" rows="4" maxlength="3000" id="cc-vi">${esc(c.cause_vi || '')}</textarea></label>
       <label class="fld"><span>${bi('i18n.lang_zh')}</span><textarea class="inp" rows="3" maxlength="3000" id="cc-zh">${esc(c.cause_zh || '')}</textarea></label>
-      <div class="hint">${bi('field.one_lang')}</div>`,
-    actions: [{ label: bi('btn.cancel'), value: null }, { label: bi('btn.save'), kind: 'primary', read: (w) => ({ cause_vi: $('#cc-vi', w).value.trim(), cause_zh: $('#cc-zh', w).value.trim() }) }]
+      <div class="hint">${bi('field.one_lang')}</div></fieldset>
+      ${K ? `<fieldset class="bi-pair"><legend>${bi('capa.escape')}</legend>
+      <label class="fld"><span>${bi('i18n.lang_vi')}</span><textarea class="inp" rows="3" maxlength="3000" id="ce-vi">${esc(c.escape_vi || '')}</textarea></label>
+      <label class="fld"><span>${bi('i18n.lang_zh')}</span><textarea class="inp" rows="2" maxlength="3000" id="ce-zh">${esc(c.escape_zh || '')}</textarea></label>
+      <div class="hint">${bi('capa.escape_hint')}</div></fieldset>` : ''}`,
+    actions: [{ label: bi('btn.cancel'), value: null }, { label: bi('btn.save'), kind: 'primary', read: (w) => ({
+      cause_vi: $('#cc-vi', w).value.trim(), cause_zh: $('#cc-zh', w).value.trim(),
+      ...(K ? { escape_vi: $('#ce-vi', w).value.trim(), escape_zh: $('#ce-zh', w).value.trim() } : {})
+    }) }]
+  });
+}
+
+/** Hộp thoại ghi phản hồi khách hàng (khiếu nại) / trả lời của nhà cung cấp (SCAR) */
+async function replyDialog(c, prev) {
+  const v = prev || {};
+  return dialog({
+    title: bi('capa.reply_btn.' + c.source),
+    wide: true,
+    body: `<p class="muted small">${bi('capa.reply_hint.' + c.source)}</p>
+      <label class="fld"><span>${bi('capa.reply_date.' + c.source)} <span class="req">*</span></span><input class="inp" type="date" id="cr-date" value="${esc(v.reply_date || today())}"></label>
+      <fieldset class="bi-pair"><legend>${bi('capa.reply_note.' + c.source)} <span class="req">*</span></legend>
+        <label class="fld"><span>${bi('i18n.lang_vi')}</span><textarea class="inp" rows="4" maxlength="3000" id="cr-vi">${esc(v.note_vi || '')}</textarea></label>
+        <label class="fld"><span>${bi('i18n.lang_zh')}</span><textarea class="inp" rows="2" maxlength="3000" id="cr-zh">${esc(v.note_zh || '')}</textarea></label>
+        <div class="hint">${bi('field.one_lang')}</div></fieldset>`,
+    actions: [{ label: bi('btn.cancel'), value: null }, { label: bi('btn.save'), kind: 'primary', read: (w) => ({
+      reply_date: $('#cr-date', w).value, note_vi: $('#cr-vi', w).value.trim(), note_zh: $('#cr-zh', w).value.trim()
+    }) }]
   });
 }
 
@@ -283,7 +401,8 @@ async function verifyDialog(c, prev) {
   const res = v.result || '';
   return dialog({
     title: bi('capa.verify_title', { N: (Number(c.verify_count) || 0) + 1 }),
-    body: `<p class="muted small">${bi('capa.verify_note_hint')}</p>
+    body: `${capaIsParty(c) && !c.reply_date ? `<p class="banner err small">${bi('capa.need_reply.' + c.source)}</p>` : ''}
+      <p class="muted small">${bi(c.source === 'COMPLAINT' && c.complaint_valid === 'NO' ? 'capa.verify_note_hint_no' : 'capa.verify_note_hint')}</p>
       <div class="chips" role="radiogroup" id="cv-res">${['EFFECTIVE', 'NOT_EFFECTIVE'].map((x) => `<button type="button" class="chip${res === x ? ' on' : ''}" data-res="${x}" role="radio" aria-checked="${res === x}">${bi('capa.result.' + x)}</button>`).join('')}</div>
       <label class="fld"><span>${bi('capa.verify_date')}</span><input class="inp" type="date" id="cv-date" value="${esc(v.verify_date || today())}"></label>
       <fieldset class="bi-pair"><legend>${bi('capa.verify_note')} <span class="req">*</span></legend>
@@ -323,10 +442,31 @@ function actionHtml(c, a, um, { online }) {
   </li>`;
 }
 
+/** Thẻ đối tác của khiếu nại / SCAR: khách hàng / nhà cung cấp, sản phẩm, lô, số lượng, hạn phản hồi, phản hồi (nút Ghi phản hồi / Bỏ) */
+function partyCard(c, { edit, online, who }) {
+  const K = c.source;
+  const late = capaReplyLate(c);
+  const rows = [
+    kv('capa.party_name.' + K, esc(c.party_name || '')), kv('capa.party_contact', esc(c.party_contact || '')),
+    kv('capa.product.' + K, esc(c.product_text || '')), kv('capa.lot.' + K, esc(c.lot_text || '')),
+    kv('capa.qty', esc(c.qty_text || '')), K === 'SUPPLIER' ? kv('capa.sent_date', esc(fmtDate(c.sent_date))) : '',
+    kv('capa.reply_due.' + K, `<span class="${late ? 't-red-text' : ''}">${esc(fmtDate(c.reply_due))}</span>`)
+  ];
+  const reply = c.reply_date
+    ? `<div class="capa-reply done"><div class="rec-top"><strong>${bi('capa.reply.' + K)}</strong>${badge('capa.replied')}</div>
+        <div class="muted small">${esc(fmtDate(c.reply_date))}${c.reply_by ? ' · ' + who(c.reply_by) : ''}</div>
+        <p class="small">${pair(c.reply_note_vi, c.reply_note_zh, c.i18n_meta, 'reply_note')}</p>
+        ${edit ? `<div class="row"><button type="button" class="btn small" id="capa-reply-undo" ${online ? '' : 'disabled'}>${ICON.x}<span>${bi('capa.reply_undo')}</span></button></div>` : ''}</div>`
+    : `<div class="capa-reply"><p class="small ${late ? 't-red-text' : 'muted'}">${bi(late ? 'capa.reply_late.' + K : 'capa.reply_wait.' + K, { D: esc(fmtDate(c.reply_due)) })}</p>
+        ${edit ? `<div class="row"><button type="button" class="btn small primary" id="capa-reply" ${online ? '' : 'disabled'}>${ICON.edit}<span>${bi('capa.reply_btn.' + K)}</span></button></div>` : ''}</div>`;
+  return `<section class="card capa-party-card"><h3>${bi('capa.party.' + K)}</h3>${rows.join('')}${reply}</section>`;
+}
+
 export async function renderCapa(view, ctx) {
   const { shell, params } = ctx;
   const c = await byId('CAPA', params.id);
-  shell.setScreen({ title: 'capa.title', back: '/capa' });
+  const K = c && capaIsParty(c) ? c.source : '';
+  shell.setScreen({ title: lk('capa.title', K), back: '/capa' });
   if (!c) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.not_found')}</p><a class="btn" href="#/capa">${bi('nav.capa')}</a></div>`; return; }
   const acts = await capaActsOf(c.capa_id);
   const live = acts.filter((a) => a.state !== 'CANCELLED');
@@ -347,7 +487,8 @@ export async function renderCapa(view, ctx) {
   const openActs = live.filter((a) => a.state === 'OPEN').length;
   const doneActs = live.filter((a) => a.state === 'DONE').length;
   const hasCause = !!(c.cause_vi || c.cause_zh);
-  const readyHint = !hasCause ? 'capa.need_cause' : openActs ? 'capa.need_done' : !doneActs ? 'capa.need_action' : '';
+  const noActOk = c.source === 'COMPLAINT' && c.complaint_valid === 'NO';
+  const readyHint = !hasCause ? lk('capa.need_cause', K) : openActs ? 'capa.need_done' : !doneActs && !noActOk ? 'capa.need_action' : '';
   const acts2 = [];
   if (edit) acts2.push(`<button type="button" class="btn primary" id="capa-complete" ${online && !readyHint ? '' : 'disabled'}>${ICON.up}<span>${bi('capa.complete')}</span></button>`);
   if (c.state === 'VERIFYING' && canVerifyCapa(c)) acts2.push(`<button type="button" class="btn primary" id="capa-verify" ${online ? '' : 'disabled'}>${ICON.check}<span>${bi('capa.verify')}</span></button>`);
@@ -359,28 +500,33 @@ export async function renderCapa(view, ctx) {
     <section class="card item-head">
       <div class="rec-top"><span class="code big">${esc(c.code)}</span>${capaBadges(c, acts)}</div>
       <h2 class="item-name capa-name">${esc(capaTitle(c))}</h2>
-      <div class="rec-badges">${badge('capa.src.' + c.source)} <span class="small">${esc(c.dept_code)}</span></div>
+      <div class="rec-badges">${badge('capa.src.' + c.source)}${c.severity ? ' ' + badge('capa.sev.' + c.severity) : ''}${c.source === 'COMPLAINT' && c.complaint_valid ? ' ' + badge('capa.valid.' + c.complaint_valid) : ''} <span class="small">${esc(c.dept_code)}</span></div>
+      ${K && c.party_name ? `<p class="small capa-party-line">${bi('capa.party.' + K)}: <strong>${esc(c.party_name)}</strong></p>` : ''}
+      ${noActOk && c.state === 'OPEN' ? `<p class="banner info small">${bi('capa.valid_no_note')}</p>` : ''}
       ${c.state === 'CLOSED' ? `<p class="banner ok small">${bi('capa.closed_by', { U: who(c.verified_by), D: esc(fmtDate(c.verify_date || c.closed_at)) })}</p>` : ''}
       ${c.state === 'CANCELLED' ? `<p class="banner small">${bi('capa.cancelled_by', { U: who(c.cancelled_by), D: esc(fmtDate(c.cancelled_at)) })}${c.cancel_reason ? ': ' + esc(c.cancel_reason) : ''}</p>` : ''}
       ${c.state === 'VERIFYING' ? `<p class="banner info small">${bi('capa.verifying_note', { D: esc(fmtDate(c.verify_due)) })}</p>` : ''}
       ${lastNo ? `<p class="banner err small">${bi('capa.not_effective_note', { N: lastNo.n, D: esc(fmtDate(lastNo.date)) })}${lastNo.note_vi || lastNo.note_zh ? ': ' + esc(lastNo.note_vi || lastNo.note_zh) : ''}</p>` : ''}
     </section>
     <section class="card"><div class="card-head"><h3>${bi('capa.info')}</h3>${edit ? `<a class="btn tiny" href="#/capa/${encodeURIComponent(c.capa_id)}/edit" id="capa-edit">${ICON.edit}<span>${bi('btn.edit')}</span></a>` : ''}</div>
-      ${kv('capa.found_date', esc(fmtDate(c.found_date)))}
-      ${kv('capa.found_by', esc(c.found_by_name || ''))}
+      ${kv(lk('capa.found_date', K), esc(fmtDate(c.found_date)))}
+      ${kv(lk('capa.found_by', K), esc(c.found_by_name || ''))}
       ${kv('capa.dept', esc(c.dept_code))}
       ${it ? kv('capa.item', `<a href="#/item/${encodeURIComponent(it.item_id)}"><span class="code">${esc(it.code)}</span></a> ${statusDot(it.status)} ${esc(nameText(it))}`) : ''}
-      ${kv('capa.ref', esc(c.ref_text || ''))}
-      ${kv('capa.owner', who(c.owner_user_id))}
+      ${kv(lk('capa.ref', K), esc(c.ref_text || ''))}
+      ${kv(lk('capa.owner', K), who(c.owner_user_id))}
+      ${K === 'COMPLAINT' ? kv('capa.team', esc(c.team_text || '')) : ''}
       ${kv('capa.due_date', `<span class="${od && c.state === 'OPEN' ? 't-red-text' : ''}">${esc(fmtDate(c.due_date))}</span>`)}
       ${kv('capa.created', `${who(c.created_by)} <span class="muted small">${esc(fmtDateTime(c.created_at))}</span>`)}
-      ${block('capa.problem', pair(c.problem_vi, c.problem_zh, c.i18n_meta, 'problem'))}
-      ${block('capa.correction', pair(c.correction_vi, c.correction_zh, c.i18n_meta, 'correction'))}
+      ${block(lk('capa.problem', K), pair(c.problem_vi, c.problem_zh, c.i18n_meta, 'problem'))}
+      ${block(lk('capa.correction', K), pair(c.correction_vi, c.correction_zh, c.i18n_meta, 'correction'))}
     </section>
-    <section class="card capa-cause"><div class="card-head"><h3>${bi('capa.cause')}</h3>${edit ? `<button type="button" class="btn tiny" id="capa-cause-btn" ${online ? '' : 'disabled'}>${ICON.edit}<span>${bi(hasCause ? 'btn.edit' : 'capa.cause_btn')}</span></button>` : ''}</div>
-      ${hasCause ? `<p>${pair(c.cause_vi, c.cause_zh, c.i18n_meta, 'cause')}</p>` : `<p class="muted small">${bi('capa.cause_empty')}</p>`}
+    ${K ? partyCard(c, { edit: (c.state === 'OPEN' || c.state === 'VERIFYING') && canEditCapa(c), online, who }) : ''}
+    <section class="card capa-cause"><div class="card-head"><h3>${bi(lk('capa.cause', K))}</h3>${edit ? `<button type="button" class="btn tiny" id="capa-cause-btn" ${online ? '' : 'disabled'}>${ICON.edit}<span>${bi(hasCause ? 'btn.edit' : lk('capa.cause_btn', K))}</span></button>` : ''}</div>
+      ${hasCause ? `<p>${pair(c.cause_vi, c.cause_zh, c.i18n_meta, 'cause')}</p>` : `<p class="muted small">${bi(lk('capa.cause_empty', K))}</p>`}
+      ${K && (c.escape_vi || c.escape_zh) ? block('capa.escape', pair(c.escape_vi, c.escape_zh, c.i18n_meta, 'escape')) : ''}
     </section>
-    <section class="card capa-acts"><div class="card-head"><h3>${bi('capa.actions')} <span class="muted small">${bi('capa.acts_n', { D: doneActs, N: live.length })}</span></h3>
+    <section class="card capa-acts"><div class="card-head"><h3>${bi(lk('capa.actions', K))} <span class="muted small">${bi('capa.acts_n', { D: doneActs, N: live.length })}</span></h3>
       ${edit ? `<button type="button" class="btn tiny primary" id="capa-act-add" ${online ? '' : 'disabled'}>${ICON.plus}<span>${bi('capa.act_add')}</span></button>` : ''}</div>
       ${live.length ? `<ul class="plain capa-act-list">${live.map((a) => actionHtml(c, a, um, { online })).join('')}</ul>` : `<p class="muted small">${bi('capa.acts_empty')}</p>`}
       ${gone.length ? `<details class="ver-hist"><summary>${bi('capa.acts_cancelled_n', { N: gone.length })}</summary><ul class="plain capa-act-list">${gone.map((a) => actionHtml(c, a, um, { online })).join('')}</ul></details>` : ''}
@@ -400,7 +546,10 @@ export async function renderCapa(view, ctx) {
     ${wait ? `<p class="banner info small">${wait}</p>` : ''}
     ${edit && readyHint ? `<p class="muted small">${bi(readyHint)}</p>` : ''}
     ${acts2.length ? `<div class="row item-actions">${acts2.join('')}</div>` : ''}
-    ${await can('report.run') ? `<a class="small rp-link" href="#/reports?kind=CAPA&capa=${encodeURIComponent(c.capa_id)}">${ICON.print} ${bi('capa.print')} ›</a>` : ''}
+    ${await can('report.run') ? `<div class="capa-prints">${capaForms(c).map((f) => {
+      const code = (session.settings || {})[CAPA_FORM_SETTING[f]] || '';
+      return `<a class="small rp-link" data-form="${f}" href="#/reports?kind=CAPA&capa=${encodeURIComponent(c.capa_id)}&form=${f}">${ICON.print} ${bi('capa.print.' + f)}${code ? ` <span class="code">${esc(code)}</span>` : ''} ›</a>`;
+    }).join('')}</div>` : ''}
     ${!online && acts2.length ? `<p class="muted small">${bi('sync.need_network')}</p>` : ''}
   </div>`;
   wireDocButtons(view);
@@ -462,6 +611,27 @@ export async function renderCapa(view, ctx) {
     if (res.ok) return again('form.saved');
     writeFail(res);
   });
+  on('#capa-reply', async () => {
+    let prev = null;
+    for (;;) {
+      const v = await replyDialog(c, prev);
+      if (!v) return;
+      prev = v;
+      if (!v.reply_date) { toast(bi('capa.need_reply_date'), 'err'); continue; }
+      if (!v.note_vi && !v.note_zh) { toast(bi('capa.need_reply_note.' + c.source), 'err'); continue; }
+      const res = await writeOnline('capa.reply', { capa_id: c.capa_id, ...v }, { expected_version: c.record_version });
+      if (res.ok) return again('capa.reply_ok.' + c.source);
+      writeFail(res);
+      if (res.code !== 'VALIDATION_ERROR') return;
+    }
+  });
+  on('#capa-reply-undo', async () => {
+    const ok = await dialog({ title: bi('capa.reply_undo'), body: `<p>${bi('capa.reply_undo_confirm.' + c.source)}</p>`, actions: [{ label: bi('btn.cancel'), value: false }, { label: bi('capa.reply_undo'), kind: 'danger', value: true }] });
+    if (!ok) return;
+    const res = await writeOnline('capa.reply', { capa_id: c.capa_id, undo: true }, { expected_version: c.record_version });
+    if (res.ok) return again('form.saved');
+    writeFail(res);
+  });
   on('#capa-complete', async () => {
     const days = Number((session.settings || {}).capa_verify_days ?? 30);
     const v = await dialog({
@@ -489,6 +659,7 @@ export async function renderCapa(view, ctx) {
       if (!v) return;
       prev = v;
       if (!v.result) { toast(bi('capa.need_verify_result'), 'err'); continue; }
+      if (v.result === 'EFFECTIVE' && K && !c.reply_date) { toast(bi('capa.need_reply.' + K), 'err'); continue; }
       if (!v.note_vi && !v.note_zh) { toast(bi('capa.need_verify_note'), 'err'); continue; }
       const res = await writeWithPin('capa.verify', { capa_id: c.capa_id, ...v }, { expected_version: c.record_version });
       if (res.ok) return again(v.result === 'EFFECTIVE' ? 'capa.closed_ok' : 'capa.reopened_ok');
@@ -554,7 +725,7 @@ export async function renderCapa(view, ctx) {
 export async function itemCapaCard(it) {
   if (!(await capaOn()) || (!isSecretary() && roleLevel() < 2)) return '';
   const st = session.settings || {};
-  const isForm = it.code && (it.code === st.capa_form_code || it.code === st.capa_log_form_code);
+  const isForm = it.code && ['capa_form_code', 'capa_log_form_code', 'complaint_form_code', 'd8_form_code', 'scar_form_code'].some((k) => st[k] && it.code === st[k]);
   const all = (await recs('CAPA')).filter((c) => !c.archived_at);
   const list = all.filter((c) => c.item_id === it.item_id).sort((a, b) => String(b.code).localeCompare(String(a.code)));
   const canNew = canCreateCapa(it.dept_code) && it.status !== 'NA';

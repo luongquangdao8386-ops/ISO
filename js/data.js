@@ -382,7 +382,24 @@ export async function distsOf(itemId) {
 
 /** Máy chủ đã lên bản 3a (có capa.save trong danh sách quyền) — chưa có thì màn Khắc phục báo cần cập nhật máy chủ */
 export async function capaOn() { return can('capa.save'); }
+/** Máy chủ đã lên bản 3b (khiếu nại 8D, SCAR: có capa.reply) — chưa có thì ẩn nút Tiếp nhận khiếu nại / Lập SCAR */
+export async function complaintOn() { return can('capa.reply'); }
+/** Nguồn của phiếu khắc phục nội bộ (3a); khiếu nại khách hàng (8D) và SCAR nhà cung cấp là phiếu có đối tác (3b) */
 export const CAPA_SOURCES = ['EQUIPMENT', 'INSPECTION', 'AUDIT', 'SAFETY', 'PROCESS', 'OTHER'];
+export const CAPA_PARTY_SOURCES = ['COMPLAINT', 'SUPPLIER'];
+export const CAPA_SEVERITIES = ['MINOR', 'MAJOR', 'CRITICAL'];
+/** Phiếu có đối tác bên ngoài (khiếu nại khách hàng / SCAR nhà cung cấp) */
+export function capaIsParty(c) { return !!c && CAPA_PARTY_SOURCES.includes(c.source); }
+/** Khiếu nại / SCAR chưa phản hồi mà quá hạn phản hồi (như máy chủ capaReplyLate_) */
+export function capaReplyLate(c, t = today()) {
+  return capaIsParty(c) && (c.state === 'OPEN' || c.state === 'VERIFYING') && !c.reply_date && !!c.reply_due && String(c.reply_due) < t;
+}
+/** Mẫu in mặc định: khiếu nại → báo cáo 8D, SCAR → SCAR, còn lại → phiếu khắc phục */
+export function capaDefaultForm(c) { return c && c.source === 'COMPLAINT' ? 'D8' : c && c.source === 'SUPPLIER' ? 'SCAR' : 'CAR'; }
+/** Mẫu in dùng được cho phiếu (theo thứ tự hiện nút) */
+export function capaForms(c) { return c && c.source === 'COMPLAINT' ? ['RECEIPT', 'D8', 'CAR'] : c && c.source === 'SUPPLIER' ? ['SCAR', 'CAR'] : ['CAR']; }
+/** Cài đặt mã biểu của mẫu in */
+export const CAPA_FORM_SETTING = { CAR: 'capa_form_code', RECEIPT: 'complaint_form_code', D8: 'd8_form_code', SCAR: 'scar_form_code' };
 /** Lập phiếu cho bộ phận: cấp 2+ trong bộ phận, Thư ký ISO */
 export function canCreateCapa(dept) { return inScopeDept(dept) && (isSecretary() || (roleLevel() >= 2 && deptWritable(dept))); }
 /** Sửa phiếu, hành động, gửi kiểm tra hiệu lực: Thư ký ISO, trưởng bộ phận, người phụ trách phiếu, người lập */
@@ -409,9 +426,11 @@ export function canCapaFiles(c, acts) {
   if (!c || (c.state !== 'OPEN' && c.state !== 'VERIFYING')) return false;
   return canEditCapa(c) || canVerifyCapa(c) || (roleLevel() >= 2 && acts.some((a) => a.state !== 'CANCELLED' && a.owner_user_id === myId()));
 }
-/** Phiếu quá hạn (như máy chủ): đang xử lý mà quá hạn phiếu hoặc có hành động đang mở quá hạn; chờ kiểm tra hiệu lực mà quá hạn kiểm tra */
+/** Phiếu quá hạn (như máy chủ): đang xử lý mà quá hạn phiếu hoặc có hành động đang mở quá hạn; chờ kiểm tra hiệu lực mà quá hạn kiểm tra;
+ *  khiếu nại / SCAR chưa phản hồi mà quá hạn phản hồi */
 export function capaOverdue(c, acts, t = today()) {
   if (!c) return false;
+  if (capaReplyLate(c, t)) return true;
   if (c.state === 'OPEN') return (!!c.due_date && c.due_date < t) || (acts || []).some((a) => a.state === 'OPEN' && a.due_date && a.due_date < t);
   return c.state === 'VERIFYING' && !!c.verify_due && c.verify_due < t;
 }

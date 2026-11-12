@@ -91,6 +91,7 @@ var ACTION_TABLE_ = [
   'capa.complete|2|net|W',
   'capa.verify|2|pin|W',
   'capa.cancel|2|pin|W',
+  'capa.reply|2|net|W',
   // Đợt 4: đánh giá nội bộ
   'audit.program.edit|X|net|W',
   // Báo cáo: logo

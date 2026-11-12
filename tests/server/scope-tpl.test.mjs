@@ -163,7 +163,7 @@ test('migrateSchema từ 2d: thêm TplFiles + cài đặt scope_depts = CĐ và 
   const rev0 = Number(owner.call('sync.changes', { cursor: 0 }).data.settings_rev);
   env.logs.length = 0;
   g.migrateSchema();
-  assert.ok(env.logs.some((l) => l === 'migrateSchema xong. Thêm: TplFiles. schema_version=1.0.8'), env.logs.join('\n'));
+  assert.ok(env.logs.some((l) => l === 'migrateSchema xong. Thêm: TplFiles. schema_version=1.0.9'), env.logs.join('\n'));
   g.cache_().removeAll(['sys:state', 'cfg:settings']);
   assert.ok(Number(owner.call('sync.changes', { cursor: 0 }).data.settings_rev) > rev0);
   assert.equal(owner.call('sync.bootstrap', {}).data.settings.scope_depts, 'CĐ');
@@ -171,7 +171,7 @@ test('migrateSchema từ 2d: thêm TplFiles + cài đặt scope_depts = CĐ và 
   const rev1 = Number(owner.call('sync.changes', { cursor: 0 }).data.settings_rev);
   env.logs.length = 0;
   g.migrateSchema();
-  assert.ok(env.logs.some((l) => l === 'migrateSchema xong. Thêm: không có. schema_version=1.0.8'), env.logs.join('\n'));
+  assert.ok(env.logs.some((l) => l === 'migrateSchema xong. Thêm: không có. schema_version=1.0.9'), env.logs.join('\n'));
   g.cache_().removeAll(['sys:state', 'cfg:settings']);
   assert.equal(Number(owner.call('sync.changes', { cursor: 0 }).data.settings_rev), rev1);
 });

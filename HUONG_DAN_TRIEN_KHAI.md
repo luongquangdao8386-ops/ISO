@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d3.1 (Đợt 3, phiên 3a — Khắc phục)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d3.2 (Đợt 3, phiên 3b — Khiếu nại 8D, SCAR)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -30,8 +30,70 @@ từng hành động (kết quả, ảnh / tệp bằng chứng) → **Gửi ki�
 Không hiệu lực thì thêm hành động bổ sung rồi kiểm tra lại; **Gmail** nhắc người phụ trách hành động 7, 1, 0 ngày trước hạn (quá hạn
 mỗi 7 ngày) và người kiểm tra trước hạn kiểm tra hiệu lực; báo cáo **Phiếu khắc phục** (in ký) và **Sổ theo dõi khắc phục** (cả năm),
 PDF + Excel. Đánh giá nội bộ (Đợt 4) vẫn mờ "Sắp có · 即将推出".
+Phiên 3b (anh chốt 12/11/2026 **giữ phạm vi Cơ điện**) thêm hai loại phiếu khắc phục có đối tác bên ngoài, cùng số `KP-yymm-001`, cùng
+luồng: **Khiếu nại khách hàng (8D)** — tiếp nhận (khách hàng, sản phẩm, lô, số lượng, mức độ, nhóm 8D) → D3 ngăn chặn tạm thời → D4
+nguyên nhân gốc + nguyên nhân lọt → D5–D7 hành động khắc phục / phòng ngừa → **Ghi phản hồi khách hàng** → kiểm tra hiệu lực → đóng (D8);
+khiếu nại **không có cơ sở** thì không cần hành động, chỉ ghi kết luận + phản hồi rồi xác nhận đóng. **SCAR nhà cung cấp / nhà thầu** —
+lập SCAR → ngày gửi → **Ghi trả lời của nhà cung cấp** → nguyên nhân, hành động (giao nhà cung cấp) → kiểm tra hiệu lực → đóng. Chưa ghi
+phản hồi / trả lời thì **không đóng được** (báo ngay, chưa hỏi PIN). Hạn phản hồi mặc định 7 ngày, quá hạn thì phiếu báo Quá hạn và Gmail
+nhắc người phụ trách 7, 1, 0 ngày trước hạn. In: **Phiếu tiếp nhận khiếu nại** (BM-KD-02-01), **Báo cáo 8D** (BM-KD-02-02), **Phiếu
+SCAR** (BM-MH-01-06, 3 ô ký: người lập · đại diện nhà cung cấp · người kiểm tra hiệu lực), Sổ theo dõi khiếu nại / SCAR. Phiếu vẫn
+thuộc bộ phận Cơ điện (khiếu nại do lỗi thiết bị; SCAR gửi nhà cung cấp vật tư, nhà thầu thuê ngoài); biểu KD, MH vẫn ẩn — mã biểu in
+trên phiếu sửa được ở **Cấu hình** (`complaint_form_code`, `d8_form_code`, `scar_form_code`).
 
-## CẬP NHẬT LÊN BẢN 3a (1.0.0-d3.1) — làm một lần, trên máy tính
+## CẬP NHẬT LÊN BẢN 3b (1.0.0-d3.2) — làm một lần, trên máy tính
+
+Bản 3b **thêm 17 cột vào sheet `Capas` và 4 cài đặt** (`complaint_form_code` = BM-KD-02-01, `d8_form_code` = BM-KD-02-02,
+`scar_form_code` = BM-MH-01-06, `capa_reply_days` = 7) → phải chạy `migrateSchema`. **Không** hỏi quyền Google mới, **không** cần
+`installTriggers` (nhắc phản hồi đi chung trigger Gmail `sendDueMail` đã có). App 3b vẫn chạy với máy chủ 3a (chỉ không có nút
+Tiếp nhận khiếu nại / Lập SCAR).
+
+**Anh phải làm:**
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký:
+   `migrateSchema xong. Thêm: Capas(party_name,party_contact,product_text,lot_text,qty_text,severity,complaint_valid,team_text,escape_vi,escape_zh,sent_date,reply_due,reply_date,reply_note_vi,reply_note_zh,reply_at,reply_by). schema_version=1.0.9`.
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d3.2 khieu nai scar` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` (đang mở thì đóng hẳn rồi mở lại; app tự tải lại dữ liệu vì có cài đặt mới) → **Tài khoản → Thông tin** ghi
+   `1.0.0-d3.2` (màn báo lỗi thì bấm **Tải lại bản mới**).
+
+**Nên kiểm (vài phút — phần máy giả lập không kiểm được):**
+1. **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.9**; dòng **Khắc phục** có thêm đuôi
+   `· khiếu nại đang mở 0 · SCAR đang mở 0 · quá hạn phản hồi 0` → máy chủ thật đã lên đúng bản.
+2. PDF thật của Google Docs với 3 ô ký: **Khắc phục → Lập SCAR** → Tên nhà cung cấp `NCC thử`, Mô tả `Phiếu thử` → **Lập phiếu** → cuối
+   màn phiếu **In phiếu SCAR** → **Tải PDF** → **Mở / lưu tệp** → xem chữ Việt / Trung, logo, mã BM-MH-01-06, hàng ký có **3 ô**
+   (Người lập SCAR · Đại diện nhà cung cấp · Người kiểm tra hiệu lực) → quay lại phiếu → **Hủy phiếu** → Lý do `Phiếu thử` → **Đúng** →
+   nhập PIN. (Phiếu thử chiếm một số KP; phiếu thật lấy số kế tiếp.)
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/complaint.test.mjs` (3 test, iPhone 390×844 và máy tính 1440×900): Tiếp nhận
+khiếu nại (thiếu tên khách báo lỗi tại ô) → khách hàng, sản phẩm, lô, số lượng, mức độ Nặng, Có cơ sở, nhóm 8D → KP-2611-001 → nguyên
+nhân + nguyên nhân lọt → hành động khắc phục + phòng ngừa → báo xong → gửi kiểm tra → bấm Có hiệu lực khi chưa phản hồi: báo "Chưa ghi
+phản hồi khách hàng", **không hỏi PIN** → Ghi phản hồi khách hàng → Có hiệu lực (PIN) → Đã đóng → In báo cáo 8D (PDF BC-2611-001), Phiếu
+tiếp nhận, Sổ theo dõi khiếu nại → lọc Khiếu nại / SCAR ở sổ khắc phục → Trạng thái hệ thống; nhân viên CĐ đổi phiếu sang SCAR (chữ đã gõ
+giữ nguyên) → ngày gửi → trả lời nhà cung cấp → hành động giao nhà cung cấp → trưởng BP kiểm tra hiệu lực (PIN) → In SCAR 3 ô ký (xem
+trước + Excel); app 3b với máy chủ 3a. Máy chủ `tests/server/complaint.test.mjs` (6 test): kiểm dữ liệu, hạn phản hồi mặc định, khiếu nại
+không có cơ sở, SCAR trả lời trước ngày gửi bị chặn, không đóng khi chưa phản hồi, bỏ / ghi lại phản hồi, quá hạn phản hồi, Gmail
+`CAPA_REPLY` mốc 7 / 1 / 0 ngày + quá hạn mỗi 7 ngày, 4 mẫu in + sổ theo loại + tên tệp, đổi mã biểu, cập nhật từ 3a (thiếu cột → tự
+thêm; dòng nhật ký `migrateSchema` ở bước 2). Cả bộ: 84 test máy chủ + 36 test giao diện đạt.
+
+Không kiểm được ở đâu cả trước khi dùng thật: thư Gmail thật "Khiếu nại / SCAR đến hạn phản hồi" (chỉ khi còn ≤ 7 ngày tới hạn phản hồi
+và người phụ trách có email đã xác nhận), chụp ảnh bằng camera iPhone thật.
+
+### Dùng khiếu nại 8D, SCAR
+
+- **Khắc phục** có 3 nút: **Lập phiếu khắc phục** (nội bộ), **Tiếp nhận khiếu nại**, **Lập SCAR**; trong phiếu đổi loại ở hàng
+  **Loại phiếu**. Hàng lọc **Tất cả · Khắc phục nội bộ · Khiếu nại khách hàng · SCAR nhà cung cấp** ở đầu sổ.
+- Khiếu nại: điền ngay khi khách báo (tên khách bắt buộc); nguyên nhân, hành động ghi sau. Gửi khách báo cáo 8D thì bấm **Ghi phản hồi
+  khách hàng** (ngày + nội dung). Kết luận **Không có cơ sở**: ghi kết luận ở Nguyên nhân, ghi phản hồi, **Gửi kiểm tra hiệu lực** →
+  người kiểm tra bấm Có hiệu lực để đóng.
+- SCAR: gửi nhà cung cấp xong ghi **Ngày gửi SCAR**; nhà cung cấp trả lời thì **Ghi trả lời của nhà cung cấp**, chép nguyên nhân vào
+  Nguyên nhân gốc, hành động họ cam kết vào Hành động (Người thực hiện ngoài app = tên nhà cung cấp). Kiểm tra hiệu lực bằng các lô giao
+  sau. In **Phiếu SCAR** gửi nhà cung cấp ký ở ô giữa.
+- Mã biểu in trên phiếu: **Tài khoản → Quản trị → Cấu hình** → `complaint_form_code`, `d8_form_code`, `scar_form_code` (vd đổi sang mã
+  biểu cơ điện nếu anh lập biểu riêng); `capa_reply_days` = số ngày hạn phản hồi mặc định.
+
+## CẬP NHẬT LÊN BẢN 3a (1.0.0-d3.1) — đã xong (anh xác nhận 12/11/2026)
 
 Bản 3a **thêm 2 sheet `Capas`, `CapaActions` và 3 cài đặt** (`capa_form_code`, `capa_log_form_code` = BM-CĐ-14-02, `capa_verify_days`
 = 30) → phải chạy `migrateSchema`. **Không** hỏi quyền Google mới, **không** cần `installTriggers` (nhắc khắc phục đi chung trigger Gmail

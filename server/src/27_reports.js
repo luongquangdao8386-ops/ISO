@@ -8,7 +8,9 @@
  *  - DIST     Sổ phân phối & thu hồi bản in (phiên 2d, thay BM-ISO-02-03): theo nơi nhận, lần ban hành, đang dùng / cần thu hồi / đã thu hồi.
  *  - DOCREQ   Phiếu đề nghị ban hành / sửa đổi / hủy tài liệu (phiên 2d, thay BM-ISO-02-02): một phiếu (request_id) hoặc sổ theo dõi theo năm.
  *  - CAPA     Khắc phục (phiên 3a, 32_capa.js — mã biểu theo Settings capa_form_code / capa_log_form_code, mặc định BM-CĐ-14-02): một phiếu
- *             (capa_id) để in ký, hoặc sổ theo dõi khắc phục theo năm phát hiện.
+ *             (capa_id) để in ký, hoặc sổ theo dõi khắc phục theo năm phát hiện. Phiên 3b: một phiếu in theo mẫu (form) CAR phiếu khắc phục ·
+ *             RECEIPT phiếu tiếp nhận khiếu nại (complaint_form_code) · D8 báo cáo 8D (d8_form_code) · SCAR (scar_form_code); sổ lọc theo loại
+ *             (source ALL | INTERNAL | COMPLAINT | SUPPLIER).
  * report.run: xem trước (không ghi). report.save: lưu bản chụp (tệp JSON riêng tư trên Drive + dòng ReportRuns, mã BC-yymm-001) rồi
  * trả PDF (máy chủ dựng bằng Google Docs tạm, 28_report_pdf.js) hoặc bản chụp để app dựng Excel; gọi lại cùng report_run_id → cùng mã,
  * cùng số liệu. report.list: báo cáo đã lưu (người lập thấy của mình; Thư ký ISO, cấp 4 thấy tất cả).
@@ -22,10 +24,25 @@ var REPORT_FORM_CODE_ = { CATALOG: 'BM-ISO-02-01', DOCREQ: 'BM-ISO-02-02', DIST:
 /** Tên tệp tải về */
 var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban', DIST: 'so-phan-phoi-thu-hoi', DOCREQ: 'de-nghi-tai-lieu', CAPA: 'so-theo-doi-khac-phuc' };
 
-/** Mã biểu in trên báo cáo: khắc phục theo cài đặt (phiếu / sổ), còn lại theo REPORT_FORM_CODE_ */
+/** Cài đặt mã biểu theo mẫu in một phiếu khắc phục (3b) */
+var CAPA_FORM_SETTING_ = { CAR: 'capa_form_code', RECEIPT: 'complaint_form_code', D8: 'd8_form_code', SCAR: 'scar_form_code' };
+/** Tên tệp một phiếu theo mẫu in; sổ theo loại */
+var CAPA_FORM_SLUG_ = { CAR: 'phieu-khac-phuc', RECEIPT: 'tiep-nhan-khieu-nai', D8: 'bao-cao-8d', SCAR: 'scar' };
+var CAPA_LOG_SLUG_ = { COMPLAINT: 'so-theo-doi-khieu-nai', SUPPLIER: 'so-theo-doi-scar' };
+
+/** Mã biểu in trên báo cáo: khắc phục theo cài đặt (phiếu theo mẫu in / sổ), còn lại theo REPORT_FORM_CODE_ */
 function reportFormCode_(kind, f) {
-  if (kind === 'CAPA') return String(setting_(f && f.capa_id ? 'capa_form_code' : 'capa_log_form_code') || '');
+  if (kind === 'CAPA') return String(setting_(f && f.capa_id ? CAPA_FORM_SETTING_[f.form || 'CAR'] || 'capa_form_code' : 'capa_log_form_code') || '');
   return REPORT_FORM_CODE_[kind] || '';
+}
+
+/** Mẫu in mặc định của một phiếu: khiếu nại → 8D, SCAR → SCAR, còn lại → phiếu khắc phục */
+function capaDefaultForm_(source) { return source === 'COMPLAINT' ? 'D8' : source === 'SUPPLIER' ? 'SCAR' : 'CAR'; }
+/** Mẫu in dùng được cho nguồn của phiếu */
+function capaFormOk_(form, source) {
+  if (form === 'RECEIPT' || form === 'D8') return source === 'COMPLAINT';
+  if (form === 'SCAR') return source === 'SUPPLIER';
+  return form === 'CAR';
 }
 var REPORT_GRAINS_ = { MONTH: { def: 6, max: 12 }, QUARTER: { def: 4, max: 8 } };
 
@@ -81,7 +98,13 @@ function reportFilters_(kind, f, today) {
   }
   if (kind === 'CAPA' && f.capa_id) {
     if (!isUuidV4_(f.capa_id)) throw validationError_([fieldError_('filters.capa_id', 'ID_INVALID')]);
-    return { capa_id: String(f.capa_id) };
+    var form = f.form ? String(f.form) : '';
+    if (form && CAPA_FORMS_.indexOf(form) < 0) throw validationError_([fieldError_('filters.form', 'INVALID_VALUE')]);
+    if (!form) {
+      var c0 = sheetExists_('Capas') ? findOne_('Capas', 'capa_id', String(f.capa_id)) : null;
+      form = capaDefaultForm_(c0 ? c0.source : '');
+    }
+    return { capa_id: String(f.capa_id), form: form };
   }
   if (kind !== 'VERSIONS') {
     if (dept) {
@@ -131,6 +154,9 @@ function reportFilters_(kind, f, today) {
     var cs = f.state || 'ALL';
     if (['ALL', 'OPEN', 'OVERDUE', 'VERIFYING', 'CLOSED'].indexOf(cs) < 0) { errs.push(fieldError_('filters.state', 'INVALID_VALUE')); cs = 'ALL'; }
     out.state = cs;
+    var src = f.source || 'ALL';
+    if (['ALL', 'INTERNAL', 'COMPLAINT', 'SUPPLIER'].indexOf(src) < 0) { errs.push(fieldError_('filters.source', 'INVALID_VALUE')); src = 'ALL'; }
+    out.source = src;
   }
   if (errs.length) throw validationError_(errs);
   return out;
@@ -567,7 +593,7 @@ function reportCompute_(ctx, kind, filters) {
   var res = kind === 'CATALOG' ? reportCatalog_(ctx, f, today) : kind === 'RECORDS' ? reportRecords_(ctx, f, today)
     : kind === 'COVERAGE' ? reportCoverage_(ctx, f) : kind === 'DIST' ? reportDist_(ctx, f, today)
     : kind === 'DOCREQ' ? reportDocreq_(ctx, f) : kind === 'CAPA' ? reportCapa_(ctx, f, today) : reportVersions_(ctx, f);
-  var t = LABELS['rpt.title.' + kind + (kind === 'CAPA' && !f.capa_id ? '_LOG' : '')] || [kind, kind];
+  var t = LABELS['rpt.title.' + kind + (kind === 'CAPA' ? capaTitleSuffix_(f) : '')] || [kind, kind];
   var formCode = reportFormCode_(kind, f);
   var formRev = '';
   if (formCode) {
@@ -588,11 +614,19 @@ function reportCompute_(ctx, kind, filters) {
   };
 }
 
+/** Đuôi khóa tiêu đề báo cáo khắc phục: một phiếu theo mẫu in (_RECEIPT, _D8, _SCAR; phiếu khắc phục không đuôi), sổ (_LOG, _LOG_COMPLAINT…) */
+function capaTitleSuffix_(f) {
+  if (f.capa_id) return f.form && f.form !== 'CAR' ? '_' + f.form : '';
+  return '_LOG' + (f.source === 'COMPLAINT' || f.source === 'SUPPLIER' ? '_' + f.source : '');
+}
+
 /** Tên tệp tải về: BC-2611-001_danh-muc-tai-lieu.pdf (lịch sử phiên bản thêm mã biểu) */
 function reportFileName_(snap, ext) {
   var tail = snap.kind === 'VERSIONS' && snap.data && snap.data.item ? '_' + String(snap.data.item.code).replace(/[\/\\:*?"<>|\s]+/g, '-')
     : (snap.kind === 'DOCREQ' || snap.kind === 'CAPA') && snap.data && snap.data.one ? '_' + String(snap.data.one.code) : '';
-  var slug = snap.kind === 'CAPA' && snap.data && snap.data.one ? 'phieu-khac-phuc' : REPORT_SLUG_[snap.kind];
+  var cf = snap.filters || {};
+  var slug = snap.kind !== 'CAPA' ? REPORT_SLUG_[snap.kind]
+    : snap.data && snap.data.one ? CAPA_FORM_SLUG_[cf.form || 'CAR'] || 'phieu-khac-phuc' : CAPA_LOG_SLUG_[cf.source] || REPORT_SLUG_.CAPA;
   return (snap.code ? snap.code + '_' : '') + slug + tail + '.' + ext;
 }
 

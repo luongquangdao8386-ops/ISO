@@ -957,6 +957,7 @@ a.chip { text-decoration: none; display: inline-flex; align-items: center; }
 .ut-read .form-actions .btn .vi, .ut-read .form-actions .btn .zh { display: block; }
 .ut-read .form-actions .btn .sep { display: none; }
 .paper-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 28px; font-size: 0.875rem; text-align: center; }
+.paper-sign.three { grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 .paper-sign > div > * { display: block; }
 .paper-sign strong { color: var(--navy); }
 .sign-line { height: 56px; }
@@ -1670,3 +1671,13 @@ ul.plain { list-style: none; padding: 0; margin: 6px 0; }
 .capa-vh { border-top: 1px solid var(--line); padding: 8px 0; }
 .capa-vh:first-child { border-top: 0; }
 .capa .card-head h3 { margin: 0; }
+
+/* Khiếu nại 8D, SCAR (3b) */
+.capa-head { flex-wrap: wrap; }
+.capa-kinds { margin-bottom: 4px; }
+.capa-party { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 4px; margin: 4px 0 12px; }
+.capa-party > legend { font-weight: 600; color: var(--navy); padding: 0 6px; }
+.capa-party-line { margin: 4px 0 0; }
+.capa-reply { border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 8px; }
+.capa-reply p { margin: 4px 0; }
+.capa-prints { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }

@@ -9,7 +9,7 @@
 import { api, bi, biText, esc, nameText, resMsg, uuid, b64ToBytes, fmtDateTime, session } from '../core.js';
 import { $, ICON, toast, dialog, freshFilters } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, depts, recs, can, seesAll, canSeeRecords, isSecretary, today, capaOn } from '../data.js';
+import { items, depts, recs, can, seesAll, canSeeRecords, isSecretary, today, capaOn, capaForms, capaDefaultForm } from '../data.js';
 import { busy } from '../form.js';
 import { openFile } from '../files.js';
 import { reportLogo } from '../report-logo.js';
@@ -22,7 +22,7 @@ const N_OPTS = { MONTH: [3, 6, 12], QUARTER: [2, 4, 8] };
 const N_DEF = { MONTH: 6, QUARTER: 4 };
 const LONG = 180000; // máy chủ dựng PDF bằng Google Docs: tới cả phút với danh mục lớn
 
-const INIT = { kind: 'CATALOG', dept: '', scope: 'ISSUED', grain: 'MONTH', end: '', n: 6, std: 'BOTH', codes: true, item: '', dstate: 'ALL', year: 0, rstate: 'ALL', req: '', capa: '', cstate: 'ALL' };
+const INIT = { kind: 'CATALOG', dept: '', scope: 'ISSUED', grain: 'MONTH', end: '', n: 6, std: 'BOTH', codes: true, item: '', dstate: 'ALL', year: 0, rstate: 'ALL', req: '', capa: '', cstate: 'ALL', cform: '', csource: 'ALL' };
 const state = { ...INIT };
 /** Bản xem trước / báo cáo đang làm: {sig, runId, code, layout, logo} — đổi bộ lọc thì bỏ */
 let cur = null;
@@ -59,7 +59,7 @@ function filtersOf(s) {
   if (s.kind === 'COVERAGE') return { dept: s.dept, std: s.std, codes: !!s.codes };
   if (s.kind === 'DIST') return { dept: s.dept, state: s.dstate };
   if (s.kind === 'DOCREQ') return s.req ? { request_id: s.req } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.rstate };
-  if (s.kind === 'CAPA') return s.capa ? { capa_id: s.capa } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.cstate };
+  if (s.kind === 'CAPA') return s.capa ? { capa_id: s.capa, form: s.cform || 'CAR' } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.cstate, source: s.csource || 'ALL' };
   return { item_id: s.item };
 }
 const sigOf = (s) => JSON.stringify([s.kind, filtersOf(s)]);
@@ -72,6 +72,8 @@ function applyQuery(q) {
   if (q.std && ['BOTH', 'ISO9001', 'BRC'].includes(q.std)) state.std = q.std;
   if (q.req) state.req = String(q.req);
   if (q.capa) state.capa = String(q.capa);
+  if (q.form) state.cform = String(q.form);
+  if (q.source && ['ALL', 'INTERNAL', 'COMPLAINT', 'SUPPLIER'].includes(q.source)) state.csource = q.source;
 }
 
 /* ---------------- Bản xem trước (cùng bố cục với PDF, Excel) ---------------- */
@@ -101,11 +103,15 @@ export function paperHtml(lay, logo) {
       ${s.kv ? `<div class="table-wrap"><table class="tbl rp-kv"><tbody>${s.kv.map((k) => `<tr><th>${esc(k[0])}</th><td>${nl(k[1])}</td></tr>`).join('')}</tbody></table></div>` : ''}
       ${s.table ? tableHtml(s.table, s.total_row, lay.none) : ''}${s.note ? `<p class="muted small">${esc(s.note)}</p>` : ''}`).join('')}
     ${(lay.notes || []).map((n) => `<p class="muted small">${esc(n)}</p>`).join('')}
-    <div class="paper-sign">
-      <div><div>${esc(lay.sign.prepared)}</div><div class="muted small">${esc(lay.sign.hint)}</div><div class="sign-line"></div><div class="sign-name">${esc(lay.sign.prepared_name || '')}</div></div>
-      <div><div>${esc(lay.sign.approved)}</div><div class="muted small">${esc(lay.sign.hint)}</div><div class="sign-line"></div><div class="sign-name">${lay.sign.approved_name ? esc(lay.sign.approved_name) : '&nbsp;'}</div></div>
+    <div class="paper-sign${lay.sign.middle ? ' three' : ''}">
+      ${signCols(lay.sign).map(([h, n]) => `<div><div>${esc(h)}</div><div class="muted small">${esc(lay.sign.hint)}</div><div class="sign-line"></div><div class="sign-name">${n ? esc(n) : '&nbsp;'}</div></div>`).join('')}
     </div>
   </div>`;
+}
+
+/** Ô ký: [[tiêu đề, tên]] — hai ô (Người lập · Người duyệt) hoặc ba ô khi có ô giữa (SCAR: đại diện nhà cung cấp) */
+function signCols(sg) {
+  return sg.middle ? [[sg.prepared, sg.prepared_name], [sg.middle, sg.middle_name], [sg.approved, sg.approved_name]] : [[sg.prepared, sg.prepared_name], [sg.approved, sg.approved_name]];
 }
 
 /* ---------------- Tải PDF / Excel ---------------- */
@@ -162,7 +168,10 @@ function filterText(run, deptMap, itemMap, reqMap = new Map(), capaMap = new Map
   if (run.kind === 'RECORDS') parts.push(`${esc(keyLabel(f.grain, f.end))} · ${bi('rp.n.' + f.grain, { N: f.n })}`);
   if (run.kind === 'COVERAGE') parts.push(bi('rpt.std.' + (f.std || 'BOTH')));
   if (run.kind === 'DIST') parts.push(bi('rpt.dist_state.' + (f.state || 'ALL')));
-  if (run.kind === 'CAPA') { if (f.capa_id) { parts.length = 0; parts.push(esc((capaMap.get(f.capa_id) || {}).code || '')); } else parts.push(esc(String(f.year || '')) + ' · ' + bi('rpt.capa_state.' + (f.state || 'ALL'))); }
+  if (run.kind === 'CAPA') {
+    if (f.capa_id) { parts.length = 0; parts.push(esc((capaMap.get(f.capa_id) || {}).code || '')); if (f.form && f.form !== 'CAR') parts.push(bi('rpt.capa_form.' + f.form)); }
+    else { parts.push(esc(String(f.year || '')) + ' · ' + bi('rpt.capa_state.' + (f.state || 'ALL'))); if (f.source && f.source !== 'ALL') parts.push(bi('rpt.capa_source.' + f.source)); }
+  }
   if (run.kind === 'DOCREQ') { if (f.request_id) { parts.length = 0; parts.push(esc((reqMap.get(f.request_id) || {}).code || '')); } else parts.push(esc(String(f.year || '')) + ' · ' + bi('rpt.req_state.' + (f.state || 'ALL'))); }
   return parts.filter(Boolean).join(' · ');
 }
@@ -194,6 +203,9 @@ export async function renderReports(view, ctx) {
   const capaList = (await recs('CAPA')).filter((c) => !c.archived_at).sort((a, b) => String(b.code).localeCompare(String(a.code)));
   const capaMap = new Map(capaList.map((c) => [c.capa_id, c]));
   if (state.capa && !capaMap.has(state.capa)) state.capa = '';
+  // Mẫu in của phiếu (3b): khiếu nại → tiếp nhận / 8D / phiếu khắc phục; SCAR → SCAR / phiếu khắc phục
+  const fixForm = () => { const c = capaMap.get(state.capa); if (c && !capaForms(c).includes(state.cform)) state.cform = capaDefaultForm(c); };
+  fixForm();
   const years = [...new Set([thisYear, ...reqList.map((r) => Number(String(r.submitted_at).slice(0, 4))), ...capaList.map((c) => Number(String(c.found_date).slice(0, 4)))].filter((y) => y > 2000))].sort((a, b) => b - a);
   if (!state.year) state.year = thisYear;
   let saved = null; // báo cáo đã lưu (report.list)
@@ -210,7 +222,9 @@ export async function renderReports(view, ctx) {
       out.push(sel('rf-year', 'rpt.f.year', years.map((y) => [y, String(y)]), state.year));
       out.push(sel('rf-rstate', 'rpt.f.req_state', ['ALL', 'OPEN', 'DONE', 'REJECTED'].map((x) => [x, biText('rpt.req_state.' + x)]), state.rstate));
     }
+    if (k === 'CAPA' && state.capa) out.push(sel('rf-cform', 'rpt.f.capa_form', capaForms(capaMap.get(state.capa)).map((x) => [x, biText('rpt.capa_form.' + x)]), state.cform));
     if (k === 'CAPA' && !state.capa) {
+      out.push(sel('rf-csource', 'rpt.f.capa_source', ['ALL', 'INTERNAL', 'COMPLAINT', 'SUPPLIER'].map((x) => [x, biText('rpt.capa_source.' + x)]), state.csource));
       out.push(sel('rf-year', 'rpt.f.year', years.map((y) => [y, String(y)]), state.year));
       out.push(sel('rf-cstate', 'rpt.f.capa_state', ['ALL', 'OPEN', 'OVERDUE', 'VERIFYING', 'CLOSED'].map((x) => [x, biText('rpt.capa_state.' + x)]), state.cstate));
     }
@@ -327,7 +341,9 @@ export async function renderReports(view, ctx) {
     on('rf-req', (el) => { state.req = el.value; });
     on('rf-year', (el) => { state.year = Number(el.value); });
     on('rf-rstate', (el) => { state.rstate = el.value; });
-    on('rf-capa', (el) => { state.capa = el.value; });
+    on('rf-capa', (el) => { state.capa = el.value; state.cform = ''; fixForm(); });
+    on('rf-cform', (el) => { state.cform = el.value; });
+    on('rf-csource', (el) => { state.csource = el.value; });
     on('rf-cstate', (el) => { state.cstate = el.value; });
     $('#rp-run', view).addEventListener('click', async (ev) => {
       const btn = ev.currentTarget;

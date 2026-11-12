@@ -103,7 +103,10 @@ var SUB_MSG = {
   TOO_MANY_ACTIONS: ['Mỗi phiếu tối đa 30 hành động', '每张单最多30项措施'],
   DATE_FUTURE: ['Ngày không được sau hôm nay', '日期不得晚于今天'],
   DATE_PAST: ['Ngày không được trước hôm nay', '日期不得早于今天'],
-  CAPA_DATE: ['Ngày phải từ ngày phát hiện tới hôm nay', '日期须在发现日期至今天之间']
+  CAPA_DATE: ['Ngày phải từ ngày phát hiện tới hôm nay', '日期须在发现日期至今天之间'],
+  // Khiếu nại 8D, SCAR (3b)
+  CAPA_NO_REPLY: ['Cần ghi phản hồi khách hàng / trả lời của nhà cung cấp trước khi đóng phiếu', '关闭单据前须记录对客户的回复/供应商的回复'],
+  CAPA_NOT_PARTY: ['Chỉ phiếu khiếu nại khách hàng hoặc SCAR nhà cung cấp mới có phản hồi', '只有客户投诉或供应商SCAR单才有回复']
 };
 
 function fmtMsg_(pair, vars) {

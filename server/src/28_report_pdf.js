@@ -38,6 +38,7 @@ function reportMetaLeft_(snap) {
   if (snap.kind === 'CAPA' && d.one) {
     out.push([lab_('rpt.f.capa'), d.one.code]);
     out.push([lab_('rpt.f.dept'), d.one.dept_code]);
+    if (d.one.party_name) out.push([lab_('capa.party.' + d.one.source), d.one.party_name]);
     return out;
   }
   if (snap.kind === 'DOCREQ' && d.one) {
@@ -61,7 +62,11 @@ function reportMetaLeft_(snap) {
   if (snap.kind === 'COVERAGE') out.push([lab_('rpt.f.std'), lab_('rpt.std.' + f.std)]);
   if (snap.kind === 'DIST') out.push([lab_('rpt.f.dist_state'), lab_('rpt.dist_state.' + f.state)]);
   if (snap.kind === 'DOCREQ') { out.push([lab_('rpt.f.year'), String(f.year)]); out.push([lab_('rpt.f.req_state'), lab_('rpt.req_state.' + f.state)]); }
-  if (snap.kind === 'CAPA') { out.push([lab_('rpt.f.year'), String(f.year)]); out.push([lab_('rpt.f.capa_state'), lab_('rpt.capa_state.' + f.state)]); }
+  if (snap.kind === 'CAPA') {
+    out.push([lab_('rpt.f.year'), String(f.year)]);
+    out.push([lab_('rpt.f.capa_state'), lab_('rpt.capa_state.' + f.state)]);
+    if (f.source && f.source !== 'ALL') out.push([lab_('rpt.f.capa_source'), lab_('rpt.capa_source.' + f.source)]);
+  }
   if (snap.scope_depts) out.push([lab_('rpt.f.scope_depts'), snap.scope_depts]);
   return out;
 }
@@ -299,7 +304,8 @@ function layoutDocreq_(snap) {
 
 /**
  * Bố cục chung của một bản chụp: {title_vi, title_zh, meta_left, meta_right, tiles: [{label, value, tone}], sections: [{heading?, note?,
- * kv?: [[nhãn, giá trị]], table?: {head, types, rows, tones}}], notes: [chữ], sign: {prepared, approved, hint, prepared_name}, footer}.
+ * kv?: [[nhãn, giá trị]], table?: {head, types, rows, tones}}], notes: [chữ], sign: {prepared, approved, hint, prepared_name, approved_name,
+ * middle?, middle_name? (ô ký giữa — SCAR 3b)}, footer}.
  */
 function reportLayout_(snap) {
   var body = snap.kind === 'CATALOG' ? layoutCatalog_(snap) : snap.kind === 'RECORDS' ? layoutRecords_(snap)
@@ -313,7 +319,8 @@ function reportLayout_(snap) {
     tiles: (snap.tiles || []).map(function (t) { return { label: lab_(t.k), value: t.v, tone: t.tone || '' }; }),
     sections: body.sections, notes: body.notes, none: lab_('rpt.none'),
     sign: { prepared: sg.prepared || lab_('rpt.prepared_by'), approved: sg.approved || lab_('rpt.approved_by'), hint: lab_('rpt.sign_hint'),
-      prepared_name: sg.prepared ? sg.prepared_name || '' : snap.generated_by_name || '', approved_name: sg.approved_name || '' },
+      prepared_name: sg.prepared ? sg.prepared_name || '' : snap.generated_by_name || '', approved_name: sg.approved_name || '',
+      middle: sg.middle || '', middle_name: sg.middle ? sg.middle_name || '' : '' },
     footer: 'ISO · 体系管理 · ' + (snap.form_code ? snap.form_code + ' · ' : '') + snap.title_vi + (snap.code ? ' · ' + snap.code : '') + ' · ' +
       lab_('rpt.generated_at') + ' ' + dmy_(gen) + ' ' + gen.slice(11, 16)
   };
@@ -568,19 +575,23 @@ function pdfKv_(pd, kv) {
 /** Khối ký: Người lập (tên người lập báo cáo) · Người duyệt; dòng hướng dẫn ký, khoảng trống để ký */
 function pdfSign_(pd, sign) {
   pdfPara_(pd.body.appendParagraph(''), { before: 14 });
+  // Hai ô ký (Người lập · Người duyệt) hoặc ba ô khi có ô giữa (SCAR: đại diện nhà cung cấp, 3b)
+  var cols = sign.middle ? [[sign.prepared, sign.prepared_name], [sign.middle, sign.middle_name], [sign.approved, sign.approved_name]]
+    : [[sign.prepared, sign.prepared_name], [sign.approved, sign.approved_name]];
+  var n = cols.length;
   var t = pdfPlain_(pd.body.appendTable([
-    [sign.prepared, sign.approved],
-    [sign.hint, sign.hint],
-    ['\n\n\n', '\n\n\n'],
-    [sign.prepared_name || '', sign.approved_name || '']
+    cols.map(function (c) { return c[0]; }),
+    cols.map(function () { return sign.hint; }),
+    cols.map(function () { return '\n\n\n'; }),
+    cols.map(function (c) { return c[1] || ''; })
   ]));
-  var half = Math.floor(pd.width / 2);
-  t.setColumnWidth(0, half).setColumnWidth(1, pd.width - half);
+  var w = Math.floor(pd.width / n);
+  for (var k = 0; k < n; k++) t.setColumnWidth(k, k === n - 1 ? pd.width - w * (n - 1) : w);
   pdfText_(t, 9, PDF_C_.ink);
   pdfText_(t.getRow(0), 9, PDF_C_.navy, true);
   pdfText_(t.getRow(1), 7, PDF_C_.muted, false, true);
   pdfText_(t.getRow(3), 9, PDF_C_.ink, true);
-  for (var r = 0; r < 4; r++) for (var c = 0; c < 2; c++) { pdfCellPad_(t.getRow(r).getCell(c), 1, 4); pdfCellAlign_(t.getRow(r).getCell(c), 'CENTER'); }
+  for (var r = 0; r < 4; r++) for (var c = 0; c < n; c++) { pdfCellPad_(t.getRow(r).getCell(c), 1, 4); pdfCellAlign_(t.getRow(r).getCell(c), 'CENTER'); }
   return t;
 }
 

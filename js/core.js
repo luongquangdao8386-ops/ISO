@@ -112,6 +112,8 @@ export function todayVN() {
 // Nguồn duy nhất: i18n/labels.json → js/dict.js (npm run build). Không viết cứng chữ trong màn hình.
 export const L = DICT;
 
+/** Từ điển có nhãn này không (nhãn theo loại phiếu: capa.problem.COMPLAINT…) */
+export function hasLabel(key) { return !!L[key]; }
 function pairOf(keyOrPair) {
   if (Array.isArray(keyOrPair)) return keyOrPair;
   return L[keyOrPair] || [keyOrPair, keyOrPair];

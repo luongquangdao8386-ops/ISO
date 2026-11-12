@@ -170,7 +170,7 @@ test('iPhone: đúng các bước "Thử bản 3a" — lập phiếu → nguyên
     await page.waitForFunction(() => /quá hạn kiểm tra hiệu lực/.test(document.body.textContent));
     const st = await page.textContent('.view');
     assert.match(st, /Đang xử lý 0 · chờ kiểm tra hiệu lực 0 · đã đóng 0 · hành động quá hạn 0 · quá hạn kiểm tra hiệu lực 0/);
-    assert.match(st, /1\.0\.8/);
+    assert.match(st, /1\.0\.9/);
     assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
 });
@@ -262,7 +262,7 @@ test('web: Nhân viên CĐ lập phiếu từ chi tiết biểu, giao hành đ�
     assert.equal(rows(env, 'Capas')[0].state, 'CLOSED');
     await go(page, '#/capa');
     await page.waitForSelector('.view .chips.tabs');
-    await page.click('#capa-new ~ a.btn, .list-head a[href="#/reports?kind=CAPA"]');
+    await page.click('.list-head a[href="#/reports?kind=CAPA"]');
     await page.waitForSelector('.rp-paper:has-text("SỔ THEO DÕI HÀNH ĐỘNG KHẮC PHỤC")');
     assert.match(await page.textContent('.rp-paper'), /KP-2611-001/);
     assert.match(await page.textContent('.rp-paper'), /Đã đóng/);

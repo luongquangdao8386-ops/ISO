@@ -9,6 +9,7 @@
  *  - CAPA_DUE      Khắc phục (3a, 32_capa.js): hành động đến hạn → người phụ trách hành động: mốc 7, 1, 0 ngày trước hạn; quá hạn mỗi 7 ngày
  *                  (phiếu chưa có hành động đang mở → người phụ trách phiếu, theo hạn của phiếu).
  *  - CAPA_VERIFY   Hạn kiểm tra hiệu lực của phiếu chờ kiểm tra → trưởng bộ phận / Thư ký ISO, cùng mốc.
+ *  - CAPA_REPLY    Khiếu nại khách hàng / SCAR (3b) chưa phản hồi → người phụ trách phiếu theo hạn phản hồi, cùng mốc.
  * Người nhận phải có email do Quản trị (cấp 4) xác nhận (Users.email_confirmed_at; đổi email thì mất xác nhận). Người nhận chính chưa
  * có email đã xác nhận → gửi Thư ký ISO thay (via FALLBACK), không để mất nhắc.
  * NotificationLogs là hàng chờ: QUEUED → SENDING → SENT | FAILED (thử lại tối đa 3 lần) | UNKNOWN (SENDING quá 1 giờ: có thể đã gửi,
@@ -17,7 +18,7 @@
  * ISO dừng gửi khi còn ≤ mail_quota_reserve người nhận; mỗi lần chạy ghi hạn mức còn lại để theo dõi (màn Gmail, Trạng thái hệ thống).
  */
 
-var MAIL_KINDS_ = ['REC_OVERDUE', 'REVIEW_DUE', 'VERSION_WAIT', 'CAPA_DUE', 'CAPA_VERIFY'];
+var MAIL_KINDS_ = ['REC_OVERDUE', 'REVIEW_DUE', 'VERSION_WAIT', 'CAPA_DUE', 'CAPA_VERIFY', 'CAPA_REPLY'];
 var MAIL_MAX_ATTEMPTS_ = 3;
 var MAIL_STALE_MS_ = 3600000;
 var MAIL_SENDER_ = 'ISO · 体系管理';
@@ -194,7 +195,7 @@ function mailDesired_(mc, opts) {
     });
   }
 
-  // 4. Khắc phục (3a): hành động đến hạn, hạn kiểm tra hiệu lực — mốc 7, 1, 0 ngày; quá hạn mỗi 7 ngày
+  // 4. Khắc phục (3a): hành động đến hạn, hạn kiểm tra hiệu lực; khiếu nại / SCAR (3b) hạn phản hồi — mốc 7, 1, 0 ngày; quá hạn mỗi 7 ngày
   capaMailNotes_(mc, out);
   return out;
 }
@@ -254,6 +255,9 @@ function mailLine_(kind, d, today, base) {
   } else if (kind === 'CAPA_VERIFY') {
     L.push('  ' + lab_('mail.capa_verify_n', { N: d.round || 1 }) + ' — hạn · 期限 ' + fmtDateVN_(d.due) + ' (' + mailDueText_(daysBetweenIso_(today, d.due)) + ')' +
       (d.owner ? ' · phụ trách phiếu · 单据负责人: ' + d.owner : ''));
+  } else if (kind === 'CAPA_REPLY') {
+    L.push('  ' + lab_(d.source === 'SUPPLIER' ? 'mail.capa_reply_supplier' : 'mail.capa_reply_customer', { P: d.party || '—' }));
+    L.push('  Hạn · 期限: ' + fmtDateVN_(d.due) + ' (' + mailDueText_(daysBetweenIso_(today, d.due)) + ')' + (d.owner ? ' · phụ trách · 负责人: ' + d.owner : ''));
   }
   if (d.for_names) L.push('  Gửi thay cho · 代为通知: ' + d.for_names + ' (chưa có email đã xác nhận · 尚无已确认邮箱)');
   link(d.path);

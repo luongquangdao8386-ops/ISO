@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d3.1';
+var SERVER_VERSION = '1.0.0-d3.2';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.8';
+var SCHEMA_VERSION = '1.0.9';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -84,6 +84,12 @@ var SETTINGS_DEFAULTS = [
   ['capa_form_code', 'STRING', 'BM-CĐ-14-02', true, 1, 'Mã biểu của phiếu khắc phục (in trên phiếu)', '纠正措施单的表单编号（打印在单据上）'],
   ['capa_log_form_code', 'STRING', 'BM-CĐ-14-02', true, 1, 'Mã biểu của sổ theo dõi khắc phục (in trên sổ)', '纠正措施跟踪台账的表单编号（打印在台账上）'],
   ['capa_verify_days', 'INT', 30, true, 1, 'Kiểm tra hiệu lực sau khi xong hành động khắc phục (ngày, mặc định)', '纠正措施完成后验证有效性的天数（默认）'],
+  // Đợt 3 (phiên 3b): khiếu nại khách hàng (8D) và yêu cầu khắc phục nhà cung cấp (SCAR) là phiếu khắc phục có nguồn riêng. Người dùng chốt
+  // 12/11/2026 giữ phạm vi Cơ điện: phiếu vẫn thuộc bộ phận trong phạm vi, in theo mẫu của biểu KD / MH (mã sửa được ở Cấu hình)
+  ['complaint_form_code', 'STRING', 'BM-KD-02-01', true, 1, 'Mã biểu của phiếu tiếp nhận khiếu nại khách hàng', '客户投诉受理单的表单编号'],
+  ['d8_form_code', 'STRING', 'BM-KD-02-02', true, 1, 'Mã biểu của báo cáo 8D (khiếu nại khách hàng)', '8D报告（客户投诉）的表单编号'],
+  ['scar_form_code', 'STRING', 'BM-MH-01-06', true, 1, 'Mã biểu của phiếu yêu cầu khắc phục nhà cung cấp (SCAR)', '供应商纠正措施要求单（SCAR）的表单编号'],
+  ['capa_reply_days', 'INT', 7, true, 1, 'Hạn phản hồi khách hàng / nhà cung cấp trả lời SCAR (ngày từ khi tiếp nhận, mặc định)', '回复客户/供应商回复SCAR的期限（自受理日起天数，默认）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本']
 ];
@@ -129,11 +135,19 @@ var DOC_ENTITY_SHEETS_ = {
 
 /** Khắc phục (Đợt 3, phiên 3a — thay BM-CĐ-14-02 trong phạm vi Cơ điện; BM-ISO-04-01 phiếu, 04-02 sổ khi mở rộng toàn công ty), mã KP-yymm-001.
  *  Nguồn: sự cố thiết bị · kiểm tra / kiểm định · đánh giá · an toàn – môi trường – năng lượng · không tuân thủ quy trình · khác
- *  (3b thêm khiếu nại, nhà cung cấp; 3c thêm sản phẩm không phù hợp).
+ *  khiếu nại khách hàng (3b, 8D) · nhà cung cấp (3b, SCAR) (3c thêm sản phẩm không phù hợp).
  *  Phiếu: OPEN đang xử lý → (xong mọi hành động, có nguyên nhân) VERIFYING chờ kiểm tra hiệu lực → CLOSED đã đóng (có hiệu lực) |
  *  OPEN lại (không hiệu lực: thêm hành động, lần kiểm tra sau); CANCELLED hủy (lập nhầm, kèm lý do).
  *  Hành động: OPEN → DONE (ngày hoàn thành + kết quả) | CANCELLED. */
-var CAPA_SOURCES_ = ['EQUIPMENT', 'INSPECTION', 'AUDIT', 'SAFETY', 'PROCESS', 'OTHER'];
+var CAPA_SOURCES_ = ['EQUIPMENT', 'INSPECTION', 'AUDIT', 'SAFETY', 'PROCESS', 'COMPLAINT', 'SUPPLIER', 'OTHER'];
+/** Phiên 3b: nguồn có đối tác bên ngoài — COMPLAINT khiếu nại khách hàng (8D), SUPPLIER yêu cầu khắc phục nhà cung cấp / nhà thầu (SCAR).
+ *  Thêm: đối tác, sản phẩm / vật tư, lô, số lượng, mức độ, hạn phản hồi; phản hồi (capa.reply) bắt buộc trước khi đóng phiếu. */
+var CAPA_PARTY_SOURCES_ = ['COMPLAINT', 'SUPPLIER'];
+var CAPA_SEVERITIES_ = ['MINOR', 'MAJOR', 'CRITICAL'];
+/** Khiếu nại: '' chưa kết luận · YES có cơ sở · NO không có cơ sở (không bắt buộc hành động khắc phục, vẫn ghi kết luận và phản hồi) */
+var CAPA_VALIDS_ = ['', 'YES', 'NO'];
+/** Mẫu in một phiếu: CAR phiếu khắc phục (capa_form_code) · RECEIPT phiếu tiếp nhận khiếu nại · D8 báo cáo 8D · SCAR */
+var CAPA_FORMS_ = ['CAR', 'RECEIPT', 'D8', 'SCAR'];
 var CAPA_STATES_ = ['OPEN', 'VERIFYING', 'CLOSED', 'CANCELLED'];
 var CAPA_ACT_TYPES_ = ['CORRECTIVE', 'PREVENTIVE'];
 var CAPA_ACT_STATES_ = ['OPEN', 'DONE', 'CANCELLED'];

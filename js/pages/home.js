@@ -34,6 +34,7 @@ async function pendingHtml() {
     [p.capa_acts.length, 'home.pend_capa_acts', p.capa_acts.length === 1 ? '/capa/' + encodeURIComponent(p.capa_acts[0].capa_id) : '/capa?f=mine', 't-red-text'],
     [p.capa_verify.length, 'home.pend_capa_verify', p.capa_verify.length === 1 ? '/capa/' + encodeURIComponent(p.capa_verify[0].capa_id) : '/capa?f=verify', 't-red-text'],
     [p.capa_owner.length, 'home.pend_capa_owner', p.capa_owner.length === 1 ? '/capa/' + encodeURIComponent(p.capa_owner[0].capa_id) : '/capa?f=mine', ''],
+    [p.capa_reply.length, 'home.pend_capa_reply', p.capa_reply.length === 1 ? '/capa/' + encodeURIComponent(p.capa_reply[0].capa_id) : '/capa?f=mine', 't-red-text'],
     [p.drafts.length, 'home.pend_drafts', '/versions?f=drafts', ''],
     [p.nofile.length, 'home.no_file_n', '/catalog?f=nofile', ''],
     [p.review_due.length, 'home.pend_review_due', '/catalog?f=review', '']
