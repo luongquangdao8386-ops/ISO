@@ -62,9 +62,11 @@ var SHEETS = {
   Documents: { book: 'B', dot: 1, key: 'document_id', c: true,
     cols: 'document_id entity_type entity_id kind drive_file_id mime_type file_name access_scope active managed_folder_id ' +
       'owned_by_app size_bytes thumb_drive_file_id sha256 page_no' },
+  // Hàng chờ Gmail nhắc hạn (phiên 2b, 19_mail.js): recipient_id = user_id; kind REC_OVERDUE | REVIEW_DUE | VERSION_WAIT;
+  // via PRIMARY | FALLBACK (người nhận chính chưa có email đã xác nhận → Thư ký ISO); detail_json: nội dung dòng thư lúc xếp hàng
   NotificationLogs: { book: 'B', dot: 1, key: 'notification_id',
     cols: 'notification_id dedupe_key run_date recipient_id entity_type entity_id due_date stage status attempt_at sent_at ' +
-      'error_code dataset_epoch digest_id queued_at attempt_count' },
+      'error_code dataset_epoch digest_id queued_at attempt_count kind via detail_json' },
   AuditLogs: { book: 'B', dot: 1, key: 'audit_id',
     cols: 'audit_id occurred_at user_id device_id action entity_type entity_id before_json after_json operation_id ' +
       'import_batch_id dataset_epoch reason auth_basis' },
@@ -74,10 +76,12 @@ var SHEETS = {
 
   // ---- Bảo mật ----
   // dept_codes: phạm vi bộ phận (cách nhau bằng dấu phẩy, rỗng = mọi bộ phận); iso_secretary: Thư ký ISO; auditor: Đánh giá viên
+  // email_confirmed_at/_by: Quản trị xác nhận email nhận Gmail nhắc hạn (phiên 2b); đổi email thì mất xác nhận
   Users: { book: 'S', dot: 1, key: 'user_id',
     cols: 'user_id employee_code display_name email role_level active pin_hash salt pin_hash_version failed_attempts ' +
       'locked_until created_at updated_at auth_version is_system_owner must_change_pin temp_pin_expires_at pin_changed_at ' +
-      'failed_window_started_at last_login_at record_version created_by updated_by dept_codes iso_secretary auditor' },
+      'failed_window_started_at last_login_at record_version created_by updated_by dept_codes iso_secretary auditor ' +
+      'email_confirmed_at email_confirmed_by' },
   Sessions: { book: 'S', dot: 1, key: 'session_id',
     cols: 'session_id token_hash user_id device_id issued_at expires_at revoked_at auth_version dataset_epoch app_id ' +
       'origin_key session_kind last_seen_at revoke_reason device_label' },
@@ -100,7 +104,8 @@ var TYPE_OVERRIDES_ = {
   i18n_meta: 'JSON', schema_version: 'STRING', email: 'STRING', note: 'STRING', where: 'STRING',
   issued_at: 'DATE', review_due: 'DATE', due_date: 'DATE', run_date: 'DATE', records_from: 'DATE', period_from: 'DATE', period_to: 'DATE',
   pages: 'INT', client_created_at: 'STRING', void_by: 'STRING', period_type: 'STRING',
-  evidence_id: 'STRING', period_key: 'STRING', count: 'INT', last_date: 'DATE', src_codes: 'STRING', source: 'STRING'
+  evidence_id: 'STRING', period_key: 'STRING', count: 'INT', last_date: 'DATE', src_codes: 'STRING', source: 'STRING',
+  email_confirmed_by: 'STRING', stage: 'STRING', kind: 'STRING', via: 'STRING', dedupe_key: 'STRING', digest_id: 'STRING', recipient_id: 'STRING'
 };
 
 /** Kiểu cột suy theo tên. */

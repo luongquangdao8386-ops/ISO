@@ -184,6 +184,7 @@ function registerRoutes() {
   route('/admin/backup', lazy('./pages/admin.js', 'renderBackup'), { nav: 'account' });
   route('/admin/audit', lazy('./pages/admin.js', 'renderAudit'), { nav: 'account' });
   route('/admin/sample', lazy('./pages/admin.js', 'renderSample'), { nav: 'account' });
+  route('/admin/mail', lazy('./pages/mail.js', 'renderMail'), { nav: 'account' });
   // Tem QR của biểu: APP_BASE_URL/#/f/<qr_key>?r=<lần ban hành> (mở bằng Camera rồi chọn mở app, hoặc nút Quét)
   route('/f/:key', async (view, ctx) => {
     const r = await resolveScan(parseScan(location.href, false));

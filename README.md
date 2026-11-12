@@ -5,10 +5,10 @@ quá hạn, phủ điều khoản. Thay danh mục Excel DM-ISO-01 bằng hệ t
 GitHub Pages (iPhone và máy tính). Cùng lõi với M&E và Checksheet (chép từ repo `CS`): PIN 6 số, phiên, ghi có xác nhận, đồng bộ,
 hàng chờ khi mất mạng. Giao diện luôn song ngữ Việt · 中文.
 
-**Trạng thái:** bản `1.0.0-d2.1` — **Đợt 2 phiên 2a** (Kết nối M&E / Checksheet). Đợt 1 xong code. **Đã phát hành THẬT** ở `/ISO/`
-(từ 11/11/2026, không qua THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang `/ISO-thu/` (repo `ISO-thu`) tạm
-chưa gắn máy chủ. Cập nhật máy chủ lên 2a: dán `Code.gs` → `migrateSchema` (cho phép quyền "Kết nối với dịch vụ bên ngoài") →
-`installTriggers` → Phiên bản mới (Hướng dẫn triển khai, mục "CẬP NHẬT LÊN BẢN 2a").
+**Trạng thái:** bản `1.0.0-d2.2` — **Đợt 2 phiên 2b** (Gmail nhắc hạn). Đợt 1 xong code, 2a (Kết nối M&E / Checksheet) đã chạy.
+**Đã phát hành THẬT** ở `/ISO/` (từ 11/11/2026, không qua THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang
+`/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ. Cập nhật máy chủ lên 2b: dán `Code.gs` → `migrateSchema` (cho phép quyền "Gửi email
+thay mặt bạn") → `installTriggers` → Phiên bản mới (Hướng dẫn triển khai, mục "CẬP NHẬT LÊN BẢN 2b").
 
 ## Phiên 1a có gì
 
@@ -98,7 +98,21 @@ chưa gắn máy chủ. Cập nhật máy chủ lên 2a: dán `Code.gs` → `mig
 - Trạng thái hệ thống: dòng **Kết nối M&E**, **Kết nối Checksheet** (lần lấy được, số biểu, mã lạ; cảnh báo khi lỗi hoặc quá 3 giờ).
 - Hợp đồng cho hai app kia: Hướng dẫn triển khai **Phần K** (làm trong chat M&E và chat Checksheet).
 
-Tiếp: Đợt 2 — Gmail nhắc hạn, báo cáo PDF, đề nghị tài liệu / phân phối / in tem · Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
+### Đợt 2 phiên 2b (1.0.0-d2.2) — Gmail nhắc hạn
+
+- **Màn Gmail nhắc hạn** (Quản trị cấp 4; Tài khoản → Quản trị): Bật / Tắt, giờ gửi (mặc định 7:00), hạn mức Gmail còn lại hôm nay
+  (dùng chung M&E, Checksheet), người nhận (email do Quản trị nhập + **xác nhận**, đổi email mất xác nhận; owner sửa được email của chính
+  mình), **Gửi thử** (nội dung thật của người đó, không ghi hàng chờ), **Gửi ngay**, việc cần nhắc tính tới hôm nay, **Nhật ký gửi**
+  (Gửi lại thư lỗi / chưa rõ đã gửi).
+- Máy chủ (`server/src/19_mail.js`): **Hồ sơ quá hạn** → trưởng bộ phận (chưa có → Thư ký ISO), tóm tắt sáng thứ Hai; **tài liệu đến
+  hạn rà soát** → người phụ trách + Thư ký ISO, mốc 30/7/0 ngày, quá hạn mỗi 7 ngày; **phiên bản chờ duyệt / chờ ban hành** quá
+  `version_wait_days` (3) ngày → người duyệt / Thư ký ISO, mỗi ngày làm việc. Người chính chưa có email đã xác nhận → Thư ký ISO gửi thay.
+  Hàng chờ `NotificationLogs` QUEUED → SENDING → SENT / FAILED (3 lần) / UNKNOWN (SENDING > 1 giờ, chỉ gửi lại tay) / SKIPPED; chống trùng
+  `người nhận|loại|hồ sơ|mốc`; mỗi người một thư tổng hợp; dừng khi hạn mức còn ≤ `mail_quota_reserve` (10). Trigger **`sendDueMail`**
+  hằng ngày lúc `email_hour`. Cột mới: `Users.email_confirmed_at/_by`, `NotificationLogs.kind/via/detail_json` (schema 1.0.4).
+- Trạng thái hệ thống: dòng **Gmail nhắc hạn** (ON/OFF, số người nhận đã xác nhận, lần chạy, hạn mức còn lại, thư lỗi).
+
+Tiếp: Đợt 2 — báo cáo PDF (2c), đề nghị tài liệu / phân phối / in tem (2d) · Đợt 3 khắc phục · Đợt 4 đánh giá nội bộ.
 
 ## Cấu trúc
 

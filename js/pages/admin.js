@@ -165,7 +165,7 @@ export async function renderUsers(view, { shell }) {
       ${u.active ? `<button type="button" class="btn small" data-act="revoke" data-id="${esc(u.user_id)}">${bi('btn.revoke_sessions')}</button>` : ''}</div>` : note(u));
   const body = isWide()
     ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>${bi('adm.user.code')}</th><th>${bi('account.display_name')}</th><th>${bi('account.level')}</th><th>${bi('account.depts')}</th><th>${bi('col.status')}</th><th>${bi('adm.user.last_login')}</th><th>${bi('col.actions')}</th></tr></thead>
-      <tbody>${items.map((u) => `<tr><td class="code">${esc(u.employee_code)}</td><td>${esc(u.display_name)}${u.email ? `<div class="muted small">${esc(u.email)}</div>` : ''}</td><td>${levelText(u)}</td><td class="small">${areaText(u)}</td><td>${userStatus(u)}</td>
+      <tbody>${items.map((u) => `<tr><td class="code">${esc(u.employee_code)}</td><td>${esc(u.display_name)}${u.email ? `<div class="muted small">${esc(u.email)}${u.email_confirmed_at ? '' : ' ' + badge('mail.email_unconfirmed')}</div>` : ''}</td><td>${levelText(u)}</td><td class="small">${areaText(u)}</td><td>${userStatus(u)}</td>
         <td>${esc(fmtDateTime(u.last_login_at) || '—')}<div class="muted small">${bi('adm.user.sessions')}: ${u.active_sessions || 0}</div></td><td>${actions(u)}</td></tr>`).join('')}</tbody></table></div>`
     : `<div class="cards">${items.map((u) => `<div class="card rec-card"><div class="rec-top"><span class="code">${esc(u.employee_code)}</span><span>${levelText(u)}</span></div>
         <div class="rec-name">${esc(u.display_name)}</div><div class="muted small">${bi('account.depts')}: ${areaText(u)}</div>

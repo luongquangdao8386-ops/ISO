@@ -39,6 +39,12 @@ var HANDLERS_ = {
   'link.test': function (ctx) { return linkTest_(ctx); },
   'link.set': function (ctx) { return linkSet_(ctx); },
   'evidence.sync': function (ctx) { return evidenceSyncAction_(ctx); },
+  'mail.view': function (ctx) { return mailView_(ctx); },
+  'mail.settings.set': function (ctx) { return mailSettingsSet_(ctx); },
+  'mail.recipient.set': function (ctx) { return mailRecipientSet_(ctx); },
+  'mail.test': function (ctx) { return mailTest_(ctx); },
+  'mail.run': function (ctx) { return mailRunAction_(ctx); },
+  'mail.resend': function (ctx) { return mailResend_(ctx); },
   'doc.upload': function (ctx) { return docUpload_(ctx); },
   'doc.get': function (ctx) { return docGet_(ctx); },
   'report.logo.get': function (ctx) { return reportLogoGet_(ctx); },
@@ -70,7 +76,9 @@ var PRECHECK_ = {
   'version.return': function (ctx) { precheckReturn_(ctx); },
   'version.issue': function (ctx) { precheckIssue_(ctx); },
   'record.return': function (ctx) { precheckRecordReturn_(ctx); },
-  'link.set': function (ctx) { precheckLinkSet_(ctx); }
+  'link.set': function (ctx) { precheckLinkSet_(ctx); },
+  'mail.recipient.set': function (ctx) { precheckMailRecipient_(ctx); },
+  'mail.test': function (ctx) { precheckMailRecipient_(ctx); }
 };
 
 /** Action không cần phiên */

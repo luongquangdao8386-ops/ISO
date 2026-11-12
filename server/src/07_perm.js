@@ -57,6 +57,13 @@ var ACTION_TABLE_ = [
   'link.test|4|net|R',
   'link.set|4|pin|W',
   'evidence.sync|4|net|W',
+  // Gmail nhắc hạn (phiên 2b): người nhận (email do Quản trị xác nhận), bật/tắt, giờ gửi, gửi thử, gửi ngay, nhật ký
+  'mail.view|4|net|R',
+  'mail.settings.set|4|pin|W',
+  'mail.recipient.set|4|pin|W',
+  'mail.test|4|pin|W',
+  'mail.run|4|pin|W',
+  'mail.resend|4|pin|W',
   'capa.edit|2|net|W',
   'audit.program.edit|X|net|W',
   // Báo cáo: logo

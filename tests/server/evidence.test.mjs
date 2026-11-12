@@ -213,7 +213,7 @@ test('nối M&E: gom ngày có hồ sơ theo kỳ của biểu, mã con về mã
   SA.getProjectTriggers().filter((t) => t.getHandlerFunction() === 'syncEvidenceHourly').forEach((t) => SA.deleteTrigger(t));
   assert.equal(owner.call('system.status', {}).data.checks.find((x) => x.key === 'triggers').status, 'WARN');
   env.g.installTriggers();
-  assert.deepEqual(SA.getProjectTriggers().map((t) => t.getHandlerFunction()).sort(), ['backupData', 'runBackgroundJobs', 'syncEvidenceHourly']);
+  assert.deepEqual(SA.getProjectTriggers().map((t) => t.getHandlerFunction()).sort(), ['backupData', 'runBackgroundJobs', 'sendDueMail', 'syncEvidenceHourly']);
   assert.equal(owner.call('system.status', {}).data.checks.find((x) => x.key === 'triggers').status, 'OK');
   // Nhật ký: link.set ghi đuôi link, không ghi mã
   const au = env.rows('AuditLogs').find((a) => a.action === 'link.set');
@@ -365,5 +365,5 @@ test('dán Code.gs 2a chưa chạy migrateSchema: đăng nhập/đồng bộ ch�
   g.dbReset_();
   assert.equal(g.sheetExists_('Evidence'), true);
   assert.ok(evRows(env, 'ME').length > 0);
-  assert.equal(g.stateGet_(g.readState_(), 'schema_version', ''), '1.0.3');
+  assert.equal(g.stateGet_(g.readState_(), 'schema_version', ''), g.SCHEMA_VERSION);
 });

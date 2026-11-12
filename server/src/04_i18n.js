@@ -86,7 +86,11 @@ var SUB_MSG = {
   // Kết nối M&E / Checksheet (phiên 2a)
   KEY_FORMAT: ['Mã kết nối là chuỗi dài 24–200 ký tự (chép từ nhật ký của app kia)', '连接码为24–200个字符（从该App的日志复制）'],
   LINK_FAILED: ['Không kết nối được', '无法连接'],
-  MIRROR_SAME_ACCOUNT: ['Tài khoản thứ hai phải khác tài khoản đang chạy máy chủ', '第二个账户须与运行服务器的账户不同']
+  MIRROR_SAME_ACCOUNT: ['Tài khoản thứ hai phải khác tài khoản đang chạy máy chủ', '第二个账户须与运行服务器的账户不同'],
+  // Gmail nhắc hạn (phiên 2b)
+  EMAIL_MISSING: ['Người này chưa có email', '此人尚无邮箱'],
+  EMAIL_NOT_CONFIRMED: ['Email chưa được Quản trị xác nhận', '邮箱尚未经管理员确认'],
+  MAIL_OFF: ['Gmail nhắc hạn đang tắt — bật trước', '邮件提醒已关闭，请先开启']
 };
 
 function fmtMsg_(pair, vars) {

@@ -19,6 +19,7 @@ function projectUser_(ctx, u, sessionsByUser) {
   };
   if (Number(ctx.user.role_level) >= 4) {
     o.email = u.email || '';
+    o.email_confirmed_at = u.email_confirmed_at || '';
     o.last_login_at = u.last_login_at || '';
     o.pin_changed_at = u.pin_changed_at || '';
     o.active_sessions = sessionsByUser ? (sessionsByUser[u.user_id] || 0) : undefined;
@@ -178,7 +179,8 @@ function userSetRole_(ctx) {
       row.iso_secretary = role.iso_secretary;
       row.auditor = role.auditor;
       if (name !== null) row.display_name = name;
-      if (email !== null) row.email = email;
+      // Đổi email thì mất xác nhận nhận Gmail nhắc hạn (Quản trị xác nhận lại ở màn Gmail nhắc hạn)
+      if (email !== null && email !== String(u.email || '')) { row.email = email; row.email_confirmed_at = ''; row.email_confirmed_by = ''; }
       av.old = u.auth_version || 0;
       row.auth_version = av.old + 1;
       av.new = row.auth_version;

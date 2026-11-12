@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.1 (Đợt 2, phiên 2a — Kết nối M&E / Checksheet)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.2 (Đợt 2, phiên 2b — Gmail nhắc hạn)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -11,7 +11,62 @@ dụng ✕**, **Đã rà soát** (gia hạn rà soát), ô **Chờ bạn xử l�
 (cả khi mất mạng), bảng kỳ ✓ ! –, trả lại hồ sơ nộp sai, tem QR báo bản in lỗi thời. Phiên 1d thêm: **Phủ điều khoản** ISO 9001 và
 BRCGS (đếm giống hệt file Excel tổng), trang chủ đầy đủ (**lịch tuần hồ sơ đến hạn**, Chờ bạn xử lý thêm hồ sơ quá hạn cần nộp).
 Phiên 2a thêm: **Kết nối M&E / Checksheet** — mỗi giờ app ISO hỏi hai app kia "mã biểu nào có hồ sơ vào ngày nào" (chỉ đọc), biểu in
-từ app có ô ✓ mà không ai phải nộp lại. Báo cáo, Khắc phục, Đánh giá nội bộ (Đợt 2–4) vẫn mờ "Sắp có · 即将推出".
+từ app có ô ✓ mà không ai phải nộp lại. Phiên 2b thêm: **Gmail nhắc hạn** — hồ sơ quá hạn (tóm tắt sáng thứ Hai), tài liệu đến hạn rà
+soát, phiên bản chờ duyệt / chờ ban hành quá 3 ngày; email người nhận do Quản trị nhập và xác nhận. Báo cáo, Khắc phục, Đánh giá nội bộ
+(Đợt 2–4) vẫn mờ "Sắp có · 即将推出".
+
+## CẬP NHẬT LÊN BẢN 2b (1.0.0-d2.2) — làm một lần, trên máy tính
+
+Bản 2b **thêm cột** (Users: email đã xác nhận; NotificationLogs: loại nhắc) và **gửi Gmail** — Google hỏi thêm quyền "Gửi email thay mặt
+bạn". Làm **đúng thứ tự** như 2a: chạy hàm và cấp quyền (bước 2–3) **trước** Phiên bản mới (bước 4). App 2b vẫn chạy với máy chủ 2a
+(mục **Gmail nhắc hạn** chỉ hiện khi máy chủ đã lên 2b).
+
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Google hỏi quyền: **Xem lại quyền** → chọn tài khoản Google của máy chủ → **Nâng cao** →
+   **Đi tới ISO_MayChu_THAT (không an toàn)** → **Cho phép** (quyền mới: "Gửi email thay mặt bạn"). Nhật ký:
+   `migrateSchema xong. Thêm: NotificationLogs(kind,via,detail_json); Users(email_confirmed_at,email_confirmed_by). schema_version=1.0.4`.
+3. Chọn hàm **`installTriggers`** → **Chạy** → Nhật ký: `Đã cài trigger: syncEvidenceHourly, runBackgroundJobs, backupData, sendDueMail`.
+4. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d2.2 gmail nhac han` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+5. Mở app `/ISO/` trên máy tính → **Tài khoản → Thông tin** ghi `1.0.0-d2.2` (màn báo lỗi thì bấm **Tải lại bản mới**).
+   **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.4**; **Trigger đã cài** có `sendDueMail`; dòng mới
+   **Gmail nhắc hạn** = **OFF**.
+
+### Bật Gmail nhắc hạn
+
+1. **Tài khoản → Quản trị → Gmail nhắc hạn**.
+2. Thẻ **Người nhận** → thẻ của **Thư ký ISO** → **Nhập / sửa email** → gõ email của thư ký → ô "Tôi (Quản trị) xác nhận đây đúng là
+   email của người này" để nguyên dấu tích → **Lưu** → nhập PIN → thẻ ghi **Đã xác nhận**.
+3. (Không bắt buộc) Thẻ của **owner** → nhập email owner → **Lưu**. Owner nhận nhắc **duyệt** phiên bản do Thư ký ISO soạn; owner
+   không có email thì thư đó gửi Thư ký ISO thay ("Gửi thay cho …").
+4. Thẻ của Thư ký ISO → **Gửi thử** → **Gửi thử** → báo xanh "Đã gửi thư thử tới …". Mở hộp thư của thư ký (xem cả **Spam** /
+   **Quảng cáo**): tiêu đề `[ISO] Gửi thử · 测试 — Nhắc hạn hồ sơ, tài liệu ISO · ISO记录与文件到期提醒 — dd/mm/yyyy`, tên người gửi
+   **ISO · 体系管理** (địa chỉ gửi là tài khoản Google của máy chủ). Danh mục hiện toàn ○ ◐ nên thư ghi "Hiện không có việc nào cần nhắc
+   bạn" là **đúng**. Thư vào Spam → bấm **Không phải thư rác**.
+5. Thẻ trên cùng → **Bật Gmail** → thẻ ghi **Đang bật**. Giờ gửi mặc định **7:00**; muốn đổi → **Đổi giờ gửi**.
+6. **Trạng thái hệ thống**: dòng **Gmail nhắc hạn** = `ON · 1 người nhận đã xác nhận`, ĐẠT.
+
+### Dùng Gmail nhắc hạn
+
+| Nhắc | Gửi ai | Khi nào |
+| --- | --- | --- |
+| Hồ sơ quá hạn | Trưởng bộ phận (bộ phận chưa có trưởng → Thư ký ISO) | Tóm tắt sáng thứ Hai; tuần sau còn quá hạn thì nhắc lại |
+| Tài liệu đến hạn rà soát | Người phụ trách tài liệu + Thư ký ISO | 30, 7, 0 ngày trước hạn; quá hạn nhắc mỗi 7 ngày |
+| Phiên bản chờ duyệt / chờ ban hành quá 3 ngày | Người duyệt (trưởng bộ phận hoặc Quản trị) / Thư ký ISO | Mỗi ngày làm việc (Thứ Hai – Thứ Sáu) tới khi xử lý |
+
+- Mỗi người một thư tổng hợp mỗi ngày lúc giờ gửi, **chỉ khi có việc**. Cùng một mốc không gửi lại; bấm **Gửi ngay** cũng không gửi trùng.
+- App hiện chỉ có owner + Thư ký ISO, chưa có trưởng bộ phận → gần như mọi thư tới **Thư ký ISO**. Có trưởng bộ phận (Quản trị → Bộ phận
+  → trưởng bộ phận) thì nhập + xác nhận email người đó ở màn Gmail; tóm tắt hồ sơ quá hạn của bộ phận đó chuyển sang trưởng bộ phận.
+- Người nhận chính chưa có email đã xác nhận → thư gửi **Thư ký ISO thay**, có dòng "Gửi thay cho …". Đổi email (ở đây hoặc ở màn Người
+  dùng) thì phải **Xác nhận** lại.
+- **Việc cần nhắc tính tới hôm nay**: xem trước ai sẽ nhận gì (Sẽ gửi / Đã gửi / Gửi sáng thứ Hai). Bấm dòng để mở biểu / phiên bản.
+- **Hạn mức Gmail** dùng chung với M&E và Checksheet (cùng tài khoản Google, khoảng 100 người nhận mỗi ngày). ISO tạm dừng gửi khi còn
+  10 trở xuống (đổi ở Cấu hình: `mail_quota_reserve`), thư còn lại gửi lần sau. Số còn lại hiện ở màn Gmail và Trạng thái hệ thống.
+- **Nhật ký gửi**: thư lỗi tự thử lại tối đa 3 lần; "Chưa rõ đã gửi" (máy chủ dừng giữa chừng) không tự gửi lại — xem hộp thư người nhận,
+  chưa có thì bấm **Gửi lại**.
+- Thư thật bắt đầu có khi danh mục có biểu **●** (ban hành): hồ sơ quá hạn, hạn rà soát trong 30 ngày; và khi có phiên bản chờ quá 3 ngày.
+- Tắt: **Tắt Gmail** (app vẫn hiện việc ở Chờ bạn xử lý trên trang chủ).
 
 ## CẬP NHẬT LÊN BẢN 2a (1.0.0-d2.1) — làm một lần, trên máy tính
 
@@ -499,10 +554,11 @@ Sổ dừng máy BM-CĐ-04-03 còn thiếu cột **ca** và **phản hồi** (ng
 | `setup` | Lần đầu dựng máy chủ (đã có thì không làm gì) |
 | `adminSetupOwner` | Tạo owner đầu tiên từ 3 thuộc tính `SETUP_OWNER_*` |
 | `adminResetOwnerPin` | Owner quên PIN: đặt `OWNER_RESET_TEMP_PIN` (6 số) rồi chạy |
-| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần; 2a: sheet `Evidence`) |
+| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần; 2a: sheet `Evidence`; 2b: cột email đã xác nhận, loại nhắc) |
 | `adminNoiLaiTep` | Khôi phục từ bản chép ở tài khoản thứ hai: nối lại ID tệp theo `file_map.json` (Phần I.5) |
 | `healthCheck` | Xem nhanh tình trạng máy chủ |
-| `installTriggers` | Trigger bị xóa nhầm; bản 2a: cấp quyền gọi ra ngoài + cài trigger `syncEvidenceHourly` (3 trigger) |
+| `installTriggers` | Trigger bị xóa nhầm; bản 2a: cấp quyền gọi ra ngoài + cài `syncEvidenceHourly`; bản 2b: cài `sendDueMail` (4 trigger) |
+| `adminSendMailNow` | Gmail đang bật: xếp hàng và gửi ngay như lần gửi hằng ngày (không gửi trùng), in kết quả + hạn mức Gmail còn lại |
 | `adminSyncEvidenceNow` | Lấy ngay ngày có hồ sơ từ M&E / Checksheet đã nối, in kết quả (số dòng, mã lạ) vào nhật ký |
 | `adminSeedSample` | Dữ liệu mẫu (chỉ THỬ) — PIN tạm in trong nhật ký |
 | `adminChuyenSangTHAT` | Một lần: máy chủ THỬ thành THẬT (xóa dữ liệu thử, đổi tên bỏ `_THU`); đã là THẬT thì không làm gì |
@@ -521,6 +577,13 @@ Sổ dừng máy BM-CĐ-04-03 còn thiếu cột **ca** và **phản hồi** (ng
   **Cho phép** (mục "CẬP NHẬT LÊN BẢN 2a" bước 3), rồi tải lại app.
 - **Biểu in từ app không có ô ✓**: cuối màn Kết nối xem "biểu in từ app chưa nhận ngày nào" và "mã biểu không có trong danh mục ISO" —
   sửa mã biểu bên app kia (mẫu checksheet: ô Mã biểu mẫu; M&E: bảng ánh xạ `iso_form_map` / mã checklist) cho khớp danh mục ISO.
+
+- **Không thấy mục Gmail nhắc hạn**: máy chủ chưa lên 2b — làm mục "CẬP NHẬT LÊN BẢN 2b"; app báo "Máy chủ chưa lên bản 2b".
+- **Gửi thử báo lỗi quyền / "Authorization is required"**: chưa cho phép quyền "Gửi email thay mặt bạn" — chạy `migrateSchema` (hoặc
+  `installTriggers`) trong trình soạn → **Cho phép**, rồi triển khai **Phiên bản mới**.
+- **Không nhận được thư**: xem mục **Spam**; màn Gmail → **Nhật ký gửi** (Đã gửi / Lỗi); email người nhận phải **Đã xác nhận**; Trạng
+  thái hệ thống dòng **Gmail nhắc hạn** báo thiếu trigger thì chạy `installTriggers`.
+- **"Hạn mức Gmail còn ít"**: M&E / Checksheet đã gửi gần hết hạn mức chung hôm nay — thư ISO tự gửi lần chạy sau.
 
 - **Phủ điều khoản trống ("Chưa có danh sách điều khoản")**: file Excel đã nhập thiếu trang Phủ ISO 9001 / Phủ BRCGS — nhập lại file
   Excel tổng đủ 5 trang (Excel → Nhập lô); số biểu theo điều khoản tự tính lại.

@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d2.1';
+var SERVER_VERSION = '1.0.0-d2.2';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.3';
+var SCHEMA_VERSION = '1.0.4';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -69,6 +69,11 @@ var SETTINGS_DEFAULTS = [
   ['record_status_cache_seconds', 'INT', 300, false, 1, 'Bộ đệm tình trạng hồ sơ trên máy chủ (giây)', '服务器记录状态缓存（秒）'],
   // Đợt 2 (phiên 2a): app đã nối để lấy ngày có hồ sơ — chỉ đặt ở màn Kết nối (link.set), không sửa ở Cấu hình
   ['evidence_sources', 'STRING', '', true, 1, 'App đã nối để lấy ngày có hồ sơ (ME, CS) — đặt ở màn Kết nối', '已连接以获取记录日期的App（ME、CS）——在连接页面设置'],
+  // Đợt 2 (phiên 2b): Gmail nhắc hạn — bật/tắt và giờ gửi đặt ở màn Gmail nhắc hạn (mail.settings.set), không sửa ở Cấu hình
+  ['gmail_enabled', 'BOOL', false, false, 1, 'Bật gửi Gmail nhắc hạn — đặt ở màn Gmail nhắc hạn', '启用邮件提醒——在邮件提醒页面设置'],
+  ['email_hour', 'INT', 7, false, 1, 'Giờ gửi Gmail nhắc hạn mỗi ngày (0–23) — đặt ở màn Gmail nhắc hạn', '每天发送提醒邮件的时间（0–23）——在邮件提醒页面设置'],
+  ['version_wait_days', 'INT', 3, false, 1, 'Nhắc phiên bản chờ duyệt / chờ ban hành quá số ngày này', '版本待审批/待发布超过此天数时提醒'],
+  ['mail_quota_reserve', 'INT', 10, false, 1, 'Chừa lại hạn mức Gmail cho M&E, Checksheet (số người nhận/ngày): còn bằng hoặc ít hơn thì ISO tạm dừng gửi', '为机电、点检表预留的邮件额度（收件人/天）：剩余不超过此数时ISO暂停发送'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本']
 ];

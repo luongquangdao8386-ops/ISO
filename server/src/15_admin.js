@@ -231,11 +231,11 @@ function adminResetOwnerPin() {
   log_('Đã cấp PIN tạm cho owner ' + code + ' (hạn 72 giờ). Mọi phiên cũ của owner đã bị thu hồi; đăng nhập rồi đổi PIN ngay. Đã xóa OWNER_RESET_TEMP_PIN.');
 }
 
-var TRIGGER_FUNCS_ = ['syncEvidenceHourly', 'runBackgroundJobs', 'backupData'];
+var TRIGGER_FUNCS_ = ['syncEvidenceHourly', 'runBackgroundJobs', 'backupData', 'sendDueMail'];
 
-/** Xóa trigger trùng tên rồi tạo lại đúng 3 trigger định kỳ: ngày có hồ sơ từ M&E / Checksheet mỗi giờ (2a), dịch bù mỗi 3 giờ,
- *  sao lưu hằng tuần. Lần đầu chạy sau khi dán Code.gs 2a: Google hỏi quyền "kết nối dịch vụ bên ngoài" (gọi link /exec của M&E,
- *  Checksheet) — bấm Cho phép. Phiên 2b thêm nhắc hạn Gmail. */
+/** Xóa trigger trùng tên rồi tạo lại đúng 4 trigger định kỳ: ngày có hồ sơ từ M&E / Checksheet mỗi giờ (2a), dịch bù mỗi 3 giờ,
+ *  sao lưu hằng tuần, Gmail nhắc hạn mỗi ngày lúc email_hour (2b; Gmail tắt thì trigger không làm gì). Lần đầu chạy sau khi dán
+ *  Code.gs mới: Google hỏi quyền mới ("kết nối dịch vụ bên ngoài" ở 2a, "gửi email thay mặt bạn" ở 2b) — bấm Cho phép. */
 function installTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (TRIGGER_FUNCS_.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
@@ -244,6 +244,7 @@ function installTriggers() {
   ScriptApp.newTrigger('runBackgroundJobs').timeBased().everyHours(3).create();
   var wd = ScriptApp.WeekDay[String(setting_('backup_weekday') || 'SUNDAY')] || ScriptApp.WeekDay.SUNDAY;
   ScriptApp.newTrigger('backupData').timeBased().onWeekDay(wd).atHour(Number(setting_('backup_hour'))).inTimezone(TZ).create();
+  ScriptApp.newTrigger('sendDueMail').timeBased().everyDays(1).atHour(Number(setting_('email_hour'))).inTimezone(TZ).create();
   var names = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
   log_('Đã cài trigger: ' + names.join(', '));
 }
@@ -278,7 +279,8 @@ function adminFlushAuthCache() {
   log_('Đã xóa ' + keys.length + ' khóa cache phiên/người dùng.');
 }
 
-/* runBackgroundJobs (dịch bù) ở 21_i18n.js; backupData (sao lưu hằng tuần) ở 23_backup.js; syncEvidenceHourly ở 18_evidence.js */
+/* runBackgroundJobs (dịch bù) ở 21_i18n.js; backupData (sao lưu hằng tuần) ở 23_backup.js; syncEvidenceHourly ở 18_evidence.js;
+ * sendDueMail (Gmail nhắc hạn) ở 19_mail.js */
 
 /* ---------------- Chuyển máy chủ THỬ thành THẬT (không dựng THỬ riêng) ---------------- */
 

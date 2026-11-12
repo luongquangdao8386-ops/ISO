@@ -26,7 +26,7 @@ function auditOwn_(ctx) {
   return { items: logs, operations: ops };
 }
 
-var ADMIN_ACTION_PREFIX_ = ['user.', 'auth.', 'session.', 'pin.', 'settings.', 'system.', 'backup.', 'dept.', 'report.logo', 'sample.'];
+var ADMIN_ACTION_PREFIX_ = ['user.', 'auth.', 'session.', 'pin.', 'settings.', 'system.', 'backup.', 'dept.', 'report.logo', 'sample.', 'mail.'];
 
 /** audit.view {entity_id?, user_id?, action?, from?, to?, limit?}: Trưởng bộ phận, Quản trị (Trưởng bộ phận không xem thao tác quản trị) */
 function auditView_(ctx) {
@@ -56,7 +56,7 @@ function auditView_(ctx) {
 /* ---------------- Cấu hình ---------------- */
 
 /** Khóa không sửa trong màn Cấu hình (logo sửa ở màn riêng) */
-var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, backup_mirror_email: 1, evidence_sources: 1 };
+var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, backup_mirror_email: 1, evidence_sources: 1, gmail_enabled: 1, email_hour: 1 };
 var SETTINGS_BOUNDS_ = {
   session_days: [1, 90], session_warn_days: [0, 30], change_pin_session_minutes: [5, 60], reauth_window_minutes: [1, 30], temp_pin_hours: [1, 168],
   max_sessions_per_user: [1, 50], login_fail_limit: [3, 20], login_fail_window_minutes: [1, 120], login_lock_minutes: [1, 1440],
@@ -66,7 +66,7 @@ var SETTINGS_BOUNDS_ = {
   client_timeout_seconds: [10, 60], client_long_timeout_seconds: [20, 300],
   sync_page_size: [100, 2000], doc_max_bytes: [1048576, 52428800], doc_mobile_upload_max_bytes: [1048576, 52428800],
   photo_max_edge_px: [640, 4096], photo_jpeg_quality: [0.5, 0.95], photo_thumb_edge_px: [120, 1024], backup_hour: [0, 23], backup_keep_count: [2, 52],
-  doc_review_months: [1, 60], record_grace_days: [0, 60]
+  doc_review_months: [1, 60], record_grace_days: [0, 60], version_wait_days: [1, 30], mail_quota_reserve: [0, 90]
 };
 var SETTINGS_ENUMS_ = {
   backup_weekday: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
@@ -242,6 +242,9 @@ function healthRows_() {
     if (unk.length) note = (note ? note + ' · ' : '') + 'Mã biểu không có trong danh mục ISO (bỏ qua): ' + unk.join(', ');
     add(hk, inf.last_status !== 'FAILED' && !!fresh, val, note);
   });
+  // Gmail nhắc hạn (2b)
+  var gm = mailHealth_(st);
+  add('gmail', gm[0], gm[1], gm[2]);
   var nofile = items.filter(function (it) { return it.status === 'ISSUED' && it.file_missing; }).length;
   add('file_missing', true, nofile, nofile ? 'Biểu ● chưa có tệp: Danh mục → lọc Chưa có tệp → Gắn tệp' : '');
   var today = todayVN_();
