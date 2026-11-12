@@ -92,8 +92,21 @@ test('iPhone, đúng các bước "Thử phiên 2d" (danh mục toàn ○ ◐, T
     await page.locator('a[href="#/request/new"]').first().click();
     await page.waitForSelector('form.dr-form');
     assert.ok((await page.textContent('.dr-form .chip.on')).includes('Sửa đổi / ban hành'));
+    // Lọc Bộ phận + Tình trạng (ô chọn, không bàn phím) → danh sách ngắn → chọn biểu
+    assert.ok((await page.textContent('#dr-pick')).includes('Tài liệu, biểu mẫu (' + (await page.locator('#f-item_id option').count() - 1) + ' biểu)'));
+    await page.selectOption('#dp-dept', 'SX');
+    await page.selectOption('#dp-st', 'DRAFTING');
+    const opts = await page.$$eval('#f-item_id option', (os) => os.map((o) => o.textContent));
+    assert.ok(opts.length >= 2 && opts.length < 10 && opts.slice(1).every((t) => t.startsWith('BM-SX-')), opts.join(' | '));
     await page.selectOption('#f-item_id', it0.item_id);
     await page.waitForFunction(() => document.querySelector('.dr-form') && /BM-SX-02-03/.test(document.querySelector('.dr-form').textContent));
+    assert.ok((await page.textContent('.dr-picked')).includes('Đang soạn'));
+    // Gõ lý do rồi đổi loại phiếu qua lại: chữ đã gõ còn nguyên
+    await page.fill('#f-reason_vi', 'Tạm');
+    await page.click('.chip[data-type="CANCEL"]');
+    await page.click('.chip[data-type="REVISE"]');
+    assert.equal(await page.inputValue('#f-reason_vi'), 'Tạm');
+    await page.fill('#f-reason_vi', '');
     // Bỏ trống lý do → báo đỏ, không gửi
     await page.click('#dr-send');
     await page.waitForSelector('.bi-pair.bad');

@@ -106,12 +106,35 @@ export async function renderRequestNew(view, { shell, query }) {
   const deps = (await depts()).filter((d) => d.active !== false);
   const myDeps = deps.filter((d) => isSecretary() || deptWritable(d.dept_code));
   let itemId = it0 && canRequest(it0) ? it0.item_id : '';
-  const draw = () => {
+  // Ô chọn tài liệu: lọc Bộ phận + Tình trạng (chỉ ô chọn, không bật bàn phím iPhone) → danh sách ngắn; chọn xong hiện mã, tình trạng
+  const pick = { dept: it0 ? it0.dept_code : '', st: '' };
+  const pickHtml = () => {
+    const inDept = list.filter((x) => !pick.dept || x.dept_code === pick.dept);
+    const shown = inDept.filter((x) => !pick.st || (x.status || 'NONE') === pick.st);
     const it = itemId ? list.find((x) => x.item_id === itemId) : null;
-    const itemSel = `<label class="fld wide" data-field="item_id"><span>${bi('dr.doc')} <span class="req">*</span></span><select class="inp sel" id="f-item_id"><option value="">${bi('field.choose')}</option>${deps.map((d) => {
-      const l = list.filter((x) => x.dept_code === d.dept_code);
-      return l.length ? `<optgroup label="${esc(d.dept_code + ' · ' + nameText(d))}">${l.map((x) => `<option value="${esc(x.item_id)}"${x.item_id === itemId ? ' selected' : ''}>${esc(x.code)} · ${esc(x.name_vi || x.name_zh || '')}</option>`).join('')}</optgroup>` : '';
-    }).join('')}</select><div class="ferr"></div></label>`;
+    const cnt = (st) => inDept.filter((x) => (x.status || 'NONE') === st).length;
+    const opt = (v, t, cur) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(t)}</option>`;
+    return `<div class="form-grid">
+        <label class="fld"><span>${bi('cat.dept')}</span><select class="inp sel" id="dp-dept">${opt('', biText('cat.all') + ` (${list.length})`, pick.dept)}${deps.map((d) => { const n = list.filter((x) => x.dept_code === d.dept_code).length; return n ? opt(d.dept_code, `${d.dept_code} · ${nameText(d)} (${n})`, pick.dept) : ''; }).join('')}</select></label>
+        <label class="fld"><span>${bi('cat.status')}</span><select class="inp sel" id="dp-st">${opt('', biText('cat.all') + ` (${inDept.length})`, pick.st)}${['DRAFTING', 'ISSUED', 'NONE'].map((k) => opt(k, `${biText('status.' + k)} (${cnt(k)})`, pick.st)).join('')}</select></label>
+      </div>
+      <label class="fld wide" data-field="item_id"><span>${bi('dr.doc_n', { N: shown.length })} <span class="req">*</span></span><select class="inp sel" id="f-item_id">${opt('', shown.length ? biText('dr.pick_item') : biText('dr.pick_none'), itemId)}${shown.map((x) => opt(x.item_id, `${x.code} · ${x.name_vi || x.name_zh || ''}`, itemId)).join('')}</select><div class="ferr"></div></label>
+      ${it ? `<p class="small dr-picked"><span class="code">${esc(it.code)}</span> ${statusDot(it.status)} ${badge('status.' + (it.status || 'NONE'))}${curRevOf(it) ? ' · ' + bi('ver.rev_n', { N: esc(curRevOf(it)) }) : ''} · ${badge('level_doc.' + (it.level || 'DEPT'))}<br>${esc(nameText(it))}</p>` : ''}
+      <p class="muted small">${bi('dr.pick_hint')}</p>`;
+  };
+  const wirePick = (form) => {
+    const box = $('#dr-pick', form);
+    if (!box) return;
+    const again = () => { box.innerHTML = pickHtml(); wirePick(form); };
+    $('#dp-dept', box).addEventListener('change', (e) => { pick.dept = e.target.value; if (itemId && !list.some((x) => x.item_id === itemId && (!pick.dept || x.dept_code === pick.dept))) itemId = ''; again(); });
+    $('#dp-st', box).addEventListener('change', (e) => { pick.st = e.target.value; if (itemId && !list.some((x) => x.item_id === itemId && (!pick.st || (x.status || 'NONE') === pick.st))) itemId = ''; again(); });
+    $('#f-item_id', box).addEventListener('change', (e) => { itemId = e.target.value; again(); });
+  };
+  const draw = () => {
+    // Giữ chữ đã gõ khi đổi loại phiếu (vẽ lại cả form)
+    const old = $('form.dr-form', view);
+    const keep = {};
+    if (old) old.querySelectorAll('input[id^="f-"], textarea[id^="f-"]').forEach((el) => { if (el.value) keep[el.id] = el.value; });
     view.innerHTML = `<form class="card form dr-form" novalidate>
       <div class="chips" role="radiogroup">${['REVISE', 'NEW', 'CANCEL'].map((t) => `<button type="button" class="chip${t === type ? ' on' : ''}" data-type="${t}" role="radio" aria-checked="${t === type}">${bi('dr.type.' + t)}</button>`).join('')}</div>
       <p class="muted small">${bi('dr.type_hint.' + type)}</p>
@@ -120,7 +143,7 @@ export async function renderRequestNew(view, { shell, query }) {
           ${selectInput('new_kind', 'cat.kind', KINDS.map((k) => [k, bi('kind.' + k)]), 'FORM', { empty: '' })}
           ${textInput('new_code', 'dr.new_code', '', { maxlength: 40, upper: true, placeholder: 'BM-SX-03-01', hint: biText('dr.new_code_hint') })}
         </div>${bilingualInputs('title', null, { labelKey: 'dr.new_title', maxlength: 300 })}`
-        : `${itemSel}${it ? `<p class="small"><span class="code">${esc(it.code)}</span> ${statusDot(it.status)} ${badge('status.' + (it.status || 'NONE'))}${curRevOf(it) ? ' · ' + bi('ver.rev_n', { N: esc(curRevOf(it)) }) : ''} · ${badge('level_doc.' + (it.level || 'DEPT'))}</p>` : ''}`}
+        : `<div id="dr-pick">${pickHtml()}</div>`}
       ${bilingualInputs('reason', null, { labelKey: 'dr.reason', area: true, maxlength: 2000 })}
       ${type === 'CANCEL' ? '' : bilingualInputs('content', null, { labelKey: type === 'NEW' ? 'dr.content_new' : 'dr.content', area: true, maxlength: 2000, required: type === 'REVISE' })}
       <div class="form-grid">
@@ -133,10 +156,10 @@ export async function renderRequestNew(view, { shell, query }) {
       <p class="muted small">${bi('dr.flow_note')}</p>
     </form>`;
     const form = $('form', view);
+    Object.keys(keep).forEach((id) => { const el = form.querySelector('#' + CSS.escape(id)); if (el && !el.value) el.value = keep[id]; });
     wireForm(form);
     form.querySelectorAll('[data-type]').forEach((b) => b.addEventListener('click', () => { type = b.dataset.type; draw(); }));
-    const sel = $('#f-item_id', form);
-    if (sel) sel.addEventListener('change', () => { itemId = sel.value; draw(); });
+    wirePick(form);
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const p = { request_id: uuid(), req_type: type };

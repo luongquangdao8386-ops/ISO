@@ -1236,7 +1236,7 @@
   "dr.tab.all": ["Tất cả", "全部"],
   "dr.none": ["Không có phiếu nào.", "没有申请单。"],
   "dr.how": ["Đề nghị ban hành mới, sửa đổi hoặc hủy tài liệu → trưởng bộ phận (tài liệu cấp bộ phận) hoặc Quản trị (cấp công ty) xem xét → Thư ký ISO / người soạn thực hiện: soạn phiên bản theo phiếu rồi ban hành, hoặc đặt Không áp dụng. Ban hành xong phiếu tự thành Đã thực hiện.", "申请新发布、修订或作废文件→部门负责人（部门级文件）或管理员（公司级）审核→体系秘书/编写人执行：依据申请编写版本并发布，或设为不适用。发布后申请自动变为已完成。"],
-  "dr.type_hint.REVISE": ["Tài liệu, biểu mẫu đã có trong danh mục: sửa đổi bản đang hiệu lực, hoặc ban hành lần đầu biểu ○ ◐. Ghi rõ phần cần sửa / cần ban hành.", "目录中已有的文件、表单：修订现行版本，或首次发布○◐表单。写明需修改/发布的内容。"],
+  "dr.type_hint.REVISE": ["Tài liệu, biểu mẫu đã có trong danh mục: sửa đổi bản đang hiệu lực, hoặc ban hành lần đầu biểu chưa ban hành (Chưa có / Đang soạn). Ghi rõ phần cần sửa / cần ban hành.", "目录中已有的文件、表单：修订现行版本，或首次发布尚未发布的表单（未编写/编写中）。写明需修改/发布的内容。"],
   "dr.type_hint.NEW": ["Tài liệu, biểu mẫu chưa có trong danh mục: được chấp thuận thì Thư ký ISO thêm vào danh mục rồi soạn lần 01.", "目录中尚无的文件、表单：批准后由体系秘书加入目录并编写第01版。"],
   "dr.type_hint.CANCEL": ["Đề nghị hủy (ngừng dùng) tài liệu: được chấp thuận thì Thư ký ISO đặt Không áp dụng ✕, hồ sơ cũ giữ nguyên.", "申请作废（停用）文件：批准后由体系秘书设为不适用✕，原有记录保留。"],
   "dr.doc": ["Tài liệu, biểu mẫu", "文件、表单"],
@@ -1371,5 +1371,9 @@
   "lbl.load_fail": ["Không nạp được bộ tạo mã QR. Tải lại app (có mạng) rồi thử lại.", "无法加载二维码生成器。请联网重新加载App后重试。"],
   "rp.req_log": ["Sổ theo dõi phiếu (cả năm)", "申请单跟踪表（全年）"],
   "audit_grp.docreq": ["Phiếu đề nghị", "文件申请"],
-  "audit_grp.dist": ["Phân phối, thu hồi", "分发、收回"]
+  "audit_grp.dist": ["Phân phối, thu hồi", "分发、收回"],
+  "dr.doc_n": ["Tài liệu, biểu mẫu ({N} biểu)", "文件、表单（{N}个）"],
+  "dr.pick_item": ["— Bấm để chọn biểu —", "— 点击选择表单 —"],
+  "dr.pick_none": ["— Không có biểu nào theo bộ lọc —", "— 无符合筛选的表单 —"],
+  "dr.pick_hint": ["Lọc Bộ phận và Tình trạng cho danh sách ngắn lại, rồi bấm ô chọn biểu. Cách khác: Danh mục → mở biểu → thẻ Phiếu đề nghị → Đề nghị sửa đổi (biểu được chọn sẵn).", "先筛选部门和状态缩短列表，再点击选择表单。也可：目录→打开表单→申请单卡片→申请修订（自动选中该表单）。"]
 }

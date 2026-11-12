@@ -42,8 +42,11 @@ vẫn dùng được vì tem dựng ngay trên máy).
 Cần một biểu ◐ mà anh đã có bản PDF (vd một biểu trong bộ 15 file BM-CĐ) — các bước dưới **ban hành thật** biểu đó (lần 01).
 
 1. Trang chủ → ô **Đề nghị tài liệu** (máy tính: menu trái) → **Đề nghị mới**.
-2. Loại **Sửa đổi / ban hành** (chọn sẵn) → **Tài liệu, biểu mẫu**: chọn biểu ◐ đó → **Lý do đề nghị** (vd "Ban hành biểu đang dùng")
-   → **Nội dung cần sửa đổi / ban hành** → **Gửi phiếu** → phiếu **DN-2611-001 · Chờ xem xét** (bỏ trống Lý do thì ô báo đỏ, không gửi).
+2. Loại **Sửa đổi / ban hành** (chọn sẵn) → ô **Bộ phận**: chọn bộ phận của biểu (vd `CĐ · Cơ điện`) → ô **Tình trạng biểu**: **Đang
+   soạn** → bấm ô **Tài liệu, biểu mẫu (N biểu)** → chọn biểu đó (dòng dưới hiện mã + "Đang soạn") → **Lý do đề nghị** (vd "Ban hành
+   biểu đang dùng") → **Nội dung cần sửa đổi / ban hành** → **Gửi phiếu** → phiếu **DN-2611-001 · Chờ xem xét** (bỏ trống Lý do thì ô
+   báo đỏ, không gửi). Cách khác: **Danh mục** → mở biểu → thẻ **Phiếu đề nghị** → **Đề nghị sửa đổi** (biểu được chọn sẵn).
+   Không thấy ô Đề nghị tài liệu ở Trang chủ / thẻ Phiếu đề nghị ở chi tiết biểu = máy chủ chưa lên 2d (làm lại phần Cập nhật).
 3. **Chấp thuận** → ô ý kiến (bỏ trống được) → **Xác nhận** → nhập **PIN** → phiếu **Đã chấp thuận**, dòng "Việc tiếp theo: soạn phiên
    bản theo phiếu…".
 4. **Soạn phiên bản theo phiếu** → ô **Soạn theo phiếu đề nghị** chọn sẵn DN-2611-001, **Tóm tắt thay đổi** điền sẵn từ phiếu → chọn
