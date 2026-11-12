@@ -59,6 +59,12 @@ var SHEETS = {
   // src_codes: mã biểu bên app kia đã ghép vào biểu này (vd BM-CĐ-03-03a, BM-CĐ-03-03b → BM-CĐ-03-03)
   Evidence: { book: 'B', dot: 1, key: 'evidence_id', c: true,
     cols: 'evidence_id source item_id form_code period_type period_key period_from period_to count last_date src_codes synced_at' },
+  // Kho tệp mẫu (2e, 31_tpl.js): một dòng = một tệp mẫu trống (bộ biểu xlsx nhiều sheet, hoặc docx/pdf) trên Drive riêng tư (Documents kind
+  // TEMPLATE). set_code = BM-<bộ phận>-<nhóm> (vd BM-CĐ-04) đọc từ tên sheet / tên tệp; sheets_json: [{n: tên sheet, p: khổ A4|A3|…, o: P|L,
+  // h: ẩn}] — app ghép sheet ↔ biểu theo mã. state ACTIVE | REPLACED (tệp mới cùng bộ thay, replaced_by_id) | DELETED (bỏ tệp tải nhầm)
+  TplFiles: { book: 'B', dot: 1, key: 'tpl_id', c: true,
+    cols: 'tpl_id set_code dept_code title_vi title_zh file_name mime_type size_bytes sha256 document_id sheets_json sheet_count state ' +
+      'replaced_by_id replaced_at uploaded_at uploaded_by note deleted_at deleted_by delete_reason' },
   // Điều khoản ISO 9001 và chủ đề BRCGS Packaging (std|key)
   Clauses: { book: 'B', dot: 1, key: 'clause_id', c: true, i18n: true,
     cols: 'clause_id std key group_vi group_zh name_vi name_zh mandatory_record sort_order active' },
@@ -123,7 +129,8 @@ var TYPE_OVERRIDES_ = {
   issued_at: 'DATE', review_due: 'DATE', due_date: 'DATE', run_date: 'DATE', records_from: 'DATE', period_from: 'DATE', period_to: 'DATE',
   pages: 'INT', client_created_at: 'STRING', void_by: 'STRING', period_type: 'STRING',
   evidence_id: 'STRING', period_key: 'STRING', count: 'INT', last_date: 'DATE', src_codes: 'STRING', source: 'STRING',
-  email_confirmed_by: 'STRING', stage: 'STRING', kind: 'STRING', via: 'STRING', dedupe_key: 'STRING', digest_id: 'STRING', recipient_id: 'STRING'
+  email_confirmed_by: 'STRING', stage: 'STRING', kind: 'STRING', via: 'STRING', dedupe_key: 'STRING', digest_id: 'STRING', recipient_id: 'STRING',
+  set_code: 'STRING', sheet_count: 'INT', uploaded_by: 'STRING', deleted_by: 'STRING', mime_type: 'STRING'
 };
 
 /** Kiểu cột suy theo tên. */

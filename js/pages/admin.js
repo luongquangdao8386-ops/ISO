@@ -3,7 +3,7 @@
 import { api, bi, biText, esc, badge, fmtDateTime, fmtNumber, session, uuid, resMsg, nameText, APP_BASE_URL } from '../core.js';
 import { $, $$, h, ICON, dialog, toast } from '../ui.js';
 import { isWide } from '../shell.js';
-import { roleLevel, isOwner, recs, boot, depts, users } from '../data.js';
+import { roleLevel, isOwner, recs, boot, allDepts, users, scopeDepts, inScopeDept, can, scopeNames, scopeBi } from '../data.js';
 import { textInput, selectInput, dateInput, wireForm, readField, showErrors, writeWithPin, writeFail, busy, bilingualInputs } from '../form.js';
 import { rememberReportLogo } from '../report-logo.js';
 import { afterCommit } from '../app.js';
@@ -77,7 +77,7 @@ function readRole(wrap) {
   };
 }
 async function activeDepts() {
-  return (await depts()).filter((d) => d.active !== false);
+  return (await allDepts()).filter((d) => d.active !== false);
 }
 
 async function userDialog(u) {
@@ -228,20 +228,52 @@ async function deptDialog(d) {
 export async function renderDepts(view, { shell }) {
   shell.setScreen({ title: 'admin.depts', back: '/account' });
   if (offline(view)) return;
-  const list = await depts();
+  const list = await allDepts();
   const um = await users();
   const its = await recs('ITEM');
   const repaint = () => renderDepts(view, { shell });
-  view.innerHTML = `<div class="toolbar"><div class="row"><span class="muted">${bi('adm.dept.total', { N: list.length })}</span>
+  // Phạm vi áp dụng (2e): bộ phận app quản lý — biểu ngoài phạm vi ẩn với mọi người (không xóa); trống = toàn công ty
+  const scope = scopeDepts();
+  const canScope = await can('settings.edit');
+  const sn = await scopeNames();
+  const scopeCard = `<section class="card scope-card" id="scope-card"><h2>${bi('scope.title')}</h2>
+    <p>${sn ? scopeBi('scope.now', sn) : bi('scope.all')}</p>
+    <p class="muted small">${bi('scope.what')}</p>
+    ${canScope ? `<div class="chips scope-chips" role="group" aria-label="${esc(biText('scope.title'))}">${list.map((d) => `<label class="chip check${scope.includes(d.dept_code) ? ' on' : ''}"><input type="checkbox" value="${esc(d.dept_code)}"${scope.includes(d.dept_code) ? ' checked' : ''}> ${esc(d.dept_code)} · ${esc(nameText(d))}</label>`).join('')}</div>
+      <div class="row"><button type="button" class="btn small primary" id="scope-save">${ICON.check}<span>${bi('scope.save')}</span></button><span class="muted small">${bi('scope.none_all')}</span></div>` : ''}
+  </section>`;
+  view.innerHTML = `${scopeCard}<div class="toolbar"><div class="row"><span class="muted">${bi('adm.dept.total', { N: list.length })}</span>
       <button type="button" class="btn small primary" id="d-add">${ICON.plus}${bi('adm.dept.add')}</button></div></div>
     <p class="muted small">${bi('adm.dept.note')}</p>
     <div class="cards">${list.map((d) => {
       const hu = um.get(d.head_user_id);
-      return `<div class="card rec-card"><div class="rec-top"><span class="code">${esc(d.dept_code)}</span>${d.active === false ? badge('user_status.DISABLED') : ''}</div>
+      return `<div class="card rec-card"><div class="rec-top"><span class="code">${esc(d.dept_code)}</span>${d.active === false ? badge('user_status.DISABLED') : ''}${inScopeDept(d.dept_code) ? '' : ` <span class="tag">${bi('scope.out')}</span>`}</div>
         <div class="rec-name">${esc(nameText(d))}</div>
         <div class="muted small">${bi('adm.dept.head')}: ${hu ? esc(hu.employee_code + ' · ' + hu.display_name) : `<span class="t-amber-text">${bi('adm.dept.no_head')}</span>`} · ${bi('home.items_n', { N: its.filter((x) => x.dept_code === d.dept_code).length })}</div>
         <div class="rec-actions"><button type="button" class="btn small" data-dept="${esc(d.dept_code)}">${ICON.edit}${bi('btn.edit')}</button></div></div>`;
     }).join('')}</div>`;
+  $$('.scope-chips input', view).forEach((cb) => cb.addEventListener('change', () => cb.closest('.chip').classList.toggle('on', cb.checked)));
+  const ss = $('#scope-save', view);
+  if (ss) ss.addEventListener('click', async () => {
+    const pick = $$('.scope-chips input', view).filter((x) => x.checked).map((x) => x.value);
+    const val = pick.join(',');
+    if (val === scope.join(',')) { toast(bi('scope.same'), 'ok'); return; }
+    const ok = await dialog({
+      title: bi('scope.title'),
+      body: `<p>${pick.length ? scopeBi('scope.confirm', await scopeNames(pick)) : bi('scope.confirm_all')}</p><p class="muted small">${bi('scope.what')}</p>`,
+      actions: [{ label: bi('btn.cancel'), value: false }, { label: bi('scope.save'), kind: 'primary', value: true }]
+    });
+    if (!ok) return;
+    busy(ss, true);
+    const r = await writeWithPin('settings.edit', { changes: { scope_depts: val }, reason: 'Phạm vi áp dụng' });
+    busy(ss, false);
+    if (!r.ok) { writeFail(r); return; }
+    // Cài đặt đổi → lần đồng bộ sau tải lại toàn bộ (máy chủ gửi lại biểu theo phạm vi mới)
+    const { syncNow } = await import('../app.js');
+    await syncNow({ quiet: true });
+    toast(bi('scope.saved'), 'ok');
+    repaint();
+  });
   $('#d-add', view).addEventListener('click', async () => { if (await deptDialog(null)) repaint(); });
   $$('[data-dept]', view).forEach((b) => b.addEventListener('click', async () => {
     const d = list.find((x) => x.dept_code === b.dataset.dept);
@@ -325,7 +357,7 @@ function wireMirror(view, again) {
 /* ====================== Nhật ký thao tác ====================== */
 
 const auditFilt = { action: '', from: '', to: '' };
-const AUDIT_ACTIONS = ['item.', 'version.', 'doc.', 'docreq.', 'dist.', 'import.', 'dept.', 'user.', 'settings.', 'report.', 'backup.'];
+const AUDIT_ACTIONS = ['item.', 'version.', 'doc.', 'tpl.', 'docreq.', 'dist.', 'import.', 'dept.', 'user.', 'settings.', 'report.', 'backup.'];
 
 function jsonLines(o) {
   if (!o || typeof o !== 'object') return '';

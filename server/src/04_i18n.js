@@ -90,7 +90,12 @@ var SUB_MSG = {
   // Gmail nhắc hạn (phiên 2b)
   EMAIL_MISSING: ['Người này chưa có email', '此人尚无邮箱'],
   EMAIL_NOT_CONFIRMED: ['Email chưa được Quản trị xác nhận', '邮箱尚未经管理员确认'],
-  MAIL_OFF: ['Gmail nhắc hạn đang tắt — bật trước', '邮件提醒已关闭，请先开启']
+  MAIL_OFF: ['Gmail nhắc hạn đang tắt — bật trước', '邮件提醒已关闭，请先开启'],
+  // Phạm vi áp dụng, Kho tệp mẫu (2e)
+  APP_SCOPE: ['Bộ phận ngoài phạm vi áp dụng của app (Quản trị → Phạm vi áp dụng)', '该部门不在应用适用范围内（管理→适用范围）'],
+  SCOPE_DEPT: ['Phạm vi áp dụng chỉ gồm mã bộ phận có trong danh sách Bộ phận, cách nhau dấu phẩy', '适用范围只能填写部门列表中的部门代码，用逗号分隔'],
+  TPL_SHEETS: ['Danh sách sheet của tệp không hợp lệ (tối đa 300 sheet)', '文件的工作表列表无效（最多300个）'],
+  TPL_STATE: ['Tệp mẫu đã được thay hoặc đã bỏ', '模板文件已被替换或已删除']
 };
 
 function fmtMsg_(pair, vars) {

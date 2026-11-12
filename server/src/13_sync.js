@@ -15,7 +15,9 @@ var SYNC_ENTITIES_ = [
   // Phiếu đề nghị tài liệu (2d): cấp 2+ / Thư ký ISO — phiếu của mình, của bộ phận mình
   { type: 'DOCREQ', sheet: 'DocRequests', scoped: 'docreq' },
   // Sổ phân phối & thu hồi (2d): như hồ sơ — cấp 2+ và Thư ký ISO, theo phạm vi của biểu
-  { type: 'DIST', sheet: 'Distributions', scoped: 'record' }
+  { type: 'DIST', sheet: 'Distributions', scoped: 'record' },
+  // Kho tệp mẫu (2e): tệp đang dùng — mọi cấp; tệp đã thay — cấp 3+, Thư ký ISO; tệp đã bỏ — xóa khỏi máy (TOMBSTONE)
+  { type: 'TPL', sheet: 'TplFiles', scoped: 'tpl' }
 ];
 
 /** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */
@@ -35,6 +37,7 @@ function syncItemMap_(aux) {
 /** Dòng → bản ghi gửi client; null nếu không gửi (ngoài phạm vi bộ phận) */
 function syncProject_(ctx, ent, row, aux) {
   if (ent.scoped === 'docreq') return docreqVisible_(ctx.user, row) ? projectRow_(ctx, row) : null;
+  if (ent.scoped === 'tpl') return tplVisible_(ctx.user, row) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'record') {
     return canSeeRecords_(ctx.user, syncItemMap_(aux)[row.item_id]) ? projectRow_(ctx, row) : null;
   }

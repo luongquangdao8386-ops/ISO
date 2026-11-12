@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.4 (Đợt 2, phiên 2d — Đề nghị tài liệu, phân phối, tem QR)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.5 (Đợt 2, phiên 2e — Phạm vi Cơ điện, Kho tệp mẫu)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -19,6 +19,66 @@ ban hành / sửa đổi / hủy tài liệu** (`DN-yymm-001`, thay BM-ISO-02-02
 (PIN) → soạn phiên bản theo phiếu → ban hành thì phiếu tự thành Đã thực hiện; **Sổ phân phối & thu hồi bản in** (thay BM-ISO-02-03) —
 ban hành lần mới thì bản in lần cũ thành "Cần thu hồi", thu hồi (PIN) và phát luôn bản mới; **In tem QR** 70×37 / 105×74 mm trên tờ
 A4 + ảnh PNG của mã; 2 báo cáo mới (Phiếu đề nghị, Sổ phân phối & thu hồi). Khắc phục, Đánh giá nội bộ (Đợt 3–4) vẫn mờ "Sắp có · 即将推出".
+Phiên 2e (12/11/2026, anh yêu cầu "chỉ phạm vi cơ điện + Kho tệp mẫu") thêm: **Phạm vi áp dụng** — app chỉ quản lý biểu, tài liệu
+của bộ phận **Cơ điện** (mặc định): 115 biểu của bộ phận khác **ẩn với mọi người, không bị xóa** (chọn lại bộ phận là hiện lại), nhập
+Excel tổng bỏ qua dòng ngoài phạm vi; **Kho tệp mẫu** — bộ biểu Excel đã căn chỉnh in (14 tệp BM-CD-01 … BM-CD-14, 151 sheet), mọi
+người tải về in; tệp tải về **mở sẵn đúng sheet của biểu** (Ctrl+P → In sheet hiện tại).
+
+## CẬP NHẬT LÊN BẢN 2e (1.0.0-d2.5) — làm một lần, trên máy tính
+
+Bản 2e **thêm sheet `TplFiles` và cài đặt `scope_depts` (= CĐ)** → phải chạy `migrateSchema`. **Không** hỏi quyền Google mới,
+**không** cần `installTriggers`. App 2e vẫn chạy với máy chủ 2d (Kho tệp mẫu báo "Máy chủ chưa lên bản có Kho tệp mẫu", danh mục vẫn
+đủ 221 biểu cho tới khi dán Code.gs mới).
+
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký: `migrateSchema xong. Thêm: TplFiles. schema_version=1.0.7`.
+   (Chưa cập nhật bản 2d thì dòng nhật ký có thêm `Versions(request_id); DocRequests; Distributions`.)
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d2.5 pham vi co dien kho tep mau` →
+   **Triển khai**. Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` (đang mở thì đóng hẳn rồi mở lại) → **Tài khoản → Thông tin** ghi `1.0.0-d2.5` (màn báo lỗi thì bấm **Tải lại bản
+   mới**). App tự tải lại dữ liệu một lần (máy chủ báo cài đặt đổi). **Tài khoản → Quản trị → Trạng thái hệ thống**:
+   - `schema_version` = **1.0.7**;
+   - dòng mới **Phạm vi áp dụng** = `CĐ` · `106 biểu trong phạm vi · 115 biểu ngoài phạm vi (ẩn, không xóa)`;
+   - **Biểu trong danh mục** = `106`;
+   - dòng mới **Kho tệp mẫu** = `0 tệp · 0 sheet · 0/106 biểu trong phạm vi có tệp mẫu` · `Chưa có tệp mẫu — Kho tệp mẫu → Tải tệp mẫu lên`.
+
+### Thử bản 2e (Thư ký ISO hoặc owner, trên máy tính)
+
+Chuẩn bị: giải nén `ISO1.rar` ra một thư mục (Windows 11: chuột phải → **Extract all / Giải nén tất cả**, hoặc 7-Zip) — có 14 tệp
+`BM-CD-01_….xlsx` … `BM-CD-14_….xlsx` (+ tệp danh mục và `HUONG_DAN_IN.txt`, không cần tải lên).
+
+1. **Trang chủ**: dưới tên anh có dải vàng **Phạm vi: Cơ điện · 范围：机电**; ô **Danh mục** ghi **106 biểu**.
+2. Ô **Kho tệp mẫu** (máy tính: menu trái **Kho tệp mẫu**) → "Chưa có tệp mẫu…" → **Tải tệp mẫu lên**.
+3. **Chọn tệp (chọn được nhiều tệp)** → mở thư mục vừa giải nén → bấm tệp `BM-CD-01_…`, giữ **Shift** bấm tệp `BM-CD-14_…` (chọn đủ 14
+   tệp) → **Open**. Danh sách xem trước 14 dòng: mỗi dòng **BM-CĐ-01 … BM-CĐ-14**, dung lượng, số sheet, số biểu (vd BM-CĐ-04 ·
+   11 sheet · 7 biểu).
+4. **Tải lên 14 tệp** → chờ từng dòng thành **Đã tải lên** (khoảng 1–2 phút) → **Kho tệp mẫu ›**. Dòng tóm tắt:
+   **14 tệp · 151 sheet · 106/106 biểu có tệp mẫu**. Mỗi bộ một thẻ: mã bộ, tên nhóm, tên tệp, **Tải cả tệp**, **Các sheet** (mỗi sheet:
+   mã, khổ giấy A4 / A3 dọc / ngang, tên biểu, nút **Tải**).
+5. Ô tìm: gõ `04-02` → dòng **BM-CĐ-04-02 · A4 dọc · Báo cáo sửa chữa…** → bấm tên biểu → chi tiết biểu, thẻ **Tệp mẫu** → **Tải tệp
+   mẫu** → tệp `BM-CD-04_Sua-chua-su-co-phan-tich-nguyen-nhan.xlsx` tải xuống → mở bằng Excel: **đang đứng ở sheet BM-CĐ-04-02** →
+   Ctrl+P → **In sheet hiện tại** (Print Active Sheets), khay **A4**.
+6. **Danh mục** → **Bộ lọc** → ô **Khác**: **Chưa có tệp mẫu** → **0 biểu**.
+7. **Trạng thái hệ thống**: dòng **Kho tệp mẫu** = `14 tệp · 151 sheet · 106/106 biểu trong phạm vi có tệp mẫu`.
+8. iPhone: **Tài khoản → Kho tệp mẫu** (hoặc ô Kho tệp mẫu ở Trang chủ) → mở một biểu → **Tải tệp mẫu** → "Đã tải xong — chạm Mở / Lưu"
+   → chạm lần nữa → bảng Chia sẻ → **Lưu vào Tệp** hoặc mở bằng Excel.
+
+### Dùng Phạm vi áp dụng, Kho tệp mẫu
+
+- **Phạm vi áp dụng** (Quản trị cấp 4): **Tài khoản → Quản trị → Bộ phận và trưởng bộ phận** → thẻ **Phạm vi áp dụng** → tích bộ phận
+  → **Lưu phạm vi** → xác nhận → PIN. Bỏ tích hết = toàn công ty (hiện lại đủ 221 biểu). Ngoài phạm vi: ẩn ở Danh mục, Hồ sơ, Phủ điều
+  khoản, Báo cáo, Gmail nhắc hạn, Trạng thái hệ thống; không thêm được biểu / phiếu đề nghị mới cho bộ phận đó; nhập Excel tổng thì dòng
+  của bộ phận đó ghi **Ngoài phạm vi (bỏ qua)**. Phủ điều khoản lúc này chỉ đếm biểu cơ điện. Nơi nhận bản in (Phân phối) vẫn chọn được
+  mọi bộ phận.
+- **Kho tệp mẫu**: ai đăng nhập cũng xem và tải (kể cả Tra cứu cấp 1). Thư ký ISO / Quản trị **tải lên**, **Sửa tên**, **Bỏ tệp** (tải
+  nhầm — PIN; tệp cũ mà nó đã thay tự dùng lại). Tải lên lại tệp cùng bộ (vd sửa BM-CD-04 rồi tải lên) → tệp mới thay tệp cũ; tệp cũ nằm ở
+  mục **Tệp đã thay bằng tệp mới** (Trưởng bộ phận, Thư ký ISO, Quản trị tải lại được). Nhận cả Word / PDF (không có sheet; bộ lấy từ
+  tên tệp kiểu `BM-CD-12_…`). Tối đa 10 MB mỗi tệp trên máy tính, 5 MB trên điện thoại.
+- Sheet ghép với biểu theo **mã ở tên sheet**: `BM-CĐ-03-03a`, `BM-CĐ-04-03-TH`, `-TD`, `-ML` là **sheet phụ** của biểu cha
+  (BM-CĐ-03-03, BM-CĐ-04-03); sheet **Mục lục** ghi "Không phải biểu trong danh mục". Đổi tên sheet trong Excel thì tải lên lại.
+- Kho tệp mẫu là **mẫu trống để in**; còn bản ban hành chính thức (PDF + tệp gốc, lần 01, 02…) vẫn đi theo **Phiên bản** (soạn → duyệt →
+  ban hành) như trước.
 
 ## CẬP NHẬT LÊN BẢN 2d (1.0.0-d2.4) — làm một lần, trên máy tính
 

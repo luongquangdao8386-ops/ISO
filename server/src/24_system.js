@@ -105,6 +105,7 @@ function parseSettingInput_(def, v) {
   if (key === 'app_base_url' && s && !/^https:\/\/[^\s]+\/$/.test(s)) throw bad();
   if (key === 'min_client_version' && !/^\d+\.\d+\.\d+$/.test(s)) throw bad();
   if (key === 'records_start_date' && s && !isDateStr_(s)) throw bad();
+  if (key === 'scope_depts') return normScopeDepts_(s);
   if (s.length > 500) throw bad();
   return s;
 }
@@ -134,7 +135,7 @@ function settingsEdit_(ctx) {
   Object.keys(changes).forEach(function (k) {
     var def = SETTINGS_DEFAULTS.filter(function (d) { return d[0] === k; })[0];
     if (!def || def[4] > RELEASED_DOT || SETTINGS_READONLY_[k]) { errs.push(fieldError_(k, 'INVALID_VALUE')); return; }
-    try { parsed[k] = parseSettingInput_(def, changes[k]); } catch (e) { errs.push(fieldError_(k, 'INVALID_VALUE')); }
+    try { parsed[k] = parseSettingInput_(def, changes[k]); } catch (e) { errs.push(e && e.apiErrors && e.apiErrors[0] ? e.apiErrors[0] : fieldError_(k, 'INVALID_VALUE')); }
   });
   if (parsed.client_long_timeout_seconds !== undefined || parsed.client_timeout_seconds !== undefined) {
     var shortT = parsed.client_timeout_seconds !== undefined ? parsed.client_timeout_seconds : setting_('client_timeout_seconds');
@@ -193,7 +194,13 @@ function healthRows_() {
   try { runs = JSON.parse(prop_('TRIGGER_RUNS') || '[]'); } catch (e) { runs = []; }
   var minutes = Math.round(runs.filter(function (r) { return Date.now() - r.s < 86400000; }).reduce(function (s, r) { return s + r.ms; }, 0) / 600) / 100;
   add('trigger_minutes_24h', minutes < 90, minutes);
-  var items = readRows_('Items');
+  var allItems = readRows_('Items').filter(function (it) { return !it.archived_at; });
+  var items = allItems.filter(inScope_);
+  var scope = scopeDepts_();
+  // Phạm vi áp dụng (2e): biểu ngoài phạm vi ẩn với mọi người (không xóa)
+  add('scope', true, scope.length ? scope.join(', ') : 'Toàn công ty',
+    (scope.length ? items.length + ' biểu trong phạm vi · ' + (allItems.length - items.length) + ' biểu ngoài phạm vi (ẩn, không xóa)' : '') +
+    (scope.length ? ' — đổi ở Tài khoản → Quản trị → Bộ phận → Phạm vi áp dụng' : ''));
   add('items', items.length > 0, items.length, items.length ? '' : 'Excel → Nhập file Excel tổng');
   var cls = readRows_('Clauses').filter(function (c) { return c.active; });
   var iso = cls.filter(function (c) { return c.std === 'ISO9001'; }).length, brc = cls.length - iso;
@@ -201,24 +208,32 @@ function healthRows_() {
   var cov = coverageCounts_(items, cls);
   add('coverage', !cov.missing, 'ISO 9001: ' + cov.iso_covered + '/' + iso + ' điều khoản có biểu · bắt buộc chưa có biểu ' + cov.missing + ' · BRCGS: ' + cov.brc_covered + '/' + brc + ' chủ đề có biểu',
     cov.missing ? 'Phủ điều khoản → Thiếu biểu – bắt buộc: ' + cov.missing_keys.join(', ') : '');
-  var heads = readRows_('Depts').filter(function (d) { return d.active; });
+  var th = tplHealth_(items);
+  add('templates', th.ok, th.value, th.note);
+  var heads = readRows_('Depts').filter(function (d) { return d.active && inScopeDept_(d.dept_code); });
   var noHead = heads.filter(function (d) { return !d.head_user_id; }).map(function (d) { return d.dept_code; });
   // Không có trưởng bộ phận thì Quản trị (cấp 4) duyệt thay — không coi là lỗi khi có Quản trị đang hoạt động
   var admins = readRows_('Users').filter(function (u) { return u.active && Number(u.role_level) === 4; }).length;
   add('dept_heads', !noHead.length || admins > 0, (heads.length - noHead.length) + ' / ' + heads.length,
     noHead.length ? 'Chưa có trưởng bộ phận: ' + noHead.join(', ') + (admins ? ' — Quản trị duyệt thay' : '') : '');
   if (sheetExists_('Versions')) {
-    var vs = readRows_('Versions');
+    var inV = {};
+    items.forEach(function (it) { inV[it.item_id] = true; });
+    var vs = readRows_('Versions').filter(function (v) { return inV[v.item_id]; });
     var cnt = function (st) { return vs.filter(function (v) { return v.state === st; }).length; };
     add('versions', true, 'Nháp ' + cnt('DRAFT') + ' · Chờ duyệt ' + cnt('IN_REVIEW') + ' · Chờ ban hành ' + cnt('APPROVED') + ' · Đang hiệu lực ' + cnt('ISSUED'));
   } else {
     add('versions', false, 'Thiếu sheet Versions', 'Chạy migrateSchema');
   }
   if (sheetExists_('Records')) {
-    var rs = readRows_('Records').filter(function (r) { return !r.archived_at; });
+    var inR = {};
+    items.forEach(function (it) { inR[it.item_id] = true; });
+    var rs = readRows_('Records').filter(function (r) { return !r.archived_at && inR[r.item_id]; });
     var rcnt = function (x) { return rs.filter(function (r) { return r.status === x; }).length; };
     var all = recordStatusAll_();
-    var od = Object.keys(all.items).filter(function (k) { return all.items[k][6] === 'L'; }).length;
+    var inIds = {};
+    items.forEach(function (it) { inIds[it.item_id] = true; });
+    var od = Object.keys(all.items).filter(function (k) { return inIds[k] && all.items[k][6] === 'L'; }).length;
     var missingFiles = rs.filter(function (r) { return r.status === 'SUBMITTED' && (r.files_json || []).length < Number(r.pages || 0); }).length;
     add('records', true, 'Đã nộp ' + rcnt('SUBMITTED') + ' · Bị trả lại ' + rcnt('RETURNED') + ' · Biểu quá hạn ' + od + ' · Chưa đủ tệp ' + missingFiles,
       'Ngày bắt đầu tính (biểu nhập từ Excel): ' + (all.start_setting || '—') + ' · cho phép trễ ' + all.grace + ' ngày');

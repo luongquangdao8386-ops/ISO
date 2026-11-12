@@ -4,7 +4,7 @@
 import { bi, biText, esc, nameText } from '../core.js';
 import { ICON, setViewHtml, wireSearch, listChunk, wireMore, freshFilters } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, depts, recs, isSecretary, seesAll, myDepts, groupText, itemHay, foldVi, STATUS_SYMBOL, STATUSES, KINDS, WHERES, catalogSummary, reviewSoon, today } from '../data.js';
+import { items, depts, recs, isSecretary, seesAll, myDepts, groupText, itemHay, foldVi, STATUS_SYMBOL, STATUSES, KINDS, WHERES, catalogSummary, reviewSoon, today, scopeNames, scopeBi } from '../data.js';
 import { isoMatch, brcMatch } from '../coverage.js';
 
 // iso / brc: lọc theo điều khoản ISO 9001 / chủ đề BRCGS (mở từ màn Phủ điều khoản, đếm như file Excel)
@@ -28,7 +28,7 @@ function applyQuery(query) {
   if (query.f === 'issued') { state.status = 'ISSUED'; state.f = ''; }
 }
 
-function filterList(list) {
+function filterList(list, tplIds) {
   const q = foldVi(state.q.trim());
   const words = q.split(/\s+/).filter(Boolean);
   return list.filter((it) => {
@@ -40,6 +40,7 @@ function filterList(list) {
     if (state.prio && String(it.priority || '') !== (state.prio === '-' ? '' : state.prio)) return false;
     if (state.f === 'nofile' && !(it.status === 'ISSUED' && it.file_missing)) return false;
     if (state.f === 'review' && !reviewSoon(it, today())) return false;
+    if (state.f === 'notpl' && (it.status === 'NA' || tplIds.has(it.item_id))) return false;
     if (state.iso && !isoMatch(it, state.iso)) return false;
     if (state.brc && !brcMatch(it, state.brc)) return false;
     if (words.length) { const hay = itemHay(it); if (!words.every((w) => hay.includes(w))) return false; }
@@ -54,17 +55,21 @@ export async function renderCatalog(view, ctx) {
   const sec = isSecretary();
   shell.setScreen({
     title: 'nav.catalog',
-    actions: sec ? [{ icon: 'plus', label: biText('cat.add'), id: 'cat-add', onClick: () => import('../router.js').then((r) => r.navigate('/item/new')) }] : []
+    actions: [{ icon: 'folder', label: biText('nav.templates'), id: 'cat-tpl', onClick: () => import('../router.js').then((r) => r.navigate('/templates')) }]
+      .concat(sec ? [{ icon: 'plus', label: biText('cat.add'), id: 'cat-add', onClick: () => import('../router.js').then((r) => r.navigate('/item/new')) }] : [])
   });
   // Mở từ chỗ khác (trang chủ, menu): bộ lọc về như đầu rồi áp tham số (?dept=, ?f=); quay lại bằng ‹ thì giữ nguyên
   if (ctx.entered) { freshFilters(ctx, state, INIT); applyQuery(query); }
   const all = await items();
   const deps = await depts();
+  // Biểu đã có sheet trong Kho tệp mẫu (lọc "Chưa có tệp mẫu", 2e)
+  const tplIds = sec ? new Set((await import('./tpl.js').then((m) => m.tplMap())).byItem.keys()) : new Set();
+  const scope = await scopeNames();
   const groups = await recs('GROUP');
   const depMap = new Map(deps.map((d) => [d.dept_code, d]));
   const grpMap = new Map(groups.map((g) => [g.group_key, g]));
   const draw = () => {
-    const list = filterList(all);
+    const list = filterList(all, tplIds);
     const sig = JSON.stringify({ ...state, open: 0 });
     const { shown, more } = listChunk('catalog', list, sig);
     const counts = {};
@@ -74,7 +79,7 @@ export async function renderCatalog(view, ctx) {
     const grpOpts = groups.filter((g) => (!state.dept || g.dept_code === state.dept) && all.some((x) => x.group_key === g.group_key))
       .sort((a, b) => String(a.group_key).localeCompare(String(b.group_key)));
     const nFilt = ['dept', 'group', 'kind', 'where', 'prio', 'f'].filter((k) => state[k]).length;
-    const scopeNote = seesAll() ? '' : `<p class="muted small">${bi('cat.scope_note', { D: myDepts().join(', ') })}</p>`;
+    const scopeNote = (scope ? `<p class="muted small">${scopeBi('scope.short', scope)}</p>` : '') + (seesAll() ? '' : `<p class="muted small">${bi('cat.scope_note', { D: myDepts().join(', ') })}</p>`);
     const clauseChip = state.iso || state.brc ? `<div class="chips cov-filter"><button type="button" class="chip on" id="cf-clause">${bi(state.iso ? 'cat.f_iso' : 'cat.f_brc', { K: esc(state.iso || state.brc) })} ${ICON.x}</button></div>` : '';
     const chips = `<div class="chips" role="group" aria-label="${esc(biText('cat.status'))}">
       <button type="button" class="chip${state.status ? '' : ' on'}" data-st="">${bi('cat.all')} <b>${base.length}</b></button>
@@ -86,7 +91,7 @@ export async function renderCatalog(view, ctx) {
         <label class="fld"><span>${bi('cat.kind')}</span><select class="inp sel" id="cf-kind">${opt('', biText('cat.all'), state.kind)}${KINDS.map((k) => opt(k, esc(biText('kind.' + k)), state.kind)).join('')}</select></label>
         <label class="fld"><span>${bi('cat.where')}</span><select class="inp sel" id="cf-where">${opt('', biText('cat.all'), state.where)}${WHERES.map((k) => opt(k, esc(biText('where.' + k)), state.where)).join('')}</select></label>
         <label class="fld"><span>${bi('cat.priority')}</span><select class="inp sel" id="cf-prio">${opt('', biText('cat.all'), state.prio)}${['1', '2', '3'].map((k) => opt(k, esc(biText('cat.prio_n', { N: k })), state.prio)).join('')}${opt('-', esc(biText('cat.prio_none')), state.prio)}</select></label>
-        ${sec ? `<label class="fld"><span>${bi('cat.special')}</span><select class="inp sel" id="cf-f">${opt('', biText('cat.all'), state.f)}${opt('nofile', esc(biText('cat.no_file')), state.f)}${opt('review', esc(biText('cat.review_soon')), state.f)}</select></label>` : ''}
+        ${sec ? `<label class="fld"><span>${bi('cat.special')}</span><select class="inp sel" id="cf-f">${opt('', biText('cat.all'), state.f)}${opt('nofile', esc(biText('cat.no_file')), state.f)}${opt('review', esc(biText('cat.review_soon')), state.f)}${opt('notpl', esc(biText('cat.no_tpl')), state.f)}</select></label>` : ''}
       </div>
       ${nFilt ? `<button type="button" class="btn small" id="cf-clear">${ICON.x}<span>${bi('cat.clear')}</span></button>` : ''}</details>`;
     const s = catalogSummary(list);

@@ -86,6 +86,7 @@ export async function renderAccount(view, { shell }) {
     ${u.iso_secretary || u.auditor ? row(bi('account.flags'), [u.iso_secretary ? bi('role.secretary') : '', u.auditor ? bi('role.auditor') : ''].filter(Boolean).join('<br>')) : ''}
   </section>
   <section class="card acc-links"><h2>${bi('account.work')}</h2>
+    ${link('nav.templates', '/templates')}
     ${lvl >= 2 || sec ? link('nav.versions', '/versions') : ''}
     ${(lvl >= 2 || sec) && dcOn ? link('nav.requests', '/requests') : ''}
     ${(lvl >= 2 || sec) && dcOn ? link('nav.dist', '/dist') : ''}

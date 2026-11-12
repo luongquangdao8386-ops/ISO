@@ -180,6 +180,8 @@ function registerRoutes() {
   route('/dist', lazy('./pages/dist.js', 'renderDist'), { nav: 'dist' });
   route('/dist/new/:item', lazy('./pages/dist.js', 'renderDistNew'), { nav: 'dist' });
   route('/labels', lazy('./pages/labels.js', 'renderLabels'), { nav: 'labels' });
+  route('/templates', lazy('./pages/tpl.js', 'renderTemplates'), { nav: 'templates' });
+  route('/templates/upload', lazy('./pages/tpl.js', 'renderTplUpload'), { nav: 'templates' });
   // Màn của đợt sau: hiện "Sắp có · 即将推出"
   ['capa', 'audits'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
   route('/links', lazy('./pages/links.js', 'renderLinks'), { nav: 'links' });
@@ -245,7 +247,7 @@ window.addEventListener('resize', () => {
 
 // Màn xem (trang chủ, danh mục, chi tiết biểu, hồ sơ, tài khoản) vẽ lại sau khi tự gửi nháp xong.
 // Không vẽ lại màn nhập (sửa biểu, Excel), khi đang mở hộp thoại hoặc đang gõ.
-const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
+const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|templates|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
 export function refreshAfterSend(r) {
   if (!app.shell) return;
   const path = currentPath();

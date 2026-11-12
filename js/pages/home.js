@@ -7,7 +7,7 @@
 import { bi, biText, esc, fmtDate, fmtNumber, session, nameText } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn } from '../data.js';
+import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { missingMandatory } from '../coverage.js';
@@ -125,8 +125,10 @@ async function gridHtml(list) {
   const uid = session.user && session.user.user_id;
   const q = (await queueItems().catch(() => [])).filter((o) => o.user_id === uid && o.dataset_epoch === session.epoch).length;
   const dcOn = await docControlOn();
+  const tplN = (await tplActive()).length;
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
+    { key: 'templates', icon: 'folder', href: '/templates', tail: tplN ? bi('tpl.files_n', { N: tplN }) : '' },
     { key: 'records', icon: 'file', href: '/records', lvl: 2, show: canSeeRecords() },
     { key: 'coverage', icon: 'checklist', href: '/coverage', show: canSeeRecords() },
     { key: 'excel', icon: 'excel', href: '/excel', show: lvl >= 3 || sec },
@@ -161,8 +163,9 @@ export async function renderHome(view, ctx) {
   const t = today();
   const list = await items();
   const flags = [u.iso_secretary ? bi('role.secretary') : '', u.auditor ? bi('role.auditor') : ''].filter(Boolean).join(' · ');
+  const scope = await scopeNames();
   view.innerHTML = `<div class="home">
-    <div class="home-hero">${brandHtml()}<div class="home-who">${esc(u.display_name || '')} · ${bi('level.' + roleLevel())}${flags ? ' · ' + flags : ''}<br>${bi('weekday.' + weekday(t))} ${esc(fmtDate(t))}</div></div>
+    <div class="home-hero">${brandHtml()}<div class="home-who">${esc(u.display_name || '')} · ${bi('level.' + roleLevel())}${flags ? ' · ' + flags : ''}<br>${bi('weekday.' + weekday(t))} ${esc(fmtDate(t))}${scope ? `<br><span class="home-scope">${scopeBi('scope.short', scope)}</span>` : ''}</div></div>
     <div class="home-body${wide ? ' wide' : ''}">
       <div class="home-left">${await pendingHtml()}${await statsHtml(list)}${await weekHtml()}</div>
       <div class="home-right">${await gridHtml(list)}</div>

@@ -53,6 +53,9 @@ var HANDLERS_ = {
   'dist.issue': function (ctx) { return distIssue_(ctx); },
   'dist.recall': function (ctx) { return distRecall_(ctx); },
   'dist.edit': function (ctx) { return distEdit_(ctx); },
+  'tpl.upload': function (ctx) { return tplUpload_(ctx); },
+  'tpl.edit': function (ctx) { return tplEdit_(ctx); },
+  'tpl.delete': function (ctx) { return tplDelete_(ctx); },
   'doc.upload': function (ctx) { return docUpload_(ctx); },
   'doc.get': function (ctx) { return docGet_(ctx); },
   'report.run': function (ctx) { return reportRun_(ctx); },
@@ -91,6 +94,7 @@ var PRECHECK_ = {
   'docreq.reject': function (ctx) { precheckDocreqDecide_(ctx); },
   'docreq.done': function (ctx) { precheckDocreqDone_(ctx); },
   'dist.recall': function (ctx) { precheckDistRecall_(ctx); },
+  'tpl.delete': function (ctx) { precheckTplDelete_(ctx); },
   'link.set': function (ctx) { precheckLinkSet_(ctx); },
   'mail.recipient.set': function (ctx) { precheckMailRecipient_(ctx); },
   'mail.test': function (ctx) { precheckMailRecipient_(ctx); }

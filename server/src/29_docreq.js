@@ -22,7 +22,7 @@ function docreqLevel_(type, it, newCode, newKind, dept) {
 
 /** Người dùng thấy phiếu: cấp 2+ / Thư ký ISO; phiếu của mình, của bộ phận mình (mọi bộ phận khi không giới hạn) */
 function docreqVisible_(u, r) {
-  if (!r || (!isSecretary_(u) && Number(u.role_level) < 2)) return false;
+  if (!r || (!isSecretary_(u) && Number(u.role_level) < 2) || !inScopeDept_(r.dept_code)) return false;
   return r.submitted_by === u.user_id || seesAllDepts_(u) || userDepts_(u).indexOf(r.dept_code) >= 0;
 }
 
@@ -142,6 +142,7 @@ function docreqSave_(ctx) {
     if (p.dept_code !== undefined) dept = trimStr_(p.dept_code);
     if (!dept) errs.push(fieldError_('dept_code', 'REQUIRED'));
     else if (!findOne_('Depts', 'dept_code', dept)) errs.push(fieldError_('dept_code', 'DEPT_UNKNOWN'));
+    else if (!inScopeDept_(dept)) errs.push(fieldError_('dept_code', 'APP_SCOPE'));
     if (p.new_code !== undefined) {
       newCode = trimStr_(p.new_code).toUpperCase().replace(/\s+/g, '');
       if (newCode && !ITEM_CODE_RE_.test(newCode)) errs.push(fieldError_('new_code', 'CODE_INVALID'));

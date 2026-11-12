@@ -196,6 +196,11 @@ function docGet_(ctx) {
     var it2 = r ? findOne_('Items', 'item_id', r.item_id) : null;
     if (!r || !it2) throw apiError_('NOT_FOUND');
     if (!canSeeRecords_(ctx.user, it2)) throw apiError_('FORBIDDEN');
+  } else if (d.entity_type === 'TPL') {
+    // Kho tệp mẫu (2e): tệp đang dùng — mọi cấp; tệp đã thay — cấp 3+, Thư ký ISO
+    var t = sheetExists_('TplFiles') ? findOne_('TplFiles', 'tpl_id', d.entity_id) : null;
+    if (!t || !d.active) throw apiError_('NOT_FOUND');
+    if (!tplVisible_(ctx.user, t)) throw apiError_('FORBIDDEN');
   } else {
     throw apiError_('FORBIDDEN');
   }

@@ -26,12 +26,13 @@ export async function catalogFile({ empty = false } = {}) {
   return new File([bytes], exportName(today(), empty), { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
-const ACTION_TONE = { ADD: 't-green', UPDATE: 't-amber', SAME: 't-grey', ERROR: 't-red' };
+const ACTION_TONE = { ADD: 't-green', UPDATE: 't-amber', SAME: 't-grey', ERROR: 't-red', SKIP: 't-grey' };
 const actBadge = (a) => `<span class="badge ${ACTION_TONE[a] || 't-grey'}">${bi('imp.act.' + a)}</span>`;
 const FIELD_KEY = (f) => 'col.' + f;
 
 function rowsHtml(rows, { onlyChanged = true } = {}) {
-  const list = onlyChanged ? rows.filter((r) => r.action !== 'SAME') : rows;
+  // Dòng ngoài phạm vi áp dụng (SKIP, 2e) không liệt kê — chỉ đếm ở phần tóm tắt
+  const list = onlyChanged ? rows.filter((r) => r.action !== 'SAME' && r.action !== 'SKIP') : rows;
   if (!list.length) return `<p class="banner ok">${bi('imp.no_change')}</p>`;
   return `<div class="table-wrap"><table class="tbl imp-rows"><thead><tr><th class="num">${bi('imp.row')}</th><th>${bi('cat.code')}</th><th>${bi('imp.action')}</th><th>${bi('imp.detail')}</th></tr></thead>
     <tbody>${list.slice(0, 400).map((r) => `<tr><td class="num">${r.row_number}</td><td class="code">${esc(r.code || '')}</td><td>${actBadge(r.action)}${r.committed_at ? ` <span class="badge t-green">${bi('imp.written')}</span>` : ''}</td>
@@ -45,6 +46,7 @@ function batchSummary(b) {
     <span class="t-amber-text">${bi('imp.n_update', { N: b.update_count })}</span>
     <span class="muted">${bi('imp.n_same', { N: b.same_count })}</span>
     <span class="t-red-text">${bi('imp.n_error', { N: b.error_count })}</span>
+    ${b.skip_count ? `<span class="muted">${bi('imp.n_skip', { N: b.skip_count })}</span>` : ''}
     ${b.clause_count ? `<span>${bi('imp.n_clause', { N: b.clause_count })}</span>` : ''}</div>`;
 }
 

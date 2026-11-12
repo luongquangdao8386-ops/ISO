@@ -1,6 +1,6 @@
 // Dữ liệu đã tải trên máy: đọc nhanh theo loại, tra theo ID, quyền phía client (chỉ để ẩn/hiện nút — máy chủ vẫn kiểm lại),
 // phạm vi bộ phận, ngày theo máy chủ, tiện ích danh mục (tình trạng ○ ◐ ● ✕, nơi làm, kỳ hồ sơ)
-import { session, todayVN, nameText } from './core.js';
+import { session, todayVN, nameText, L, bi } from './core.js';
 import { getRecords, getMeta, KEY, queueItems } from './sync.js';
 import { itemRecordStatus, periodTypeFromDays, weekAgenda, mondayOf, parseSources } from './periods.js';
 
@@ -114,8 +114,42 @@ export async function items() {
   return memo.__items;
 }
 
-export async function depts() {
+/* ---------------- Phạm vi áp dụng (2e, cài đặt scope_depts — máy chủ đã ẩn biểu ngoài phạm vi) ---------------- */
+
+/** Mã bộ phận app quản lý ([] = toàn công ty) */
+export function scopeDepts() {
+  return String((session.settings || {}).scope_depts || '').split(',').map((x) => x.trim()).filter(Boolean);
+}
+export function inScopeDept(code) { const s = scopeDepts(); return !s.length || s.includes(code); }
+
+/** Mọi bộ phận (Quản trị, nơi nhận bản in) */
+export async function allDepts() {
   return (await recs('DEPT')).slice().sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+}
+/** Bộ phận trong phạm vi áp dụng (lọc, chọn bộ phận của biểu) */
+export async function depts() {
+  return (await allDepts()).filter((d) => inScopeDept(d.dept_code));
+}
+/** Tên bộ phận của phạm vi: {vi: 'Cơ điện', zh: '机电'} (null khi toàn công ty) */
+export async function scopeNames(codes = scopeDepts()) {
+  if (!codes.length) return null;
+  const m = new Map((await allDepts()).map((d) => [d.dept_code, d]));
+  return { vi: codes.map((c) => (m.get(c) && m.get(c).name_vi) || c).join(', '), zh: codes.map((c) => (m.get(c) && (m.get(c).name_zh || m.get(c).name_vi)) || c).join('、') };
+}
+/** Nhãn có {D} = tên bộ phận: phần Việt điền tên Việt, phần Trung điền tên Trung */
+export function scopeBi(key, names) {
+  const p = L[key] || [key, ''];
+  return bi([String(p[0]).split('{D}').join(names.vi), String(p[1] || '').split('{D}').join(names.zh)]);
+}
+
+/* ---------------- Kho tệp mẫu (2e) ---------------- */
+
+/** Máy chủ đã lên bản 2e (có tpl.upload trong danh sách quyền của Thư ký ISO / cấp 4, hoặc đã có bảng TPL) */
+export async function tplOn() { return (await can('tpl.upload')) || (await recs('TPL')).length > 0; }
+/** Tệp mẫu đang dùng (mới nhất trước trong cùng bộ), sắp theo mã bộ */
+export async function tplActive() {
+  return (await recs('TPL')).filter((t) => t.state === 'ACTIVE' && !t.archived_at)
+    .sort((a, b) => String(a.set_code || '~' + a.file_name).localeCompare(String(b.set_code || '~' + b.file_name)) || String(b.uploaded_at).localeCompare(String(a.uploaded_at)));
 }
 export function deptLabel(d, code) { return d ? nameText(d) : code || ''; }
 

@@ -96,6 +96,13 @@ function seedBaseRows_() {
     su.dataset_epoch = ['STRING', prop_('DATASET_EPOCH')];
     su.maintenance_mode = ['BOOL', prop_('MAINTENANCE_MODE') === 'true'];
     su.schema_version = ['STRING', SCHEMA_VERSION];
+    // Thêm cài đặt gửi xuống app (vd scope_depts ở 2e): tăng mốc để app đang mở tải lại toàn bộ (biểu ngoài phạm vi rời máy)
+    if (add.length && add.some(function (r) { var d = SETTINGS_DEFAULTS.filter(function (x) { return x[0] === r.setting_key; })[0]; return d && d[3]; })) {
+      var rev = Number(stateGet_(st, 'sync_revision', 0)) + 1;
+      su.sync_revision = ['INT', rev];
+      su['table_rev.Settings'] = ['INT', rev];
+      su.settings_rev = ['INT', rev];
+    }
     stateWrite_(st, su, SYSTEM_USER);
     // 10 bộ phận mặc định (ISO, KD, CB, SX, CL, MH, KV, NS, BRC, CĐ)
     seedDepts_();

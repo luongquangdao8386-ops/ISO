@@ -35,6 +35,11 @@ var ACTION_TABLE_ = [
   'import.commit|X|pin|W',
   'import.cancel|X|net|W',
   'i18n.suggest|2|net|R',
+  // Kho tệp mẫu (2e): bộ biểu xlsx (nhiều sheet, mỗi sheet một mã biểu) hoặc docx/pdf — mọi cấp xem và tải (doc.get); Thư ký ISO / cấp 4
+  // tải lên (tệp cùng bộ thay tệp cũ), sửa tên / ghi chú, bỏ tệp tải nhầm (PIN)
+  'tpl.upload|X|net|W',
+  'tpl.edit|X|net|W',
+  'tpl.delete|X|pin|W',
   // Phiên bản & ban hành (phiên 1b). Quyền theo bộ phận, cấp công ty, người soạn kiểm thêm ở PRECHECK_ (trước khi hỏi PIN)
   'version.save|2|net|W',
   'version.submit|2|net|W',
@@ -168,15 +173,47 @@ function isCommonItem_(it) {
   return it && (it.dept_code === 'ISO' || it.kind === 'MANUAL' || it.kind === 'POLICY');
 }
 
+/* ---------------- Phạm vi áp dụng của app (2e, Settings.scope_depts) ---------------- */
+
+/** Mã bộ phận app quản lý ([] = toàn công ty) */
+function scopeDepts_() {
+  return deptList_(setting_('scope_depts'));
+}
+/** Bộ phận nằm trong phạm vi áp dụng */
+function inScopeDept_(code) {
+  var s = scopeDepts_();
+  return !s.length || s.indexOf(String(code || '')) >= 0;
+}
+/** Biểu/tài liệu nằm trong phạm vi áp dụng (ngoài phạm vi: ẩn với mọi người, kể cả Quản trị — dữ liệu không xóa) */
+function inScope_(it) {
+  return !!it && inScopeDept_(it.dept_code);
+}
+/** Chuẩn hóa ô Phạm vi áp dụng: "cđ, CL" → "CĐ,CL"; mã phải có trong Depts — sai ném VALIDATION_ERROR (SCOPE_DEPT) */
+function normScopeDepts_(s) {
+  var known = {};
+  readRows_('Depts').forEach(function (d) { known[d.dept_code] = true; });
+  var out = [];
+  var bad = false;
+  String(s || '').split(/[,;\s]+/).forEach(function (x) {
+    var c = x.trim().toUpperCase();
+    if (!c) return;
+    if (!known[c]) { bad = true; return; }
+    if (out.indexOf(c) < 0) out.push(c);
+  });
+  if (bad) throw validationError_([fieldError_('scope_depts', 'SCOPE_DEPT')]);
+  return out.join(',');
+}
+
 /** Người dùng xem được một biểu/tài liệu */
 function itemVisible_(u, it) {
-  if (!it) return false;
+  if (!it || !inScope_(it)) return false;
   if (seesAllDepts_(u) || isCommonItem_(it)) return true;
   return userDepts_(u).indexOf(it.dept_code) >= 0;
 }
 
 /** Người dùng ghi được trong bộ phận này (cấp 1–3: chỉ bộ phận mình) */
 function deptWritable_(u, deptCode) {
+  if (!inScopeDept_(deptCode)) return false;
   if (seesAllDepts_(u)) return true;
   return userDepts_(u).indexOf(deptCode) >= 0;
 }

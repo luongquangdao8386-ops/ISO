@@ -5,10 +5,10 @@ quá hạn, phủ điều khoản. Thay danh mục Excel DM-ISO-01 bằng hệ t
 GitHub Pages (iPhone và máy tính). Cùng lõi với M&E và Checksheet (chép từ repo `CS`): PIN 6 số, phiên, ghi có xác nhận, đồng bộ,
 hàng chờ khi mất mạng. Giao diện luôn song ngữ Việt · 中文.
 
-**Trạng thái:** bản `1.0.0-d2.2` — **Đợt 2 phiên 2b** (Gmail nhắc hạn). Đợt 1 xong code, 2a (Kết nối M&E / Checksheet) đã chạy.
+**Trạng thái:** bản `1.0.0-d2.5` — **Đợt 2 phiên 2e** (Phạm vi Cơ điện + Kho tệp mẫu). Đợt 1, Đợt 2 (2a–2d) xong code.
 **Đã phát hành THẬT** ở `/ISO/` (từ 11/11/2026, không qua THỬ: máy chủ đã dựng chuyển thành THẬT bằng `adminChuyenSangTHAT`); trang
-`/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ. Cập nhật máy chủ lên 2b: dán `Code.gs` → `migrateSchema` (cho phép quyền "Gửi email
-thay mặt bạn") → `installTriggers` → Phiên bản mới (Hướng dẫn triển khai, mục "CẬP NHẬT LÊN BẢN 2b").
+`/ISO-thu/` (repo `ISO-thu`) tạm chưa gắn máy chủ. Cập nhật máy chủ lên 2e: dán `Code.gs` → `migrateSchema` → Phiên bản mới (Hướng dẫn
+triển khai, mục "CẬP NHẬT LÊN BẢN 2e").
 
 ## Phiên 1a có gì
 
@@ -128,6 +128,24 @@ thay mặt bạn") → `installTriggers` → Phiên bản mới (Hướng dẫn 
   thu hồi**. Chờ bạn xử lý: phiếu chờ xem xét / chờ thực hiện / không được chấp thuận, bản in cần thu hồi. Trạng thái hệ thống dòng
   **Đề nghị tài liệu, phân phối**. Sheet mới `DocRequests`, `Distributions`, cột `Versions.request_id` (schema 1.0.6).
 
+### Đợt 2 phiên 2e (1.0.0-d2.5) — Phạm vi Cơ điện, Kho tệp mẫu
+
+- **Phạm vi áp dụng** (`Settings.scope_depts`, mặc định `CĐ`; `07_perm.js` `inScope_` trong `itemVisible_` / `deptWritable_`): biểu,
+  tài liệu của bộ phận ngoài phạm vi **ẩn với mọi người kể cả Quản trị, không xóa** — đồng bộ, hồ sơ, phủ điều khoản, báo cáo, Gmail nhắc
+  hạn, Trạng thái hệ thống; không thêm / chuyển biểu, phiếu đề nghị Tài liệu mới sang bộ phận ngoài phạm vi (`APP_SCOPE`); nhập Excel tổng
+  bỏ qua dòng ngoài phạm vi (`SKIP`, `skip_count`). Quản trị đổi ở **Bộ phận và trưởng bộ phận → Phạm vi áp dụng** (`settings.edit`, PIN;
+  mã lạ `SCOPE_DEPT`); đổi → `settings_rev` tăng → app tải lại toàn bộ. `migrateSchema` thêm cài đặt gửi xuống app cũng tăng
+  `settings_rev`. Trang chủ / Danh mục ghi **Phạm vi: Cơ điện**. Nơi nhận bản in (Phân phối) vẫn là mọi bộ phận.
+- **Kho tệp mẫu** (`server/src/31_tpl.js`, `js/pages/tpl.js`, `js/tplx.js`; sheet `TplFiles`, schema 1.0.7): bộ biểu Excel nhiều sheet
+  (hoặc Word / PDF) trên Drive riêng tư của máy chủ. Thư ký ISO / cấp 4 tải lên nhiều tệp một lần (`tpl.upload`; app đọc tên sheet + khổ
+  giấy / hướng trang từ XML, không dựng lại workbook); bộ `BM-CĐ-xx` lấy từ tên sheet / tên tệp (`BM-CD-04_…` → `BM-CĐ-04`); tệp cùng bộ
+  thay tệp cũ (`REPLACED`); **Bỏ tệp** tải nhầm (`tpl.delete`, PIN, quyền kiểm trước PIN) → tệp trước dùng lại; **Sửa tên**
+  (`tpl.edit`). Mọi cấp xem / tải (`doc.get` entity `TPL`); tệp đã thay: cấp 3+, Thư ký ISO. Sheet ghép với biểu theo mã như Evidence
+  (`normFormCode_`, `evMatchItem_` = `normCode`, `matchSheet` của app — test so hai bên): `BM-CĐ-03-03a`, `-TD`, `-TH`, `-ML` là sheet
+  phụ của biểu cha. Tệp Excel tải về **mở sẵn sheet của biểu** (`openAtSheet`: đặt `activeTab` + `tabSelected`, giữ nguyên mọi phần
+  khác). Chi tiết biểu có thẻ **Tệp mẫu**; Danh mục lọc **Chưa có tệp mẫu**; Trạng thái hệ thống dòng **Kho tệp mẫu**, **Phạm vi áp dụng**.
+  Bộ thật 14 tệp BM-CD-01 … 14: 151 sheet, ghép đủ 106/106 biểu cơ điện (đã thử ngoài repo, không commit tệp).
+
 Tiếp: Đợt 3 khắc phục (3a–3c) · Đợt 4 đánh giá nội bộ (4a–4c).
 
 ## Cấu trúc
@@ -142,6 +160,7 @@ Tiếp: Đợt 3 khắc phục (3a–3c) · Đợt 4 đánh giá nội bộ (4a�
 | `server/src/` | Mã máy chủ theo mô-đun (`11_catalog.js` danh mục, `14_import.js` nhập Excel tổng, `16_versions.js` phiên bản, `17_records.js` hồ sơ) |
 | `js/periods.js` | Kỳ hồ sơ và tình trạng ✓ ! – (giống hệt máy chủ, Node chạy thẳng được trong test); lịch tuần trang chủ |
 | `js/coverage.js` | Phủ điều khoản ISO 9001 / BRCGS, đếm giống hệt hai trang Phủ của file Excel tổng |
+| `js/tplx.js` | Kho tệp mẫu: đọc tên sheet + khổ giấy của tệp xlsx, mở sẵn sheet khi tải về, ghép sheet ↔ biểu (giống máy chủ) |
 | `apps-script/` | `Code.gs` (tạo bằng `npm run build`) và `appsscript.json` để dán vào Apps Script; `SaoLuuPhu.gs` cho tài khoản thứ hai |
 | `i18n/labels.json` | Từ điển nhãn duy nhất [Việt, 中文] → `js/dict.js` và `LABELS` trong `Code.gs` |
 | `tests/` | Giả lập Apps Script cho Node, test máy chủ, test giao diện Playwright |

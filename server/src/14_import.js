@@ -27,6 +27,8 @@ function batchProject_(b, dir) {
     committed_by_name: c ? c.employee_code + ' · ' + c.display_name : '', completed_at: b.completed_at,
     total_rows: b.total_rows || 0, add_count: b.add_count || 0, update_count: b.update_count || 0, same_count: b.same_count || 0,
     error_count: b.error_count || 0, clause_count: b.clause_count || 0, committed_rows: b.committed_rows || 0,
+    // Dòng ngoài phạm vi áp dụng (2e): không có cột riêng — tổng trừ các loại còn lại
+    skip_count: Math.max(0, (b.total_rows || 0) - (b.add_count || 0) - (b.update_count || 0) - (b.same_count || 0) - (b.error_count || 0)),
     record_version: b.record_version || 1
   };
 }
@@ -137,7 +139,10 @@ function importPreview_(ctx) {
         });
         var cur = n.code ? items[n.code] : null;
         var action, changes = [];
-        if (e.length) action = 'ERROR';
+        // Phạm vi áp dụng (2e): dòng của bộ phận ngoài phạm vi bỏ qua (không ghi, không báo lỗi)
+        var skip = !!(n.fields && n.fields.dept_code && !inScopeDept_(n.fields.dept_code));
+        if (skip) { action = 'SKIP'; e = []; }
+        else if (e.length) action = 'ERROR';
         else if (!cur) action = 'ADD';
         else {
           changes = itemChanges_(cur, n.fields);
@@ -146,11 +151,12 @@ function importPreview_(ctx) {
           action = changes.length ? 'UPDATE' : 'SAME';
         }
         if (action === 'ADD' && n.group && !groups[n.group.group_key]) changes.push('group_label');
+        if (skip) changes = [];
         var ir = {
           import_row_id: uuid_(), import_batch_id: p.import_batch_id, row_number: rn, code: n.code, entity_id: cur ? cur.item_id : '',
           action: action, expected_version: cur ? (cur.record_version || 0) : 0, validation_status: e.length ? 'ERROR' : 'OK',
           errors_json: e.length ? JSON.stringify(e.slice(0, 10)) : '', changes_json: changes.length ? JSON.stringify(changes) : '',
-          committed_at: '', normalized_payload_json: e.length ? '' : JSON.stringify({ fields: n.fields, group: n.group })
+          committed_at: '', normalized_payload_json: e.length || skip ? '' : JSON.stringify({ fields: n.fields, group: n.group })
         };
         irows.push(ir);
         out.push({ row_number: rn, code: n.code, action: action, errors: e, changes: changes });
@@ -186,7 +192,7 @@ function importPreview_(ctx) {
         // Lượt cuối trả mọi dòng của lô (dòng của lượt trước có thể đổi thành lỗi do trùng mã)
         result: { batch: proj, rows: out, all_rows: last ? allRows : undefined, last: last, clause_changes: idx === 0 ? b.clause_count : undefined, record_version: b.record_version },
         record_version: b.record_version,
-        audit: last ? { entity_type: 'IMPORT_BATCH', entity_id: p.import_batch_id, before_json: null, after_json: { file_name: b.file_name, total: b.total_rows, add: b.add_count, update: b.update_count, same: b.same_count, error: b.error_count, clauses: b.clause_count } } : null
+        audit: last ? { entity_type: 'IMPORT_BATCH', entity_id: p.import_batch_id, before_json: null, after_json: { file_name: b.file_name, total: b.total_rows, add: b.add_count, update: b.update_count, same: b.same_count, error: b.error_count, skip: proj.skip_count, clauses: b.clause_count, scope: scopeDepts_().join(',') } } : null
       };
     }
   });

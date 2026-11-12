@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d2.4';
+var SERVER_VERSION = '1.0.0-d2.5';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.6';
+var SCHEMA_VERSION = '1.0.7';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -60,6 +60,9 @@ var SETTINGS_DEFAULTS = [
   ['backup_hour', 'INT', 1, false, 1, 'Giờ sao lưu', '备份时间'],
   ['backup_keep_count', 'INT', 8, false, 1, 'Số bản sao lưu giữ lại', '保留备份份数'],
   ['backup_mirror_email', 'STRING', '', false, 1, 'Tài khoản Google thứ hai nhận bản sao lưu (chia sẻ chỉ xem thư mục Sao lưu và Dữ liệu)', '接收备份的第二个Google账户（备份及数据文件夹仅查看共享）'],
+  // Phạm vi áp dụng (2e, người dùng chốt 12/11/2026 "chỉ phạm vi cơ điện"): app chỉ quản lý biểu/tài liệu của các bộ phận này —
+  // biểu ngoài phạm vi ẩn với mọi người (không xóa), nhập Excel tổng bỏ qua dòng ngoài phạm vi. Trống = toàn công ty.
+  ['scope_depts', 'STRING', 'CĐ', true, 1, 'Phạm vi áp dụng: mã bộ phận app quản lý, cách nhau dấu phẩy (trống = toàn công ty)', '适用范围：应用管理的部门代码，用逗号分隔（空=全公司）'],
   // ISO (mục 10 đặc tả, chốt 06/11/2026)
   ['doc_review_months', 'INT', 12, true, 1, 'Chu kỳ rà soát tài liệu (tháng)', '文件评审周期（月）'],
   ['review_warn_days', 'INT', 30, true, 1, 'Báo tài liệu sắp đến hạn rà soát trước (ngày)', '文件评审到期提前提醒（天）'],
@@ -112,7 +115,21 @@ var CODE_PATTERNS = {
 /** Loại hồ sơ của tệp (Documents.entity_type) và loại tệp được gắn — phiên 1b (phiên bản: PDF, tệp gốc), 1c (hồ sơ: ảnh, tệp) */
 var DOC_ENTITY_SHEETS_ = {
   VERSION: { sheet: 'Versions', key: 'version_id', kinds: ['PDF', 'SOURCE'] },
-  RECORD: { sheet: 'Records', key: 'record_id', kinds: ['PHOTO', 'FILE'] }
+  RECORD: { sheet: 'Records', key: 'record_id', kinds: ['PHOTO', 'FILE'] },
+  // Kho tệp mẫu (2e): một dòng TplFiles = một tệp mẫu (bộ biểu xlsx nhiều sheet, hoặc docx/pdf), tải lên bằng tpl.upload
+  TPL: { sheet: 'TplFiles', key: 'tpl_id', kinds: ['TEMPLATE'] }
+};
+
+/** Kho tệp mẫu (2e): ACTIVE đang dùng · REPLACED đã thay bằng tệp mới cùng bộ (giữ để tra) · DELETED đã bỏ (tải nhầm).
+ *  Mỗi tệp tối đa TPL_MAX_SHEETS_ sheet; mỗi lần tải lên tối đa TPL_MAX_CODES_ mã biểu tự nhận từ tên sheet. */
+var TPL_STATES_ = ['ACTIVE', 'REPLACED', 'DELETED'];
+var TPL_MAX_SHEETS_ = 300;
+var TPL_MIMES_ = {
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/msword': 'doc',
+  'application/pdf': 'pdf'
 };
 
 /** Hồ sơ (phiên 1c): trạng thái; số tệp tối đa mỗi hồ sơ; khoảng ngày tối đa một lần nộp */

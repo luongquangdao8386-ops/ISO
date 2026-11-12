@@ -316,13 +316,14 @@ function itemEdit_(ctx) {
   var depts = {};
   readRows_('Depts').forEach(function (d) { depts[d.dept_code] = d; });
   if (p.dept_code !== undefined && !depts[p.dept_code]) errs.push(fieldError_('dept_code', 'DEPT_UNKNOWN'));
+  else if (p.dept_code !== undefined && !inScopeDept_(p.dept_code)) errs.push(fieldError_('dept_code', 'APP_SCOPE'));
   if (isNew && p.dept_code === undefined) errs.push(fieldError_('dept_code', 'REQUIRED'));
   if (p.priority !== undefined && p.priority !== null && p.priority !== '' && [1, 2, 3].indexOf(Number(p.priority)) < 0) errs.push(fieldError_('priority', 'PRIORITY_INVALID'));
   if (p.where !== undefined && p.where !== '' && !WHERE_.some(function (w) { return w[0] === p.where; })) errs.push(fieldError_('where', 'WHERE_INVALID'));
   if (p.period_days !== undefined && p.period_days !== null && p.period_days !== '' && !(Number(p.period_days) > 0 && Math.floor(Number(p.period_days)) === Number(p.period_days))) errs.push(fieldError_('period_days', 'PERIOD_DAYS_INVALID'));
   if (p.owner_user_id && !isUuidV4_(p.owner_user_id)) errs.push(fieldError_('owner_user_id', 'ID_INVALID'));
   var cur = isNew ? null : findOne_('Items', 'item_id', p.item_id);
-  if (!isNew && !cur) throw apiError_('NOT_FOUND');
+  if (!isNew && (!cur || !inScope_(cur))) throw apiError_('NOT_FOUND');
   // Thêm tài liệu mới theo phiếu đề nghị ban hành mới đã chấp thuận (2d)
   var reqId = isNew && p.request_id ? String(p.request_id) : '';
   if (reqId && !isUuidV4_(reqId)) errs.push(fieldError_('request_id', 'ID_INVALID'));

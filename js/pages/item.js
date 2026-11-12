@@ -17,6 +17,7 @@ import { itemRecordsCard, wireItemRecords } from './records.js';
 import { canSubmitRecord, recordCheck } from '../data.js';
 import { itemRequestsCard, approvedCancelFor } from './docreq.js';
 import { itemDistCard } from './dist.js';
+import { itemTplCard, wireTplButtons } from './tpl.js';
 
 const PERIOD_OF = (d) => {
   if (d === null || d === undefined || d === '') return 'EVENT';
@@ -109,6 +110,7 @@ export async function renderItem(view, { shell, params, query }) {
       ${hist.length ? `<details class="ver-hist"><summary>${bi('ver.history_n', { N: hist.length })}</summary><ul class="cat-list">${hist.map((v) => versionRow(v, it, { um })).join('')}</ul></details>` : ''}
       ${await can('report.run') ? `<a class="small rp-link" href="#/reports?kind=VERSIONS&item=${encodeURIComponent(it.item_id)}">${ICON.reports} ${bi('rp.version_report')} ›</a>` : ''}
     </section>
+    ${await itemTplCard(it)}
     ${await itemRecordsCard(it)}
     ${await itemRequestsCard(it)}
     ${await itemDistCard(it)}
@@ -127,6 +129,7 @@ export async function renderItem(view, { shell, params, query }) {
     ${rel.length ? `<section class="card"><h3>${bi('item.related')}</h3><ul class="cat-list">${rel.slice(0, 30).map((x) => `<li><a class="cat-row" href="#/item/${encodeURIComponent(x.item_id)}"><span class="cat-top"><span class="code">${esc(x.code)}</span>${statusDot(x.status)}</span><span class="cat-name">${esc(x.name_vi || x.name_zh)}</span>${ICON.chevron}</a></li>`).join('')}</ul></section>` : ''}
   </div>`;
   wireDocButtons(view);
+  wireTplButtons(view);
   await wireItemRecords(view, it);
   const again = async (key) => { await afterCommit(); toast(bi(key), 'ok'); refresh(); };
   const on = (id, fn) => { const b = $('#' + id, view); if (b) b.addEventListener('click', async () => { if (!navigator.onLine) { toast(bi('sync.need_network'), 'err'); return; } busy(b, true); try { await fn(); } finally { busy(b, false); } }); };

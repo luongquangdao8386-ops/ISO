@@ -18,6 +18,7 @@ const NAV = [
 export const SIDE = [
   { key: 'home', label: 'nav.home', icon: 'home', path: '/', lvl: 1 },
   { key: 'catalog', label: 'nav.catalog', icon: 'library', path: '/catalog', lvl: 1 },
+  { key: 'templates', label: 'nav.templates', icon: 'folder', path: '/templates', lvl: 1 },
   { key: 'versions', label: 'nav.versions', icon: 'edit', path: '/versions', lvl: 2 },
   { key: 'records', label: 'nav.records', icon: 'file', path: '/records', lvl: 2 },
   { key: 'coverage', label: 'nav.coverage', icon: 'checklist', path: '/coverage', lvl: 2 },

@@ -4,12 +4,15 @@ import { loadServer } from './gas-mock.mjs';
 export const OWNER_CODE = 'NV-001';
 export const OWNER_TEMP_PIN = '358024';
 export const OWNER_PIN = '604817';
-export const APP_VERSION = '1.0.0-d2.4';
+export const APP_VERSION = '1.0.0-d2.5';
 
 export const uuid = () => crypto.randomUUID();
 
-/** Máy chủ đã setup + owner (PIN tạm) */
-export function freshServer({ envName = 'THU', now } = {}) {
+/**
+ * Máy chủ đã setup + owner (PIN tạm). scope: Phạm vi áp dụng (2e, Settings.scope_depts) — sản phẩm mặc định 'CĐ'; test cũ dùng
+ * nhiều bộ phận nên mặc định '' (toàn công ty), test phạm vi truyền scope: 'CĐ'.
+ */
+export function freshServer({ envName = 'THU', now, scope = '' } = {}) {
   const env = loadServer();
   if (now) env.clock.offset = Date.parse(now) - Date.now(); // đồng hồ giả đặt trước setup để PIN tạm của owner còn hạn
   env.props.setProperty('ENV', envName);
@@ -19,7 +22,15 @@ export function freshServer({ envName = 'THU', now } = {}) {
   env.props.setProperty('SETUP_OWNER_TEMP_PIN', OWNER_TEMP_PIN);
   env.g.adminSetupOwner();
   env.g.dbReset_();
+  if (scope !== 'CĐ') setScope(env, scope);
   return env;
+}
+
+/** Đặt Phạm vi áp dụng trực tiếp (không qua API) */
+export function setScope(env, scope) {
+  env.g.dbReset_();
+  env.g.withWriteLock_(() => env.g.writeSetting_('scope_depts', scope, 'TEST'));
+  env.g.dbReset_();
 }
 
 /** Client giả: giữ device_id, token, epoch */

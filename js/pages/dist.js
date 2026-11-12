@@ -5,7 +5,7 @@
 // Ban hành lần mới (hoặc đặt ✕): bản của lần cũ thành "Cần thu hồi" (tính trên máy theo lần ban hành, như máy chủ).
 import { bi, biText, esc, fmtDate, nameText, uuid } from '../core.js';
 import { ICON, toast, dialog, $, $$ } from '../ui.js';
-import { byId, recs, items, depts, users, userName, isSecretary, roleLevel, curRevOf, distState, distOverdue, distDueSince, docControlOn, can, today } from '../data.js';
+import { byId, recs, items, allDepts, users, userName, isSecretary, roleLevel, curRevOf, distState, distOverdue, distDueSince, docControlOn, can, today } from '../data.js';
 import { navigate, refresh } from '../router.js';
 import { afterCommit } from '../app.js';
 import { textInput, dateInput, wireForm, readField, showErrors, writeOnline, writeWithPin, writeFail, busy } from '../form.js';
@@ -34,7 +34,7 @@ export async function renderDist(view, ctx) {
   if (query && query.item !== undefined) st.item = String(query.item);
   const sec = isSecretary();
   const itMap = new Map((await items()).map((x) => [x.item_id, x]));
-  const deps = await depts();
+  const deps = await allDepts();
   const um = await users();
   const t = today();
   const all = (await recs('DIST')).filter((d) => d.state !== 'VOID' && !d.archived_at && itMap.has(d.item_id))
@@ -146,7 +146,7 @@ async function rowDialog(x, um) {
   if (a === 'recall') return recallDialog([x]);
   if (a !== 'edit') return false;
   if (!navigator.onLine) { toast(bi('sync.need_network'), 'err'); return false; }
-  const deps = (await depts()).filter((q) => q.active !== false);
+  const deps = (await allDepts()).filter((q) => q.active !== false);
   const v = await dialog({
     title: bi('dist.edit'),
     body: `<label class="fld"><span>${bi('dist.recipient')}</span><select class="inp sel" id="de-dept">${deps.map((q) => `<option value="${esc(q.dept_code)}"${q.dept_code === d.dept_code ? ' selected' : ''}>${esc(q.dept_code + ' · ' + nameText(q))}</option>`).join('')}</select></label>
@@ -180,7 +180,7 @@ export async function renderDistNew(view, { shell, params }) {
   if (!isSecretary() || !(await can('dist.issue'))) { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('err.forbidden')}</p></div>`; return; }
   if (it.status !== 'ISSUED') { view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('dist.not_issued')}</p></div>`; return; }
   if (!navigator.onLine) { view.innerHTML = `<div class="card empty-state">${ICON.sync}<p class="muted">${bi('sync.need_network')}</p></div>`; return; }
-  const deps = (await depts()).filter((d) => d.active !== false);
+  const deps = (await allDepts()).filter((d) => d.active !== false);
   const cur = (await recs('DIST')).filter((d) => d.item_id === it.item_id && d.state === 'ACTIVE');
   const rev = curRevOf(it);
   let n = 1;

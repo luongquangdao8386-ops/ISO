@@ -121,7 +121,7 @@ function mailDesired_(mc, opts) {
   opts = opts || {};
   var out = [];
   var today = mc.today;
-  var items = readRows_('Items').filter(function (it) { return !it.archived_at; });
+  var items = readRows_('Items').filter(function (it) { return !it.archived_at && inScope_(it); });
   var itemById = {};
   items.forEach(function (it) { itemById[it.item_id] = it; });
   var monday = opts.all || mc.wd === 1;
@@ -490,7 +490,7 @@ function mailView_(ctx) {
   });
   var unreachable = mc.unreachable.map(function (n) { return { kind: n.kind, code: n.detail.code, name: n.detail.name, path: n.detail.path }; });
   var itemsN = {};
-  readRows_('Items').forEach(function (it) { if (!it.archived_at && it.owner_user_id) itemsN[it.owner_user_id] = (itemsN[it.owner_user_id] || 0) + 1; });
+  readRows_('Items').forEach(function (it) { if (!it.archived_at && inScope_(it) && it.owner_user_id) itemsN[it.owner_user_id] = (itemsN[it.owner_user_id] || 0) + 1; });
   var recipients = mc.users.filter(function (u) { return u.active; }).map(function (u) { return mailRecipientInfo_(ctx, mc, u, itemsN); });
   recipients.sort(function (a, b) { return String(a.employee_code).localeCompare(String(b.employee_code)); });
   logs.sort(function (a, b) { return String(b.queued_at || b.attempt_at).localeCompare(String(a.queued_at || a.attempt_at)); });
