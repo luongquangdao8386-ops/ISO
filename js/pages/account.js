@@ -71,6 +71,7 @@ export async function renderAccount(view, { shell }) {
   if (await can('user.view')) admin.push(['admin.users', '/admin/users']);
   if (await can('dept.edit')) admin.push(['admin.depts', '/admin/depts']);
   if (await can('report.logo.set')) admin.push(['admin.report_logo', '/admin/report-logo']);
+  if (await can('bg.set')) admin.push(['admin.bg', '/admin/backgrounds']);
   if (await can('backup.view')) admin.push(['admin.backup', '/admin/backup']);
   if (await can('audit.view')) admin.push(['admin.audit', '/admin/audit']);
   if (await can('link.info')) admin.push(['nav.links', '/links']);

@@ -71,6 +71,8 @@ var HANDLERS_ = {
   'report.list': function (ctx) { return reportList_(ctx); },
   'report.logo.get': function (ctx) { return reportLogoGet_(ctx); },
   'report.logo.set': function (ctx) { return reportLogoSet_(ctx); },
+  'bg.get': function (ctx) { return bgGet_(ctx); },
+  'bg.set': function (ctx) { return bgSet_(ctx); },
   'user.pickList': function (ctx) { return userPickList_(ctx); },
   'user.view': function (ctx) { return userView_(ctx); },
   'user.create': function (ctx) { return userCreate_(ctx); },

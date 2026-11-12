@@ -26,7 +26,7 @@ function auditOwn_(ctx) {
   return { items: logs, operations: ops };
 }
 
-var ADMIN_ACTION_PREFIX_ = ['user.', 'auth.', 'session.', 'pin.', 'settings.', 'system.', 'backup.', 'dept.', 'report.logo', 'sample.', 'mail.'];
+var ADMIN_ACTION_PREFIX_ = ['user.', 'auth.', 'session.', 'pin.', 'settings.', 'system.', 'backup.', 'dept.', 'report.logo', 'sample.', 'mail.', 'bg.set'];
 
 /** audit.view {entity_id?, user_id?, action?, from?, to?, limit?}: Trưởng bộ phận, Quản trị (Trưởng bộ phận không xem thao tác quản trị) */
 function auditView_(ctx) {
@@ -56,7 +56,7 @@ function auditView_(ctx) {
 /* ---------------- Cấu hình ---------------- */
 
 /** Khóa không sửa trong màn Cấu hình (logo sửa ở màn riêng) */
-var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, backup_mirror_email: 1, evidence_sources: 1, gmail_enabled: 1, email_hour: 1 };
+var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, bg_login_file_id: 1, bg_login_rev: 1, bg_home_file_id: 1, bg_home_rev: 1, backup_mirror_email: 1, evidence_sources: 1, gmail_enabled: 1, email_hour: 1 };
 /** Cài đặt là mã biểu in trên phiếu / sổ (viết hoa, bỏ dấu cách, đúng dạng mã biểu) */
 var FORM_CODE_SETTINGS_ = ['capa_form_code', 'capa_log_form_code', 'complaint_form_code', 'd8_form_code', 'scar_form_code'];
 
@@ -288,6 +288,7 @@ function healthRows_() {
   var base = String(setting_('app_base_url') || '');
   add('app_base_url', !!base, base, base ? '' : 'Chưa điền app_base_url');
   add('report_logo', true, setting_('report_logo_rev') ? 'ON' : 'OFF');
+  add('bg', true, 'Đăng nhập: ' + (setting_('bg_login_rev') ? 'ảnh riêng' : 'ảnh mặc định') + ' · Trang chủ: ' + (setting_('bg_home_rev') ? 'ảnh riêng' : 'ảnh mặc định'));
   // Báo cáo (2c): số báo cáo đã lưu (mã BC), thiếu sheet ReportRuns → chạy migrateSchema
   var rh = reportHealth_();
   add('reports', rh[0], rh[1], rh[2]);

@@ -5,7 +5,7 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d3.2';
+var SERVER_VERSION = '1.0.0-d3.3';
 var API_CONTRACT_VERSION = '1.0';
 var SCHEMA_VERSION = '1.0.9';
 var TZ = 'Asia/Ho_Chi_Minh';
@@ -91,7 +91,12 @@ var SETTINGS_DEFAULTS = [
   ['scar_form_code', 'STRING', 'BM-MH-01-06', true, 1, 'Mã biểu của phiếu yêu cầu khắc phục nhà cung cấp (SCAR)', '供应商纠正措施要求单（SCAR）的表单编号'],
   ['capa_reply_days', 'INT', 7, true, 1, 'Hạn phản hồi khách hàng / nhà cung cấp trả lời SCAR (ngày từ khi tiếp nhận, mặc định)', '回复客户/供应商回复SCAR的期限（自受理日起天数，默认）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
-  ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本']
+  ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本'],
+  // Ảnh nền màn đăng nhập / trang chủ (Quản trị → Ảnh nền, 33_bg.js): ID tệp trên Drive và mã phiên bản ('' = ảnh mặc định trong app)
+  ['bg_login_file_id', 'STRING', '', false, 1, 'Tệp ảnh nền màn đăng nhập (Drive)', '登录页背景图片文件（云端硬盘）'],
+  ['bg_login_rev', 'STRING', '', true, 1, 'Phiên bản ảnh nền màn đăng nhập (trống = ảnh mặc định)', '登录页背景图片版本（空=默认图片）'],
+  ['bg_home_file_id', 'STRING', '', false, 1, 'Tệp ảnh nền trang chủ (Drive)', '首页背景图片文件（云端硬盘）'],
+  ['bg_home_rev', 'STRING', '', true, 1, 'Phiên bản ảnh nền trang chủ (trống = ảnh mặc định)', '首页背景图片版本（空=默认图片）']
 ];
 
 /** Khóa SystemState ban đầu. Bộ đếm `code_seq.*`, `table_rev.*` thêm khi dùng. */

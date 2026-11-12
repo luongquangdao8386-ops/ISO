@@ -7,6 +7,10 @@ import { renderLogin, renderChangePin, renderUnlock, renderBoot, toast, dialog, 
 import { app, enterApp, syncNow } from './app.js';
 import { stopRouter } from './router.js';
 import { invalidate } from './data.js';
+import { applyBg } from './bg.js';
+
+// Ảnh nền riêng (Quản trị → Ảnh nền) đã giữ trên máy: gắn ngay cho màn chờ / đăng nhập
+applyBg().catch(() => {});
 
 const root = document.getElementById('app');
 applyEnvTitle(ls.get('env'));

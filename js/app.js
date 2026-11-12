@@ -7,6 +7,7 @@ import { invalidate, boot as bootData } from './data.js';
 import { toast, dialog, reloadFreshHtml, wireReloadFresh, resetListChunks } from './ui.js';
 import { openScanner, parseScan, resolveScan, qrStateText } from './scan.js';
 import { pendingFor } from './pending.js';
+import { syncBg } from './bg.js';
 
 export const app = {
   shell: null,
@@ -97,6 +98,7 @@ async function runSync() {
     if (app.onSessionError && await app.onSessionError(r)) return { ...r, handled: true, committed: f.committed };
     return { ...r, committed: f.committed };
   }
+  syncBg(); // ảnh nền riêng (Quản trị → Ảnh nền) đổi thì tải ở nền
   return { ok: true, committed: f.committed, applied: r.applied || 0 };
 }
 
@@ -198,6 +200,7 @@ function registerRoutes() {
   route('/admin/depts', lazy('./pages/admin.js', 'renderDepts'), { nav: 'account' });
   route('/admin/status', lazy('./pages/admin.js', 'renderStatus'), { nav: 'account' });
   route('/admin/report-logo', lazy('./pages/admin.js', 'renderReportLogo'), { nav: 'account' });
+  route('/admin/backgrounds', lazy('./pages/bg.js', 'renderBackgrounds'), { nav: 'account' });
   route('/admin/backup', lazy('./pages/admin.js', 'renderBackup'), { nav: 'account' });
   route('/admin/audit', lazy('./pages/admin.js', 'renderAudit'), { nav: 'account' });
   route('/admin/sample', lazy('./pages/admin.js', 'renderSample'), { nav: 'account' });
@@ -226,8 +229,8 @@ export async function enterApp(root, { offline = false, maintenance = false } = 
   lastWide = isWide();
   startRouter(renderRoute);
   await renderRoute();
-  // Vào app khi có mạng: gửi nháp của người này ở nền
-  if (!offline) sendMineInBackground();
+  // Vào app khi có mạng: gửi nháp của người này ở nền; ảnh nền riêng mới (nếu có) tải ở nền
+  if (!offline) { sendMineInBackground(); syncBg(); }
 }
 
 async function hasMineQueued() {

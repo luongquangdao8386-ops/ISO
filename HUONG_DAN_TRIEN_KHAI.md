@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d3.2 (Đợt 3, phiên 3b — Khiếu nại 8D, SCAR)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d3.3 (Đợt 3, phiên 3b — Khiếu nại 8D, SCAR; Ảnh nền)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -40,6 +40,40 @@ nhắc người phụ trách 7, 1, 0 ngày trước hạn. In: **Phiếu tiếp 
 SCAR** (BM-MH-01-06, 3 ô ký: người lập · đại diện nhà cung cấp · người kiểm tra hiệu lực), Sổ theo dõi khiếu nại / SCAR. Phiếu vẫn
 thuộc bộ phận Cơ điện (khiếu nại do lỗi thiết bị; SCAR gửi nhà cung cấp vật tư, nhà thầu thuê ngoài); biểu KD, MH vẫn ẩn — mã biểu in
 trên phiếu sửa được ở **Cấu hình** (`complaint_form_code`, `d8_form_code`, `scar_form_code`).
+
+Bản 3.3 (12/11/2026, anh yêu cầu) thêm **Ảnh nền**: Quản trị tự thay ảnh nền **màn đăng nhập** (cả màn chờ lúc mở app) và **trang chủ**
+trong app, hoặc bấm **Dùng ảnh mặc định** để quay lại ảnh cũ. Ảnh lưu riêng tư trên Drive của máy chủ ISO (không đưa lên repo công khai).
+
+## CẬP NHẬT LÊN BẢN 3.3 (1.0.0-d3.3, Ảnh nền) — làm một lần, trên máy tính
+
+Bản này **gồm luôn bản 3b**. Không hỏi quyền Google mới, không cần `installTriggers`.
+
+**Anh phải làm:**
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy** (chạy lại vẫn an toàn). Nhật ký:
+   - đã lên 3b rồi: `migrateSchema xong. Thêm: không có. schema_version=1.0.9`;
+   - chưa lên 3b: dòng `Thêm: Capas(party_name,…,reply_by)` như mục 3b bên dưới.
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → **Phiên bản mới** → Mô tả `d3.3 anh nen` → **Triển khai**.
+4. Đóng hẳn app `/ISO/` rồi mở lại → **Tài khoản → Thông tin** ghi `1.0.0-d3.3`.
+5. Thay ảnh: **Tài khoản → Quản trị → Ảnh nền đăng nhập, trang chủ** → ô **Màn đăng nhập** (hoặc **Trang chủ**) → **Chọn ảnh** → chọn
+   ảnh trong máy (iPhone: Thư viện ảnh hoặc chụp) → xem trước → **Dùng ảnh này** → nhập PIN. Muốn quay lại ảnh cũ: **Dùng ảnh mặc định**.
+
+**Nên kiểm (vài phút):**
+1. **Trạng thái hệ thống** có dòng **Ảnh nền đăng nhập, trang chủ** = `Đăng nhập: ảnh riêng · Trang chủ: …` sau khi thay → máy chủ thật
+   đã lên đúng bản và ảnh đã lưu.
+2. Trên iPhone thật: mở app (đã đăng nhập) → kéo làm mới hoặc đợi đồng bộ → trang chủ hiện ảnh mới → **Đăng xuất** → màn đăng nhập ảnh
+   mới → tắt hẳn app rồi mở lại → vẫn ảnh mới ngay từ đầu.
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/bg.test.mjs` (iPhone 390×844): Quản trị thay ảnh màn đăng nhập rồi trang chủ (thu
+nhỏ, xem trước, PIN chỉ hỏi một lần) → trang chủ đổi ngay → đăng xuất: màn đăng nhập ảnh mới → mở lại trang: ảnh mới ngay, không tải ảnh
+mặc định → máy thứ hai: lần đầu ảnh mặc định, đăng nhập xong nhận ảnh mới → Dùng ảnh mặc định → máy thứ hai về ảnh mặc định ở lần đồng bộ
+sau; nhân viên không có mục Ảnh nền. Máy chủ `tests/server/bg.test.mjs` (2 test): chỉ Quản trị + PIN, kiểm loại / cỡ tệp (≤ 2 MB), cùng
+ảnh không tạo tệp mới, ảnh cũ vào thùng rác, nhật ký, Trạng thái hệ thống, máy chủ chưa có dòng cài đặt. Cả bộ: 86 test máy chủ + 37 test
+giao diện đạt.
+
+Lưu ý: máy chưa đăng nhập lần nào (máy mới, hoặc đã xóa dữ liệu trang) thấy ảnh mặc định ở màn đăng nhập cho tới lần đăng nhập đầu. Biểu
+tượng app trên màn hình chính iPhone và ô vuông vàng cạnh chữ ISO không đổi trong app (cần Claude thay tệp).
 
 ## CẬP NHẬT LÊN BẢN 3b (1.0.0-d3.2) — làm một lần, trên máy tính
 
