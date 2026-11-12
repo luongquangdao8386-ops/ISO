@@ -67,6 +67,12 @@ var SHEETS = {
   NotificationLogs: { book: 'B', dot: 1, key: 'notification_id',
     cols: 'notification_id dedupe_key run_date recipient_id entity_type entity_id due_date stage status attempt_at sent_at ' +
       'error_code dataset_epoch digest_id queued_at attempt_count kind via detail_json' },
+  // Báo cáo đã lưu (phiên 2c, 27_reports.js): mã BC-yymm-001; bản chụp số liệu là tệp JSON riêng tư trên Drive (Documents kind SNAPSHOT),
+  // PDF dựng lần đầu khi tải rồi giữ lại (Documents kind PDF). kind CATALOG | RECORDS | COVERAGE | VERSIONS; summary_json: ô số tóm tắt.
+  // Chỉ máy chủ đọc/ghi, không đồng bộ xuống app (report.list).
+  ReportRuns: { book: 'B', dot: 1, key: 'report_run_id', c: true,
+    cols: 'report_run_id code kind title_vi title_zh filters_json summary_json row_count dept_code generated_at generated_by ' +
+      'snapshot_doc_id pdf_doc_id pdf_file_name pdf_size status' },
   AuditLogs: { book: 'B', dot: 1, key: 'audit_id',
     cols: 'audit_id occurred_at user_id device_id action entity_type entity_id before_json after_json operation_id ' +
       'import_batch_id dataset_epoch reason auth_basis' },
@@ -98,7 +104,7 @@ var TYPE_OVERRIDES_ = {
   record_version: 'INT', sync_revision: 'INT', role_level: 'INT', auth_version: 'INT', failed_attempts: 'INT',
   size_bytes: 'INT', sort_order: 'INT', expected_version: 'INT', priority: 'INT', period_days: 'INT', row_number: 'INT', page_no: 'INT',
   total_rows: 'INT', add_count: 'INT', update_count: 'INT', same_count: 'INT', error_count: 'INT', clause_count: 'INT', committed_rows: 'INT',
-  attempt_count: 'INT',
+  attempt_count: 'INT', row_count: 'INT', generated_by: 'STRING',
   active: 'BOOL', owned_by_app: 'BOOL', must_change_pin: 'BOOL', is_system_owner: 'BOOL', iso_secretary: 'BOOL', auditor: 'BOOL',
   file_missing: 'BOOL', mandatory_record: 'BOOL',
   i18n_meta: 'JSON', schema_version: 'STRING', email: 'STRING', note: 'STRING', where: 'STRING',

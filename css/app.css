@@ -1533,3 +1533,37 @@ ul.plain { list-style: none; padding: 0; margin: 6px 0; }
 .lk-form .inp { width: 100%; }
 .lk-unk summary { cursor: pointer; font-size: 0.875rem; padding: 6px 0; color: var(--amber); }
 .lk-res:empty { display: none; }
+/* Báo cáo (phiên 2c): chọn báo cáo, bộ lọc (ô chọn, không có ô gõ), bản xem trước như trang PDF, báo cáo đã lưu */
+.rf-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.rp-list { display: flex; flex-direction: column; }
+.rp-list .rp-item { width: 100%; margin: 0; text-align: left; font: inherit; cursor: pointer; border: 1px solid var(--line); }
+.rp-item .rp-text strong { color: var(--navy); }
+.rp-actions { flex-wrap: wrap; margin-top: 8px; }
+.rp-actions .btn { flex: 1 1 auto; }
+.fld.chk { display: flex; align-items: center; gap: 8px; }
+.fld.chk input { width: 20px; height: 20px; }
+.rp-tbl td.mid, .rp-tbl th.mid { text-align: center; }
+.rp-tbl td.code { font-weight: 600; }
+.rp-tbl tr.rp-total td { background: #E6ECF3; font-weight: 700; color: var(--navy); }
+.rp-kv th { width: 32%; background: #F1F5F9; color: #5B6875; font-size: 0.75rem; text-align: left; vertical-align: top; }
+.rp-kv td { white-space: normal; }
+.navy-text { color: var(--navy); }
+.rp-saved .rp-run { padding: 8px 2px; border-bottom: 1px solid var(--bg); }
+.rp-saved .row { margin-top: 4px; }
+.rp-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
+.rp-link svg { width: 16px; height: 16px; }
+.rp-file-name { overflow-wrap: anywhere; }
+@media (min-width: 900px) {
+  .rp-web .rf-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .rp-left .card { margin-bottom: 14px; }
+}
+/* iPhone: 4 báo cáo xếp 2 × 2, ẩn mô tả dài; bảng báo cáo cho chữ xuống dòng (mã, ngày, số giữ một dòng) */
+@media (max-width: 899px) {
+  .rp-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .rp-list .rp-item { flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px; }
+  .rp-list .rp-item .rp-text .small, .rp-list .rp-item > svg:last-child { display: none; }
+  .rp-list .rp-item .rp-ico { width: 28px; height: 28px; }
+}
+.rp-tbl th, .rp-tbl td { white-space: normal; }
+.rp-tbl td.code, .rp-tbl td.num, .rp-tbl td.mid, .rp-tbl th.num, .rp-tbl th.mid { white-space: nowrap; }
+.rp-tbl td:not(.code):not(.num):not(.mid) { min-width: 9em; }

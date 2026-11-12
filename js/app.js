@@ -171,8 +171,9 @@ function registerRoutes() {
   route('/excel', lazy('./pages/excel.js', 'renderExcel'), { nav: 'excel' });
   route('/excel/batch/:id', lazy('./pages/excel.js', 'renderBatch'), { nav: 'excel' });
   route('/coverage', lazy('./pages/coverage.js', 'renderCoverage'), { nav: 'coverage' });
+  route('/reports', lazy('./pages/reports.js', 'renderReports'), { nav: 'reports' });
   // Màn của đợt sau: hiện "Sắp có · 即将推出"
-  ['reports', 'capa', 'audits'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
+  ['capa', 'audits'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
   route('/links', lazy('./pages/links.js', 'renderLinks'), { nav: 'links' });
   route('/account', lazy('./pages/account.js', 'renderAccount'), { nav: 'account' });
   route('/account/drafts', lazy('./pages/drafts.js', 'renderDrafts'), { nav: 'account' });

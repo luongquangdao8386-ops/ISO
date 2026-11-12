@@ -268,6 +268,9 @@ function healthRows_() {
   var base = String(setting_('app_base_url') || '');
   add('app_base_url', !!base, base, base ? '' : 'Chưa điền app_base_url');
   add('report_logo', true, setting_('report_logo_rev') ? 'ON' : 'OFF');
+  // Báo cáo (2c): số báo cáo đã lưu (mã BC), thiếu sheet ReportRuns → chạy migrateSchema
+  var rh = reportHealth_();
+  add('reports', rh[0], rh[1], rh[2]);
   var cells = 0;
   [prop_('BUSINESS_SPREADSHEET_ID'), prop_('SECURITY_SPREADSHEET_ID')].forEach(function (id) {
     if (!id) return;

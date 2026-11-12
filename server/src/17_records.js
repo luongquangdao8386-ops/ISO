@@ -123,12 +123,7 @@ function itemRecordStatus_(it, recs, today, grace, startSetting, n, evs, srcs) {
   evs.forEach(function (e) { var d = String(e.last_date || ''); if (d > last) last = d; cnt += Number(e.count) || 0; });
   var out = { type: type, counted: counted, reason: ci.reason, start: start, src: ci.src, cells: [], due_key: '', due_st: '', overdue: false, late_n: 0, last_date: last, count: cnt };
   if (type === 'EVENT') return out;
-  var cellState = function (p) {
-    for (var i = 0; i < recs.length; i++) if (String(recs[i].period_from) <= p.to && String(recs[i].period_to) >= p.from) return 'OK';
-    for (var j = 0; j < evs.length; j++) if (Number(evs[j].count) > 0 && String(evs[j].period_from) <= p.to && String(evs[j].period_to) >= p.from) return 'OK';
-    if (!counted || p.to < start) return 'NA';
-    return addDaysIso_(p.to, grace) < today ? 'LATE' : 'DUE';
-  };
+  var cellState = function (p) { return periodCellState_(p, recs, evs, counted, start, today, grace); };
   lastPeriods_(type, today, n).forEach(function (p) {
     var s = cellState(p);
     if (s === 'LATE') out.late_n++;
@@ -144,6 +139,18 @@ function itemRecordStatus_(it, recs, today, grace, startSetting, n, evs, srcs) {
     }
   }
   return out;
+}
+
+/**
+ * Tình trạng một kỳ p = {from, to} của biểu: OK khi có hồ sơ SUBMITTED hoặc dòng Evidence (số lượt > 0) giao với kỳ;
+ * NA khi biểu không tính hoặc kỳ kết thúc trước ngày bắt đầu tính; LATE khi kỳ kết thúc quá số ngày cho phép trễ; còn lại DUE.
+ * Dùng chung cho bảng kỳ (itemRecordStatus_) và báo cáo tình trạng hồ sơ (27_reports.js). Giống periodCell() trong js/periods.js.
+ */
+function periodCellState_(p, recs, evs, counted, start, today, grace) {
+  for (var i = 0; i < recs.length; i++) if (String(recs[i].period_from) <= p.to && String(recs[i].period_to) >= p.from) return 'OK';
+  for (var j = 0; j < evs.length; j++) if (Number(evs[j].count) > 0 && String(evs[j].period_from) <= p.to && String(evs[j].period_to) >= p.from) return 'OK';
+  if (!counted || p.to < start) return 'NA';
+  return addDaysIso_(p.to, grace) < today ? 'LATE' : 'DUE';
 }
 
 function graceDays_() {

@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d2.2';
+var SERVER_VERSION = '1.0.0-d2.3';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.4';
+var SCHEMA_VERSION = '1.0.5';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -104,7 +104,7 @@ var CODE_PATTERNS = {
   RECORD: { prefix: 'HS', digits: 4, yymm: true, sheet: 'Records', col: 'code' },
   DOC_REQUEST: { prefix: 'DN', digits: 3, yymm: true, sheet: null, col: null },
   CAPA: { prefix: 'KP', digits: 3, yymm: true, sheet: null, col: null },
-  REPORT: { prefix: 'BC', digits: 3, yymm: true, sheet: null, col: null }
+  REPORT: { prefix: 'BC', digits: 3, yymm: true, sheet: 'ReportRuns', col: 'code' }
 };
 
 /** Loại hồ sơ của tệp (Documents.entity_type) và loại tệp được gắn — phiên 1b (phiên bản: PDF, tệp gốc), 1c (hồ sơ: ảnh, tệp) */

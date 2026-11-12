@@ -50,8 +50,11 @@ var ACTION_TABLE_ = [
   'record.submit|2|offline|W',
   'record.return|2|pin|W',
   'record.status|2|net|R',
-  // Đợt 2–4: báo cáo PDF, khắc phục, đánh giá nội bộ
-  'report.pdf|1|net|R',
+  // Báo cáo (phiên 2c): xem trước (không lưu); lưu có mã BC-yymm-001 rồi tải PDF (máy chủ dựng) / Excel (app dựng); báo cáo đã lưu.
+  // Loại báo cáo theo cấp kiểm trong 27_reports.js: Danh mục, Lịch sử phiên bản mọi cấp; Tình trạng hồ sơ, Phủ điều khoản cấp 2+ / Thư ký ISO
+  'report.run|1|net|R',
+  'report.save|1|net|W',
+  'report.list|1|net|R',
   // Kết nối M&E / Checksheet (phiên 2a): link /exec + mã kết nối của từng app; thử kết nối; Cập nhật ngay
   'link.info|4|net|R',
   'link.test|4|net|R',
@@ -64,6 +67,7 @@ var ACTION_TABLE_ = [
   'mail.test|4|pin|W',
   'mail.run|4|pin|W',
   'mail.resend|4|pin|W',
+  // Đợt 3–4: khắc phục, đánh giá nội bộ
   'capa.edit|2|net|W',
   'audit.program.edit|X|net|W',
   // Báo cáo: logo

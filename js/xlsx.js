@@ -208,6 +208,30 @@ const XSTYLE = {
   pct_b: { font: { b: 1, sz: 9 }, border: 1, wrap: 1, h: 'center', v: 'center', numFmt: 9 },
   total: { font: { b: 1, sz: 9 }, border: 1, wrap: 1, h: 'center', v: 'center' }
 };
+// Báo cáo (phiên 2c, js/report-xlsx.js): cùng màu với PDF — tiêu đề navy 17324F, đầu bảng nền E6ECF3, ô số tóm tắt nền F1F5F9;
+// màu chữ ô theo tình trạng (xanh đạt, đỏ quá hạn / thiếu, cam sắp hạn, xám không tính)
+const RPT_NAVY = '17324F', RPT_MUTED = '5B6875', RPT_TILE = 'F1F5F9', RPT_HEAD = 'E6ECF3';
+const RPT_TONES = { '': '1F2933', green: '1E7B4A', red: 'B42318', amber: 'B54708', muted: RPT_MUTED, navy: RPT_NAVY };
+Object.assign(XSTYLE, {
+  rpt_title: { font: { b: 1, sz: 14, color: RPT_NAVY }, wrap: 1, h: 'center', v: 'center' },
+  rpt_title_zh: { font: { b: 1, sz: 12, color: RPT_NAVY }, wrap: 1, h: 'center', v: 'center' },
+  rpt_meta: { font: { sz: 9 }, h: 'left', v: 'center' },
+  rpt_meta_r: { font: { sz: 9 }, h: 'right', v: 'center' },
+  rpt_tile_l: { font: { sz: 8, color: RPT_MUTED }, fill: RPT_TILE, wrap: 1, h: 'left', v: 'top' },
+  rpt_kv_l: { font: { b: 1, sz: 8, color: RPT_MUTED }, fill: RPT_TILE, border: 1, wrap: 1, h: 'left', v: 'top' },
+  rpt_head: { font: { b: 1, sz: 9, color: RPT_NAVY }, fill: RPT_HEAD, border: 1, wrap: 1, h: 'center', v: 'center' },
+  rpt_note: { font: { i: 1, sz: 8, color: RPT_MUTED }, wrap: 1, h: 'left', v: 'top' },
+  rpt_sign_h: { font: { b: 1, sz: 9, color: RPT_NAVY }, h: 'center', v: 'center' },
+  rpt_sign_hint: { font: { i: 1, sz: 8, color: RPT_MUTED }, h: 'center', v: 'center' },
+  rpt_sign_name: { font: { b: 1, sz: 9 }, h: 'center', v: 'center' }
+});
+for (const [t, rgb] of Object.entries(RPT_TONES)) {
+  XSTYLE['rpt_tile_v' + (t ? '_' + t : '')] = { font: { b: 1, sz: 13, color: t ? rgb : RPT_NAVY }, fill: RPT_TILE, h: 'left', v: 'center' };
+  for (const [a, h] of [['l', 'left'], ['c', 'center'], ['r', 'right']]) {
+    XSTYLE[`rpt_${a}${t ? '_' + t : ''}`] = { font: { b: t && t !== 'muted' ? 1 : 0, sz: 9, color: rgb }, border: 1, wrap: 1, h, v: 'top' };
+    if (!t) XSTYLE[`rpt_tot_${a}`] = { font: { b: 1, sz: 9, color: RPT_NAVY }, fill: RPT_HEAD, border: 1, wrap: 1, h, v: 'top' };
+  }
+}
 /** Tô màu có điều kiện: nền như file gốc */
 const XDXF = {
   bad: { fill: 'F8CBAD' },

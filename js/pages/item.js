@@ -104,6 +104,7 @@ export async function renderItem(view, { shell, params, query }) {
         : `<p class="muted small">${bi(it.status === 'ISSUED' ? 'ver.no_current_file' : 'ver.no_current')}</p>`}
       ${openV ? `<p class="lbl">${bi('ver.open')}</p><ul class="cat-list">${versionRow(openV, it, { um })}</ul>` : ''}
       ${hist.length ? `<details class="ver-hist"><summary>${bi('ver.history_n', { N: hist.length })}</summary><ul class="cat-list">${hist.map((v) => versionRow(v, it, { um })).join('')}</ul></details>` : ''}
+      ${await can('report.run') ? `<a class="small rp-link" href="#/reports?kind=VERSIONS&item=${encodeURIComponent(it.item_id)}">${ICON.reports} ${bi('rp.version_report')} ›</a>` : ''}
     </section>
     ${await itemRecordsCard(it)}
     <div class="row item-actions">

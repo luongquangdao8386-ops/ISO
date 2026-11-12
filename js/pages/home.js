@@ -124,7 +124,7 @@ async function gridHtml(list) {
     { key: 'records', icon: 'file', href: '/records', lvl: 2, show: canSeeRecords() },
     { key: 'coverage', icon: 'checklist', href: '/coverage', show: canSeeRecords() },
     { key: 'excel', icon: 'excel', href: '/excel', show: lvl >= 3 || sec },
-    { key: 'reports', icon: 'reports', href: '/reports', soon: 1 },
+    { key: 'reports', icon: 'reports', href: '/reports' },
     { key: 'capa', icon: 'repairs', href: '/capa', soon: 1, lvl: 2 },
     { key: 'audits', icon: 'inspections', href: '/audits', soon: 1, lvl: 2 },
     { key: 'links', icon: 'link', href: '/links', lvl: 4 },

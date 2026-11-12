@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.2 (Đợt 2, phiên 2b — Gmail nhắc hạn)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d2.3 (Đợt 2, phiên 2c — Báo cáo)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -12,8 +12,54 @@ dụng ✕**, **Đã rà soát** (gia hạn rà soát), ô **Chờ bạn xử l�
 BRCGS (đếm giống hệt file Excel tổng), trang chủ đầy đủ (**lịch tuần hồ sơ đến hạn**, Chờ bạn xử lý thêm hồ sơ quá hạn cần nộp).
 Phiên 2a thêm: **Kết nối M&E / Checksheet** — mỗi giờ app ISO hỏi hai app kia "mã biểu nào có hồ sơ vào ngày nào" (chỉ đọc), biểu in
 từ app có ô ✓ mà không ai phải nộp lại. Phiên 2b thêm: **Gmail nhắc hạn** — hồ sơ quá hạn (tóm tắt sáng thứ Hai), tài liệu đến hạn rà
-soát, phiên bản chờ duyệt / chờ ban hành quá 3 ngày; email người nhận do Quản trị nhập và xác nhận. Báo cáo, Khắc phục, Đánh giá nội bộ
-(Đợt 2–4) vẫn mờ "Sắp có · 即将推出".
+soát, phiên bản chờ duyệt / chờ ban hành quá 3 ngày; email người nhận do Quản trị nhập và xác nhận. Phiên 2c thêm: **Báo cáo** —
+Danh mục tài liệu hiện hành (thay BM-ISO-02-01), Tình trạng hồ sơ theo bộ phận và kỳ, Phủ điều khoản ISO 9001 và BRCGS, Lịch sử phiên
+bản; PDF A4 ngang có logo công ty + Excel, số báo cáo `BC-yymm-001`, khối Người lập / Người duyệt. Khắc phục, Đánh giá nội bộ (Đợt 3–4)
+vẫn mờ "Sắp có · 即将推出".
+
+## CẬP NHẬT LÊN BẢN 2c (1.0.0-d2.3) — làm một lần, trên máy tính
+
+Bản 2c **thêm sheet `ReportRuns`** (báo cáo đã lưu) và **dựng PDF bằng Google Docs** — Google hỏi thêm quyền "Xem, chỉnh sửa, tạo và
+xóa tất cả tài liệu Google Docs của bạn" (máy chủ tạo một tài liệu Docs tạm, đổi sang PDF rồi bỏ vào thùng rác). Làm **đúng thứ tự** như
+2a, 2b: chạy hàm và cấp quyền (bước 2) **trước** Phiên bản mới (bước 3). Không cần `installTriggers` (không thêm trigger). App 2c vẫn
+chạy với máy chủ 2b (màn Báo cáo báo "Máy chủ chưa lên bản có Báo cáo").
+
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Google hỏi quyền: **Xem lại quyền** → chọn tài khoản Google của máy chủ → **Nâng cao** →
+   **Đi tới ISO_MayChu_THAT (không an toàn)** → **Cho phép** (quyền mới: tài liệu Google Docs). Nhật ký:
+   `migrateSchema xong. Thêm: ReportRuns. schema_version=1.0.5`.
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d2.3 bao cao` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` trên máy tính → **Tài khoản → Thông tin** ghi `1.0.0-d2.3` (màn báo lỗi thì bấm **Tải lại bản mới**).
+   **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.5**; dòng mới **Báo cáo đã lưu** = `Đã lưu 0 báo cáo`, ĐẠT
+   (chưa có logo thì có dòng nhắc "Chưa có logo công ty trên báo cáo").
+5. Logo (nếu chưa có): **Tài khoản → Quản trị → Logo trên báo cáo** → chọn ảnh PNG / JPG → **Lưu** (PIN).
+
+### Thử Báo cáo
+
+1. Trang chủ → ô **Báo cáo** (hết "Sắp có"); máy tính: menu trái **Báo cáo**.
+2. **Danh mục tài liệu** → **Phạm vi**: chọn **Tất cả tình trạng** (danh mục hiện toàn ○ ◐, để "Đang hiệu lực (●)" thì bảng trống
+   "Không có dòng nào" — đúng) → **Xem báo cáo** → bản xem trước giống trang PDF: logo, tiêu đề hai dòng, Biểu mẫu BM-ISO-02-01, ô số,
+   bảng theo bộ phận, khối **Người lập / Người duyệt**. Số báo cáo ghi "Cấp khi tải PDF / Excel".
+3. **Tải PDF** → chờ (máy chủ dựng PDF, tới khoảng 1 phút) → hộp **Đã có PDF BC-2611-001** → **Mở / lưu tệp** (máy tính mở tab mới;
+   iPhone mở bảng Chia sẻ → **Lưu vào Tệp**). PDF khổ A4 ngang, logo đầu trang, chân trang có số báo cáo.
+4. **Tải Excel** (cùng bộ lọc) → **Đã có Excel BC-2611-001** (cùng số, cùng số liệu) → **Mở / lưu tệp**. Excel có logo ở A1, in ra A4
+   ngang vừa một trang ngang; ngày là ô ngày thật, số là ô số.
+5. **Báo cáo đã lưu** (cuối màn; máy tính ở cột trái): có `BC-2611-001` → tải lại **PDF / Excel** đúng như lúc lập (không cấp số mới,
+   số liệu là bản chụp lúc lập — sửa danh mục sau đó không làm đổi báo cáo đã lưu).
+6. **Tình trạng hồ sơ** → **Kỳ: Theo quý** (hoặc Theo tháng), **Đến kỳ**, **Số cột** → **Xem báo cáo**: bảng tổng hợp theo bộ phận +
+   mỗi bộ phận một bảng biểu × tháng/quý (✓ có hồ sơ · ! quá hạn · – chưa tới hạn · a/b với biểu ngày, tuần · số lần nộp với biểu khi phát
+   sinh). Hiện chỉ có biểu nhận ✓ từ M&E / Checksheet; biểu ○ ◐ ghi ở dòng "Không tính".
+7. **Phủ điều khoản** → **Chuẩn: ISO 9001 và BRCGS** → **Xem báo cáo**: số biểu theo điều khoản khớp màn Phủ điều khoản (và file Excel
+   tổng), cột **Mã biểu** liệt kê biểu của từng điều khoản (bỏ tích "Kèm mã biểu" để bảng gọn).
+8. **Lịch sử phiên bản** → chọn tài liệu → **Xem báo cáo**; hoặc mở chi tiết một biểu → thẻ Phiên bản → **Báo cáo lịch sử phiên bản**.
+
+- Mỗi lần tải với **bộ lọc mới** là một báo cáo mới, số kế tiếp (`BC-2611-002`…; sang tháng sau đánh lại `BC-2612-001`). Đổi bộ lọc rồi
+  quay lại bộ lọc cũ cũng thành báo cáo mới.
+- Ai xem được: Danh mục tài liệu, Lịch sử phiên bản — mọi cấp; Tình trạng hồ sơ, Phủ điều khoản — Nhân viên (cấp 2) trở lên và Thư ký
+  ISO; cấp 1–3 chỉ có biểu trong bộ phận mình + tài liệu chung. Báo cáo đã lưu: người lập thấy của mình; Thư ký ISO, Quản trị thấy tất cả.
+- Báo cáo do máy chủ tính: **cần mạng**. PDF / Excel lưu trong thư mục dữ liệu `ISO_Data` của máy chủ (riêng tư), tải qua app.
 
 ## CẬP NHẬT LÊN BẢN 2b (1.0.0-d2.2) — làm một lần, trên máy tính
 
@@ -554,7 +600,7 @@ Sổ dừng máy BM-CĐ-04-03 còn thiếu cột **ca** và **phản hồi** (ng
 | `setup` | Lần đầu dựng máy chủ (đã có thì không làm gì) |
 | `adminSetupOwner` | Tạo owner đầu tiên từ 3 thuộc tính `SETUP_OWNER_*` |
 | `adminResetOwnerPin` | Owner quên PIN: đặt `OWNER_RESET_TEMP_PIN` (6 số) rồi chạy |
-| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần; 2a: sheet `Evidence`; 2b: cột email đã xác nhận, loại nhắc) |
+| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần; 2a: sheet `Evidence`; 2b: cột email đã xác nhận, loại nhắc; 2c: sheet `ReportRuns` + quyền Google Docs) |
 | `adminNoiLaiTep` | Khôi phục từ bản chép ở tài khoản thứ hai: nối lại ID tệp theo `file_map.json` (Phần I.5) |
 | `healthCheck` | Xem nhanh tình trạng máy chủ |
 | `installTriggers` | Trigger bị xóa nhầm; bản 2a: cấp quyền gọi ra ngoài + cài `syncEvidenceHourly`; bản 2b: cài `sendDueMail` (4 trigger) |
@@ -567,6 +613,12 @@ Sổ dừng máy BM-CĐ-04-03 còn thiếu cột **ca** và **phản hồi** (ng
 | `caiDat`, `chepNgay`, `kiemTra`, `danhSachNguon` | Script **SaoLuu_Phu** ở tài khoản thứ hai (Phần I) |
 
 ## Xử lý sự cố
+
+- **Màn Báo cáo báo "Máy chủ chưa lên bản có Báo cáo"**: làm mục "CẬP NHẬT LÊN BẢN 2c" (dán `Code.gs`, `migrateSchema`, Phiên bản mới).
+- **Tải PDF báo "Lỗi máy chủ" / "Authorization is required"** (Tải Excel vẫn được): chưa cho phép quyền Google Docs — chạy `migrateSchema`
+  trong trình soạn → **Cho phép**, rồi triển khai **Phiên bản mới**.
+- **Tải PDF lâu rồi báo mất kết nối**: bấm **Tải PDF** lần nữa — máy chủ dùng lại báo cáo vừa lưu (cùng số), không cấp số mới.
+- **PDF không có logo**: Quản trị → **Logo trên báo cáo** chưa có ảnh; báo cáo **đã lưu** trước khi tải logo giữ nguyên (lập báo cáo mới).
 
 - **Kết nối báo "App kia từ chối: sai mã kết nối…"**: chép lại mã từ nhật ký `adminCreateFeedKeyIso` của app đó (đủ ký tự, không dấu
   cách); app đó chưa lên bản có `feed.isoEvidence` cũng báo vậy.

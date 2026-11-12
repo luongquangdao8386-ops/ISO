@@ -22,7 +22,7 @@ export const SIDE = [
   { key: 'records', label: 'nav.records', icon: 'file', path: '/records', lvl: 2 },
   { key: 'coverage', label: 'nav.coverage', icon: 'checklist', path: '/coverage', lvl: 2 },
   { key: 'excel', label: 'nav.excel', icon: 'excel', path: '/excel', lvl: 3 },
-  { key: 'reports', label: 'nav.reports', icon: 'reports', path: '/reports', lvl: 1, soon: true },
+  { key: 'reports', label: 'nav.reports', icon: 'reports', path: '/reports', lvl: 1 },
   { key: 'capa', label: 'nav.capa', icon: 'repairs', path: '/capa', lvl: 2, soon: true },
   { key: 'audits', label: 'nav.audits', icon: 'inspections', path: '/audits', lvl: 2, soon: true },
   { key: 'links', label: 'nav.links', icon: 'link', path: '/links', lvl: 4 },
