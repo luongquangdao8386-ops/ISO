@@ -183,15 +183,15 @@ function codeExists_(sheet, col, code) {
  */
 function allocCode_(st, su, kind, bizDate) {
   var pat = CODE_PATTERNS[kind];
-  var ym = pat.yymm ? yymm_(bizDate || now_()) : '';
-  var key = 'code_seq.' + pat.prefix + (pat.yymm ? '.' + ym : '');
+  var ym = pat.yymm ? yymm_(bizDate || now_()) : pat.yy ? yymm_(bizDate || now_()).slice(0, 2) : ''; // yy: theo năm (DG-26-01)
+  var key = 'code_seq.' + pat.prefix + (ym ? '.' + ym : '');
   var n = Number(stateGet_(st, key, 0));
   var code;
   for (var guard = 0; guard < 100000; guard++) {
     n++;
     var num = String(n);
     while (num.length < pat.digits) num = '0' + num;
-    code = pat.prefix + '-' + (pat.yymm ? ym + '-' : '') + num;
+    code = pat.prefix + '-' + (ym ? ym + '-' : '') + num;
     if (!pat.sheet || !codeExists_(pat.sheet, pat.col, code)) break;
   }
   st.map[key] = n;

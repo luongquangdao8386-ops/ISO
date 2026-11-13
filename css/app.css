@@ -1713,3 +1713,49 @@ html.bg-home .home-hero, html.bg-home .cs-hero { background-image: var(--bg-home
 .ncr .card-head h3 { margin: 0; }
 .ncr-capa .cat-row { margin-bottom: 8px; }
 .capa-from-ncr { margin: 4px 0; }
+
+/* ---------------- Đánh giá nội bộ (4a) ---------------- */
+.aud-years { margin-bottom: 8px; }
+.aud-cov .chips { flex-wrap: wrap; margin-bottom: 6px; }
+.aud-cov-list { margin: 4px 0; }
+.aud-cov-group { padding: 8px 0 2px; font-weight: 600; }
+.aud-cov-row { display: flex; width: 100%; gap: 8px; align-items: flex-start; justify-content: space-between; text-align: left; background: none; border: 0;
+  border-top: 1px solid var(--line); padding: 8px 2px; font: inherit; color: var(--text); cursor: pointer; min-height: 44px; }
+.aud-cov-key { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aud-cov-key > span:first-of-type { overflow-wrap: anywhere; }
+.aud-cov-right { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; flex: 0 0 auto; max-width: 45%; }
+.aud-cov-row.st-MISSING .aud-cov-key b { color: var(--red); }
+.tag.t-red { background: #FDECEA; color: var(--red); }
+.aud-tag { background: #E8EEF5; color: var(--navy); }
+.aud-clauses, .aud-team { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 6px; margin: 4px 0 12px; }
+.aud-clauses > legend, .aud-team > legend { font-weight: 600; color: var(--navy); padding: 0 6px; }
+.aud-cl-std h4 { margin: 10px 0 4px; color: var(--navy); }
+.aud-cl-gh { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 6px; }
+.aud-cl.check { align-items: flex-start; margin-top: 4px; }
+.aud-cl.check input { margin-top: 4px; }
+.aud-member { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 8px 0; }
+.aud-member + .aud-member { border-top: 1px dashed var(--line); }
+.aud-member [data-k="u"], .aud-member [data-k="n"], .aud-member [data-k="d"] { grid-column: 1 / 2; }
+.aud-member .aud-lead { grid-column: 1 / 2; margin: 0; min-height: 36px; }
+.aud-member .icon-btn { grid-column: 2; grid-row: 1; }
+@media (min-width: 900px) {
+  .aud-member { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto auto; }
+  .aud-member [data-k="u"], .aud-member [data-k="n"], .aud-member [data-k="d"], .aud-member .aud-lead { grid-column: auto; }
+  .aud-member .icon-btn { grid-column: auto; grid-row: auto; }
+}
+.aud-ro { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; background: var(--bg); }
+.aud-cl-row { border-top: 1px solid var(--line); padding: 8px 0; }
+.aud-forms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.aud-fchip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8125rem; text-decoration: none; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; }
+.aud-check-list { margin: 4px 0 8px; }
+.aud-check { border-top: 1px solid var(--line); padding: 8px 0; }
+.aud-check p { margin: 4px 0; }
+.aud-ev { background: var(--bg); border-radius: 8px; padding: 6px 8px; margin: 4px 0; }
+.aud-check-btns { gap: 6px; margin-top: 4px; }
+.aud-team-view li { padding: 3px 0; }
+.aud-sugg li { border-top: 1px solid var(--line); }
+.aud-sugg .check { align-items: flex-start; }
+.aud-sugg .check input { margin-top: 4px; }
+.aud-row .code, .item.aud .code.big { white-space: nowrap; }
+.aud-check-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.aud-check-top .badge { margin-left: auto; }

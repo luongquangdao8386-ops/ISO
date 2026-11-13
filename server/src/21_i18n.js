@@ -74,7 +74,9 @@ function translateText_(text, src, tgt) {
 
 /** Bảng có dịch máy (dịch bù) — trường gốc */
 var MT_SHEETS_ = {
-  Items: ['name', 'purpose', 'freq'], Groups: ['name'], Depts: ['name'], Clauses: ['name', 'group'], Versions: ['change_summary']
+  Items: ['name', 'purpose', 'freq'], Groups: ['name'], Depts: ['name'], Clauses: ['name', 'group'], Versions: ['change_summary'],
+  // Đánh giá nội bộ (4a): câu hỏi checklist thêm nhiều dòng một lần dịch ở nền; nội dung, ghi chú kế hoạch khi quá thời gian dịch lúc lưu
+  AuditChecks: ['question'], Audits: ['title', 'note'], AuditPrograms: ['title', 'objective', 'scope']
 };
 
 /**

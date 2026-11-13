@@ -58,7 +58,8 @@ function auditView_(ctx) {
 /** Khóa không sửa trong màn Cấu hình (logo sửa ở màn riêng) */
 var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, bg_login_file_id: 1, bg_login_rev: 1, bg_home_file_id: 1, bg_home_rev: 1, backup_mirror_email: 1, evidence_sources: 1, gmail_enabled: 1, email_hour: 1 };
 /** Cài đặt là mã biểu in trên phiếu / sổ (viết hoa, bỏ dấu cách, đúng dạng mã biểu) */
-var FORM_CODE_SETTINGS_ = ['capa_form_code', 'capa_log_form_code', 'complaint_form_code', 'd8_form_code', 'scar_form_code', 'ncr_form_code', 'ncr_log_form_code', 'ncr_decision_form_code'];
+var FORM_CODE_SETTINGS_ = ['capa_form_code', 'capa_log_form_code', 'complaint_form_code', 'd8_form_code', 'scar_form_code', 'ncr_form_code', 'ncr_log_form_code', 'ncr_decision_form_code',
+  'audit_program_form_code', 'audit_plan_form_code', 'audit_checklist_form_code'];
 
 var SETTINGS_BOUNDS_ = {
   session_days: [1, 90], session_warn_days: [0, 30], change_pin_session_minutes: [5, 60], reauth_window_minutes: [1, 30], temp_pin_hours: [1, 168],
@@ -70,7 +71,7 @@ var SETTINGS_BOUNDS_ = {
   sync_page_size: [100, 2000], doc_max_bytes: [1048576, 52428800], doc_mobile_upload_max_bytes: [1048576, 52428800],
   photo_max_edge_px: [640, 4096], photo_jpeg_quality: [0.5, 0.95], photo_thumb_edge_px: [120, 1024], backup_hour: [0, 23], backup_keep_count: [2, 52],
   doc_review_months: [1, 60], record_grace_days: [0, 60], version_wait_days: [1, 30], mail_quota_reserve: [0, 90], capa_verify_days: [0, 365], capa_reply_days: [1, 90],
-  ncr_decide_days: [0, 30], ncr_exec_days: [0, 365]
+  ncr_decide_days: [0, 30], ncr_exec_days: [0, 365], audit_notice_days: [1, 30]
 };
 var SETTINGS_ENUMS_ = {
   backup_weekday: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
@@ -301,6 +302,9 @@ function healthRows_() {
   // Sản phẩm không phù hợp (3c)
   var nh = ncrHealth_();
   add('ncr', nh[0], nh[1], nh[2]);
+  // Đánh giá nội bộ (4a)
+  var ah = iauditHealth_();
+  add('iaudit', ah[0], ah[1], ah[2]);
   var cells = 0;
   [prop_('BUSINESS_SPREADSHEET_ID'), prop_('SECURITY_SPREADSHEET_ID')].forEach(function (id) {
     if (!id) return;

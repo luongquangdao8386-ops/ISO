@@ -8,9 +8,12 @@
 // phiếu tôi phụ trách chưa có hành động đang mở (cần lập kế hoạch, hoặc đã xong hành động — gửi kiểm tra hiệu lực).
 // Phiên 3c: sản phẩm không phù hợp chờ tôi quyết định xử lý; phiếu tôi phụ trách đang xử lý đến hạn trong 7 ngày / quá hạn; phiếu cần
 // phiếu khắc phục mà chưa lập (tôi sửa được phiếu).
+// Phiên 4a: chương trình đánh giá nội bộ chờ tôi duyệt / bị trả lại (Thư ký ISO); đợt đánh giá tôi tham gia trong 7 ngày tới, đang đánh giá;
+// đợt đã đến tháng dự kiến mà chưa chốt kế hoạch (Thư ký ISO, trưởng đoàn).
 import { session } from './core.js';
 import { recs, items, isSecretary, canApprove, versionEditable, reviewSoon, today, addDaysIso, canSeeRecords, canSubmitRecord, recordCheck,
-  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa, capaIsParty, canDecideNcr, canEditNcr } from './data.js';
+  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa, capaIsParty, canDecideNcr, canEditNcr,
+  canApproveProgram, isAuditMember, canPlanAudit, canRecordAudit } from './data.js';
 import { queueItems } from './sync.js';
 import { covers } from './periods.js';
 
@@ -71,7 +74,18 @@ export async function pendingFor() {
   out.ncr_decide = ncrs.filter((n) => n.state === 'OPEN' && canDecideNcr(n));
   out.ncr_due = ncrs.filter((n) => n.state === 'DECIDED' && n.owner_user_id === uid && n.exec_due && n.exec_due <= soon);
   out.ncr_capa = ncrs.filter((n) => n.state === 'DECIDED' && n.need_capa === 'YES' && !(n.capa_id && liveCapa.has(n.capa_id)) && canEditNcr(n));
-  out.total = out.ncr_decide.length + out.ncr_due.length + out.ncr_capa.length + out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
+  // Đánh giá nội bộ (4a)
+  const progs = (await recs('AUD_PROG')).filter((x) => !x.archived_at);
+  const approved = new Set(progs.filter((x) => x.state === 'APPROVED').map((x) => x.program_id));
+  const audits = (await recs('AUDIT')).filter((a) => !a.archived_at);
+  const t = today();
+  out.aud_review = progs.filter((x) => x.state === 'IN_REVIEW' && canApproveProgram(x));
+  out.aud_returned = sec ? progs.filter((x) => x.state === 'DRAFT' && x.return_reason) : [];
+  out.aud_soon = audits.filter((a) => (a.state === 'PLANNED' || a.state === 'READY') && a.audit_date && a.audit_date >= t && a.audit_date <= soon && (isAuditMember(a) || canPlanAudit(a)));
+  out.aud_doing = audits.filter((a) => a.state === 'IN_PROGRESS' && canRecordAudit(a));
+  out.aud_plan = audits.filter((a) => a.state === 'PLANNED' && approved.has(a.program_id) && canPlanAudit(a) && !(a.audit_date && a.audit_date >= t) && String(a.plan_month) <= t.slice(0, 7));
+  out.total = out.aud_review.length + out.aud_returned.length + out.aud_soon.length + out.aud_doing.length + out.aud_plan.length +
+    out.ncr_decide.length + out.ncr_due.length + out.ncr_capa.length + out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
     out.req_review.length + out.req_todo.length + out.req_rejected.length + out.capa_acts.length + out.capa_verify.length + out.capa_owner.length + out.capa_reply.length +
     (out.nofile.length ? 1 : 0) + (out.review_due.length ? 1 : 0) + (out.rec_late.length ? 1 : 0) + (out.dist_due.length ? 1 : 0);
   return out;

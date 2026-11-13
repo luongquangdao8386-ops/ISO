@@ -591,9 +591,16 @@ function userDirectory_() {
   var m;
   if (c) {
     m = JSON.parse(c);
-  } else {
+    var k0 = Object.keys(m)[0];
+    if (k0 && !Object.prototype.hasOwnProperty.call(m[k0], 'auditor')) m = null; // bộ đệm của bản trước 4a (chưa có bộ phận, cờ)
+  }
+  if (!m) {
     m = {};
-    readRows_('Users').forEach(function (u) { m[u.user_id] = { employee_code: u.employee_code, display_name: u.display_name, active: !!u.active }; });
+    // Bộ phận, cờ Đánh giá viên / Thư ký ISO, cấp: chọn đoàn đánh giá nội bộ (4a) — không có PIN, email
+    readRows_('Users').forEach(function (u) {
+      m[u.user_id] = { employee_code: u.employee_code, display_name: u.display_name, active: !!u.active, dept_codes: String(u.dept_codes || ''),
+        auditor: !!u.auditor, iso_secretary: !!u.iso_secretary, role_level: Number(u.role_level) || 0 };
+    });
     try { cache_().put('users:dir', JSON.stringify(m), 600); } catch (e) { /* quá cỡ cache: đọc lại lần sau */ }
   }
   DB_.userDir = m;

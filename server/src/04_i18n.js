@@ -114,7 +114,29 @@ var SUB_MSG = {
   NCR_RECHECK: ['Có làm lại / sửa chữa / hạ cấp: sản phẩm phải kiểm tra lại Đạt mới đóng phiếu (không đạt thì quyết định lại)', '有返工/返修/降级：产品须复检合格才能关闭（不合格请重新决定）'],
   NCR_NEED_CAPA: ['Quyết định cần phiếu khắc phục — lập phiếu khắc phục trước khi đóng', '决定需要纠正措施——关闭前请先创建纠正措施单'],
   NCR_DATE: ['Ngày phải từ ngày phát hiện / ngày quyết định tới hôm nay', '日期须在发现日期/决定日期至今天之间'],
-  TOO_MANY_LINES: ['Tối đa 6 dòng cách xử lý', '最多6行处置方式']
+  TOO_MANY_LINES: ['Tối đa 6 dòng cách xử lý', '最多6行处置方式'],
+  // Đánh giá nội bộ (4a)
+  AUDIT_YEAR_TAKEN: ['Năm này đã có chương trình đánh giá nội bộ (mở chương trình đó để sửa)', '该年度已有内部审核方案（请打开该方案修改）'],
+  AUDIT_STD_USED: ['Còn đợt đánh giá có điều khoản của chuẩn này — bỏ điều khoản đó khỏi đợt trước', '仍有审核包含该标准的条款——请先从审核中移除这些条款'],
+  AUDIT_NO_AUDITS: ['Chương trình chưa có đợt đánh giá nào', '方案中尚无审核'],
+  AUDIT_NOT_COVERED: ['Chương trình chưa phủ hết điều khoản: thêm đợt có điều khoản đó hoặc đánh dấu Không áp dụng kèm lý do', '方案尚未覆盖全部条款：请添加包含该条款的审核，或标记为不适用并说明理由'],
+  AUDIT_TEAM_MAX: ['Đoàn đánh giá tối đa 6 người', '审核组最多6人'],
+  AUDIT_TEAM_DUP: ['Người này đã có trong đoàn', '此人已在审核组中'],
+  AUDIT_NOT_AUDITOR: ['Người trong app phải có cờ Đánh giá viên (Quản trị → Người dùng) hoặc là Thư ký ISO / Quản trị', '应用内人员须具有审核员标记（管理→用户）或为体系秘书/管理员'],
+  AUDIT_OWN_DEPT: ['Đánh giá viên không đánh giá bộ phận của chính mình', '审核员不得审核本部门'],
+  AUDIT_ONE_LEAD: ['Mỗi đợt chỉ một trưởng đoàn', '每次审核只能有一名组长'],
+  AUDIT_NOT_IN_YEAR: ['Tháng / ngày đánh giá phải trong năm của chương trình', '审核月份/日期须在方案年度内'],
+  AUDIT_NO_LEAD: ['Cần chọn trưởng đoàn đánh giá', '须指定审核组长'],
+  AUDIT_PROG_LOCKED: ['Chương trình đã gửi duyệt / đã duyệt: bấm Sửa chương trình trước khi thêm, bỏ đợt hoặc đổi bộ phận, tháng, nội dung, điều khoản', '方案已提交审批/已批准：增删审核或修改部门、月份、内容、条款前请先点“修改方案”'],
+  AUDIT_TOO_MANY: ['Mỗi chương trình tối đa 40 đợt đánh giá', '每个方案最多40次审核'],
+  AUDIT_PROG_NOT_APPROVED: ['Chương trình chưa được duyệt — duyệt chương trình trước khi chốt kế hoạch đợt', '方案尚未批准——请先批准方案再确定审核计划'],
+  AUDIT_NO_CHECKS: ['Checklist chưa có câu hỏi nào', '检查表尚无问题'],
+  AUDIT_NOT_YET: ['Chưa tới ngày đánh giá', '尚未到审核日期'],
+  AUDIT_HAS_RESULTS: ['Đã ghi kết quả — bỏ kết quả trước', '已记录结果——请先清除结果'],
+  AUDIT_CLAUSE_NOT_IN: ['Điều khoản không thuộc đợt đánh giá này', '该条款不属于本次审核'],
+  AUDIT_CHECKS_MAX: ['Mỗi checklist tối đa 80 câu hỏi', '每份检查表最多80个问题'],
+  AUDIT_EVIDENCE: ['Không phù hợp / Cần cải tiến: ghi bằng chứng, nhận xét', '不符合/需改进：请记录证据和说明'],
+  AUDIT_STARTED: ['Có đợt đã bắt đầu đánh giá — không hủy được chương trình', '已有审核开始进行——无法取消方案']
 };
 
 function fmtMsg_(pair, vars) {

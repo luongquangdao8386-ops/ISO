@@ -49,7 +49,8 @@ test('iPhone: đăng nhập PIN, trang chủ (biểu tượng, 4 ô số, ô S�
     assert.equal(await page.locator('.home-hero img.brand-logo[src*="iso-tile.svg"]').count(), 1);
     assert.equal(await page.locator('.stats > .stat').count(), 4);
     assert.ok((await page.textContent('.stats')).includes('25'));
-    assert.equal(await page.locator('.grid9 .tile.soon').count(), 1, 'ô của phiên sau mờ "Sắp có" (Đánh giá; Kết nối có từ 2a, Báo cáo từ 2c, Khắc phục từ 3a)');
+    assert.equal(await page.locator('.grid9 .tile.soon').count(), 0, 'hết ô "Sắp có" (Đánh giá nội bộ có từ 4a)');
+    assert.equal(await page.locator('.grid9 .tile[href="#/audits"]:not(.soon)').count(), 1);
     assert.equal(await page.locator('.grid9 .tile[href="#/links"]:not(.soon)').count(), 1);
     assert.ok((await page.textContent('.pend-card')).includes('chưa có tệp'));
     assert.ok(await noOverflow(page));
@@ -102,12 +103,11 @@ test('iPhone: đăng nhập PIN, trang chủ (biểu tượng, 4 ô số, ô S�
     // Hồ sơ (phiên 1c): nút Hồ sơ mở bảng kỳ
     await page.click('.bnav-item[data-nav="records"]');
     await page.waitForSelector('.rg .rg-sec');
-    // Phủ điều khoản (phiên 1d) có màn thật; màn của đợt sau vẫn "Sắp có"
+    // Phủ điều khoản (phiên 1d), Đánh giá nội bộ (phiên 4a) có màn thật
     await go(page, '#/coverage');
     await page.waitForSelector('.cov .cov-row');
     await go(page, '#/audits');
-    await page.waitForSelector('.soon-page');
-    assert.ok((await page.textContent('.soon-page')).includes('Sắp có'));
+    await page.waitForFunction(() => /Chưa có chương trình đánh giá nội bộ năm 2026/.test(document.body.textContent));
 
     // Bộ nhớ: chỉ tiền tố iso_thu (trang /ISO-thu/), không tạo dữ liệu tên me*, cs*
     const st = await page.evaluate(async () => ({ dbs: (await indexedDB.databases()).map((d) => d.name), keys: Object.keys(localStorage) }));
@@ -165,7 +165,7 @@ test('web: menu trái (màn phiên sau mờ "Sắp có"), Excel xuất đúng kh
     await login(page);
     assert.equal(await page.locator('.side .side-item').count(), 16); // 2d: + Đề nghị tài liệu, Phân phối & thu hồi, In tem QR; 2e: + Kho tệp mẫu; 3c: + Sản phẩm không phù hợp
     assert.equal(await page.locator('.side .side-item[data-nav="versions"]').count(), 1);
-    assert.equal(await page.locator('.side .side-item.soon').count(), 1, 'Đánh giá (Kết nối có từ 2a, Báo cáo từ 2c, Khắc phục từ 3a)');
+    assert.equal(await page.locator('.side .side-item.soon').count(), 0, 'hết mục "Sắp có" (Đánh giá nội bộ có từ 4a)');
     assert.equal(await page.locator('.side .side-item[data-nav="links"]:not(.soon)').count(), 1);
     assert.ok(await page.locator('.stats').isVisible());
     assert.ok(await page.locator('.home-depts').isVisible());

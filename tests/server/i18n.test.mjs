@@ -94,9 +94,26 @@ test('họ khóa ghép động đủ thành viên', () => {
     'imp.status.': ['STAGING', 'PREVIEWED', 'COMMITTING', 'COMPLETED', 'CANCELLED'],
     'soon.what.': ['records', 'coverage', 'reports', 'capa', 'audits', 'links'],
     'tile.': ['catalog', 'records', 'coverage', 'excel', 'requests', 'dist', 'labels', 'reports', 'capa', 'audits', 'links', 'drafts'],
+    // Đánh giá nội bộ (4a)
+    'aud.state.': ['PLANNED', 'READY', 'IN_PROGRESS', 'REPORTED', 'CLOSED', 'CANCELLED'],
+    'aud.prog.state.': ['DRAFT', 'IN_REVIEW', 'APPROVED', 'CANCELLED'],
+    'aud.result.': ['C', 'NC', 'OBS', 'NA'],
+    'aud.cov.': ['MISSING', 'AUDIT', 'NA'],
+    'aud.std.': ['ISO9001', 'BRC'],
+    'aud.role.': ['L', 'M'],
+    'aud.print.': ['PROGRAM', 'PLAN', 'CHECKLIST'],
+    'rpt.aud_form.': ['PROGRAM', 'PLAN', 'CHECKLIST'],
+    'rpt.title.AUDIT': ['', '_PLAN', '_CHECKLIST'],
+    'rpt.t.aud_cov_': ['ISO9001', 'BRC'],
+    'rpt.sec.aud_cov_': ['ISO9001', 'BRC'],
     'col.': ['dept_code', 'group_key', 'name_vi', 'name_zh', 'purpose_vi', 'purpose_zh', 'iso9001', 'iso14001', 'iso45001', 'iso50001', 'brc_topics', 'law', 'cls',
       'freq_vi', 'freq_zh', 'flow', 'keep', 'priority', 'where', 'where_note', 'status', 'current_rev', 'issued_at', 'period_days', 'note', 'group_label']
   };
+  // Họ khóa đã có ở trên, thêm thành viên của phiên sau (3c, 4a)
+  const more = (p, list) => { fam[p] = (fam[p] || []).concat(list); };
+  ['mail.kind.', 'mail.kind_short.', 'mail.rule.', 'mail.due.'].forEach((p) => more(p, ['CAPA_REPLY', 'NCR_DECIDE', 'NCR_DUE', 'AUDIT_SOON']));
+  ['rpt.kind.', 'rpt.desc.'].forEach((p) => more(p, ['NCR', 'AUDIT']));
+  more('audit_grp.', ['ncr', 'iaudit']);
   // Dòng kiểm tra sức khỏe máy chủ (24_system.js add('khóa', …))
   const sys = fs.readFileSync(path.join(ROOT, 'server', 'src', '24_system.js'), 'utf8');
   fam['health.'] = [...sys.matchAll(/\badd\('([a-z_0-9]+)'/g)].map((m) => m[1]).concat([...sys.matchAll(/'(link_[a-z]+)'/g)].map((m) => m[1]));

@@ -98,8 +98,24 @@ var ACTION_TABLE_ = [
   'ncr.decide|3|pin|W',
   'ncr.close|2|pin|W',
   'ncr.cancel|2|pin|W',
-  // Đợt 4: đánh giá nội bộ
-  'audit.program.edit|X|net|W',
+  // Đánh giá nội bộ (Đợt 4, phiên 4a): chương trình năm DG-yy (Thư ký ISO lập, Quản trị duyệt / trả lại — PIN; sửa chương trình đã duyệt, hủy
+  // — PIN), đợt DG-yy-01 (thêm / bỏ khi chương trình Nháp), kế hoạch đợt + checklist (Thư ký ISO, trưởng đoàn), ghi kết quả (cả người trong
+  // đoàn). Quyền theo đợt kiểm ở handler / PRECHECK_ (trước PIN)
+  'iaudit.program.save|X|net|W',
+  'iaudit.program.submit|X|net|W',
+  'iaudit.program.approve|4|pin|W',
+  'iaudit.program.return|4|pin|W',
+  'iaudit.program.reopen|X|pin|W',
+  'iaudit.program.cancel|X|pin|W',
+  'iaudit.save|2|net|W',
+  'iaudit.cancel|X|net|W',
+  'iaudit.ready|2|net|W',
+  'iaudit.start|2|net|W',
+  'iaudit.check.save|2|net|W',
+  'iaudit.check.add|2|net|W',
+  'iaudit.check.record|2|net|W',
+  // Phiên 4b: phát hiện đánh giá → phiếu khắc phục, báo cáo đánh giá (đăng ký trước, chưa có mã → FEATURE_NOT_ENABLED)
+  'iaudit.finding.save|2|net|W',
   // Báo cáo: logo
   'report.logo.get|1|net|R',
   'report.logo.set|4|pin|W',

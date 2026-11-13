@@ -12,6 +12,8 @@
  *  - CAPA_REPLY    Khiếu nại khách hàng / SCAR (3b) chưa phản hồi → người phụ trách phiếu theo hạn phản hồi, cùng mốc.
  *  - NCR_DECIDE    Sản phẩm không phù hợp (3c, 34_ncr.js) chờ quyết định xử lý → trưởng bộ phận / Quản trị theo hạn quyết định, cùng mốc.
  *  - NCR_DUE       Sản phẩm không phù hợp đang xử lý → người phụ trách theo hạn thực hiện, cùng mốc.
+ *  - AUDIT_SOON    Đợt đánh giá nội bộ (4a, 35_iaudit.js) có ngày đánh giá trong audit_notice_days ngày tới → đoàn đánh giá, trưởng bộ phận
+ *                  được đánh giá (một lần cho mỗi ngày đánh giá; dời ngày thì báo lại).
  * Người nhận phải có email do Quản trị (cấp 4) xác nhận (Users.email_confirmed_at; đổi email thì mất xác nhận). Người nhận chính chưa
  * có email đã xác nhận → gửi Thư ký ISO thay (via FALLBACK), không để mất nhắc.
  * NotificationLogs là hàng chờ: QUEUED → SENDING → SENT | FAILED (thử lại tối đa 3 lần) | UNKNOWN (SENDING quá 1 giờ: có thể đã gửi,
@@ -20,7 +22,7 @@
  * ISO dừng gửi khi còn ≤ mail_quota_reserve người nhận; mỗi lần chạy ghi hạn mức còn lại để theo dõi (màn Gmail, Trạng thái hệ thống).
  */
 
-var MAIL_KINDS_ = ['REC_OVERDUE', 'REVIEW_DUE', 'VERSION_WAIT', 'CAPA_DUE', 'CAPA_VERIFY', 'CAPA_REPLY', 'NCR_DECIDE', 'NCR_DUE'];
+var MAIL_KINDS_ = ['REC_OVERDUE', 'REVIEW_DUE', 'VERSION_WAIT', 'CAPA_DUE', 'CAPA_VERIFY', 'CAPA_REPLY', 'NCR_DECIDE', 'NCR_DUE', 'AUDIT_SOON'];
 var MAIL_MAX_ATTEMPTS_ = 3;
 var MAIL_STALE_MS_ = 3600000;
 var MAIL_SENDER_ = 'ISO · 体系管理';
@@ -201,6 +203,8 @@ function mailDesired_(mc, opts) {
   capaMailNotes_(mc, out);
   // 5. Sản phẩm không phù hợp (3c): hạn quyết định xử lý, hạn thực hiện — cùng mốc
   ncrMailNotes_(mc, out);
+  // 6. Đánh giá nội bộ (4a): đợt sắp tới
+  auditMailNotes_(mc, out);
   return out;
 }
 
@@ -268,6 +272,11 @@ function mailLine_(kind, d, today, base) {
   } else if (kind === 'NCR_DUE') {
     L.push('  ' + lab_('mail.ncr_due') + (d.lines ? ': ' + d.lines : ''));
     L.push('  Hạn · 期限: ' + fmtDateVN_(d.due) + ' (' + mailDueText_(daysBetweenIso_(today, d.due)) + ')' + (d.owner ? ' · phụ trách · 负责人: ' + d.owner : ''));
+  } else if (kind === 'AUDIT_SOON') {
+    L.push('  ' + lab_('mail.audit_soon', { D: d.dept_code + (d.dept ? ' · ' + d.dept : '') }));
+    L.push('  Ngày đánh giá · 审核日期: ' + fmtDateVN_(d.due) + (d.time ? ' ' + d.time : '') + ' (' + mailDueText_(daysBetweenIso_(today, d.due)) + ')' +
+      (d.place ? ' · ' + d.place : ''));
+    if (d.lead || d.team) L.push('  Đoàn đánh giá · 审核组: ' + [d.lead ? d.lead + ' (trưởng đoàn · 组长)' : '', d.team].filter(function (x) { return x; }).join(', '));
   }
   if (d.for_names) L.push('  Gửi thay cho · 代为通知: ' + d.for_names + ' (chưa có email đã xác nhận · 尚无已确认邮箱)');
   link(d.path);

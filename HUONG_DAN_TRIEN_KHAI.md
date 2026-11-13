@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d3.4 (Đợt 3, phiên 3c — Sản phẩm không phù hợp)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.1 (Đợt 4, phiên 4a — Chương trình, kế hoạch đánh giá nội bộ)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -57,7 +57,83 @@ bộ phận Cơ điện (hàng lỗi do thiết bị, sự cố máy; vật tư,
 **Cấu hình** (`ncr_form_code`, `ncr_decision_form_code`, `ncr_log_form_code`). Muốn quản lý cả bộ phận Chất lượng: **Tài khoản → Quản trị
 → Bộ phận → Phạm vi áp dụng** tích thêm CL (không cần sửa code).
 
-## CẬP NHẬT LÊN BẢN 3c (1.0.0-d3.4, Sản phẩm không phù hợp) — làm một lần, trên máy tính
+Phiên 4a (anh chốt 13/11/2026: **giữ phạm vi Cơ điện**) thêm **Đánh giá nội bộ** — in theo mẫu **BM-ISO-03-01** (chương trình năm),
+**BM-ISO-03-02** (kế hoạch đánh giá), **BM-ISO-03-03** (checklist): Thư ký ISO **lập chương trình năm** (`DG-26`, mỗi năm một chương
+trình: mục tiêu, phạm vi, chuẩn ISO 9001 + BRCGS) → **thêm các đợt** (tháng, bộ phận được đánh giá, quá trình / nội dung, điều khoản) →
+**Phủ điều khoản**: mỗi điều khoản ISO 9001 / chủ đề BRCGS phải có đợt đánh giá hoặc **Không áp dụng** kèm lý do (nút "Không áp dụng các
+điều khoản còn thiếu" một lần cho cả chuẩn, lý do điền sẵn "Ngoài phạm vi áp dụng (Cơ điện)") → **Gửi duyệt** (chưa phủ hết thì báo ngay)
+→ **Quản trị duyệt** (PIN; người gửi không tự duyệt, Quản trị được) hoặc **Trả lại** kèm lý do → mã đợt `DG-26-01, 02…` cấp khi duyệt, theo
+tháng. Đổi chương trình đã duyệt: **Sửa chương trình** (PIN, lý do) → về Nháp → thêm / bỏ / dời đợt → gửi duyệt lại thành **lần 02**.
+Trước mỗi đợt, Thư ký ISO hoặc trưởng đoàn lập **kế hoạch đợt**: ngày, giờ, địa điểm, đại diện bộ phận được đánh giá, **đoàn đánh giá**
+(người trong app có cờ **Đánh giá viên** hoặc là Thư ký ISO / Quản trị, hoặc ghi tên người ngoài app kèm bộ phận công tác — **đánh giá viên
+không đánh giá bộ phận của chính mình**, app báo ngay), **checklist** (nút **Gợi ý câu hỏi từ điều khoản**: mỗi điều khoản một câu hỏi kèm
+mã biểu cần xem hồ sơ; thêm / sửa / xóa câu) → **Chốt kế hoạch** → Gmail báo đoàn đánh giá và trưởng bộ phận trước 7 ngày → tới ngày
+**Bắt đầu đánh giá** → **Ghi kết quả** từng câu: Phù hợp · Không phù hợp · Cần cải tiến · Không áp dụng + bằng chứng (Không phù hợp / Cần
+cải tiến bắt buộc ghi bằng chứng; bằng chứng không dịch máy). Màn đợt hiện các **biểu liên quan** của từng điều khoản (○ ◐ ●, ! khi kỳ gần
+nhất quá hạn hồ sơ) để đoàn biết cần xem hồ sơ nào. Phát hiện → phiếu khắc phục, báo cáo đánh giá, đóng đợt: **phiên 4b**. Đợt đánh giá chỉ
+cho bộ phận trong phạm vi (Cơ điện); biểu ISO vẫn ẩn — mã biểu in sửa được ở **Cấu hình** (`audit_program_form_code`,
+`audit_plan_form_code`, `audit_checklist_form_code`; `audit_notice_days` = số ngày Gmail báo trước).
+
+## CẬP NHẬT LÊN BẢN 4a (1.0.0-d4.1, Đánh giá nội bộ) — làm một lần, trên máy tính
+
+Bản 4a **thêm 3 sheet** (`AuditPrograms`, `Audits`, `AuditChecks`) và **4 cài đặt** (`audit_program_form_code` = BM-ISO-03-01,
+`audit_plan_form_code` = BM-ISO-03-02, `audit_checklist_form_code` = BM-ISO-03-03, `audit_notice_days` = 7) → chạy `migrateSchema`.
+**Không** hỏi quyền Google mới, **không** cần `installTriggers` (Gmail báo đợt sắp tới đi chung trigger `sendDueMail`). App 4a vẫn chạy với
+máy chủ 3c (ô Đánh giá nội bộ còn "Sắp có").
+
+**Anh phải làm:**
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký: `migrateSchema xong. Thêm: AuditPrograms; Audits; AuditChecks. schema_version=1.0.11`
+   (nếu trigger nền đã kịp tự chạy trước thì báo `Thêm: không có. schema_version=1.0.11` — cũng đúng).
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d4.1 danh gia noi bo` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` (đang mở thì đóng hẳn rồi mở lại; app tự tải lại dữ liệu vì có cài đặt mới) → **Tài khoản → Thông tin** ghi
+   `1.0.0-d4.1 · mã vỏ app 17b18325ade0` (màn báo lỗi hoặc mã khác thì bấm **Tải lại bản mới**).
+5. (Khi cần) người đánh giá trong app: **Tài khoản → Quản trị → Người dùng** → chọn người → tích **Đánh giá viên** → Lưu (PIN). Owner và
+   Thư ký ISO không cần tích (làm trưởng đoàn được sẵn). Đánh giá viên không có tài khoản app thì ghi tên trong kế hoạch đợt.
+
+**Nên kiểm (vài phút — phần máy giả lập không kiểm được):**
+1. **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.11**; có dòng **Đánh giá nội bộ** =
+   `Chưa có chương trình năm 2026` → máy chủ thật đã lên đúng bản.
+2. PDF thật của Google Docs: Trang chủ → ô **Đánh giá nội bộ** → **Lập chương trình năm 2026** → **Lập chương trình** → **Thêm đợt đánh
+   giá** → tháng 12/2026, nội dung `Đợt thử`, tích 1 điều khoản → **Thêm vào chương trình** → cuối màn **In chương trình năm** → **Tải PDF**
+   → **Mở / lưu tệp** → xem chữ Việt / Trung, logo, mã BM-ISO-03-01, bảng Lịch đánh giá, hai bảng Phủ điều khoản. Không giữ thì quay lại →
+   **Hủy chương trình** → Lý do `Dữ liệu thử` → **Đúng** → nhập PIN (lập lại chương trình năm 2026 thật được ngay sau đó).
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/iaudit.test.mjs` (4 test, trong đó một test chạy đúng 2 bước "Nên kiểm" ở trên; iPhone 390×844 và máy tính 1440×900, dữ liệu như thật:
+phạm vi Cơ điện, danh mục ○ ◐, Thư ký ISO cấp 4): Trang chủ → ô Đánh giá nội bộ → Lập chương trình năm 2026 (mặc định ISO 9001 + BRCGS,
+phạm vi điền sẵn Cơ điện) → DG-26 Nháp → Thêm đợt (chưa chọn điều khoản báo lỗi tại ô; tháng 11, 3 điều khoản, ngày 20/11, trưởng đoàn ngoài
+app bộ phận CL) → Gửi duyệt khi chưa phủ hết bị chặn → Không áp dụng các điều khoản còn thiếu (ISO 9001 rồi BRCGS) → ISO 9001 11/11, BRCGS
+6/6 → Gửi duyệt → Duyệt chương trình (PIN) → Đã duyệt lần 01, đợt DG-26-01 → biểu liên quan BM-CĐ-… ở từng điều khoản → Gợi ý câu hỏi (3 câu)
+→ Chốt kế hoạch (Bắt đầu bị khóa vì chưa tới ngày) → dời ngày về hôm nay → Bắt đầu đánh giá → Ghi kết quả (Không phù hợp chưa có bằng chứng bị
+nhắc) → Chờ bạn xử lý "1 đợt đánh giá nội bộ đang đánh giá" → In kế hoạch BM-ISO-03-02 → checklist BM-ISO-03-03 → PDF
+`BC-2611-001_checklist-danh-gia_DG-26-01.pdf` → chương trình BM-ISO-03-01 → Trạng thái hệ thống; máy tính: chọn Đánh giá viên của bộ phận Cơ
+điện bị báo ngay "không đánh giá bộ phận của chính mình" → Đánh giá viên bộ phận CL làm trưởng đoàn → đăng nhập thấy menu + Chờ bạn xử lý, thêm
+câu hỏi, chốt, bắt đầu, ghi Cần cải tiến, Excel checklist; nhân viên SX thấy chương trình, không thấy đợt của CĐ; app 4a với máy chủ 3c. Máy chủ
+`tests/server/iaudit.test.mjs` (6 test): lập chương trình (một chương trình mỗi năm, chỉ Thư ký ISO), kiểm dữ liệu đợt (phạm vi, tháng trong
+năm, điều khoản thuộc chuẩn), phủ điều khoản máy chủ = app, gửi duyệt phải phủ hết, Không áp dụng, rút lại, chờ duyệt khóa phần chương trình,
+duyệt cần PIN, trả lại cần lý do, cấp mã theo tháng, sửa chương trình đã duyệt → lần 02 (mã cũ giữ), tắt tự duyệt; đoàn đánh giá (bộ phận
+mình, không có cờ Đánh giá viên, trùng người, hai trưởng đoàn, quá 6 người), quyền trưởng đoàn, checklist (thêm nhiều câu dịch ở nền, sửa,
+xóa, điều khoản ngoài đợt), chốt / bắt đầu / ghi kết quả, đồng bộ theo quyền; bỏ đợt, hủy chương trình (có đợt đang đánh giá thì chặn trước
+PIN); Gmail `AUDIT_SOON` (7 ngày trước, không gửi lại, dời ngày thì báo lại); báo cáo chương trình / kế hoạch / checklist + PDF + tên tệp +
+đổi mã biểu; cập nhật từ 3c (thiếu 3 sheet → tự thêm; dòng nhật ký ở bước 2). Cả bộ: 97 test máy chủ + 44 test giao diện đạt.
+
+Không kiểm được ở đâu cả trước khi dùng thật: thư Gmail thật "Đánh giá nội bộ sắp tới" (người nhận phải có email đã xác nhận), in PDF trên
+máy in thật.
+
+### Dùng đánh giá nội bộ
+
+- **Đầu năm** (hoặc cuối năm trước): lập chương trình năm sau (nút năm ở đầu màn), thêm các đợt theo tháng; BRCGS yêu cầu đánh giá trải đều
+  trong năm, mỗi yêu cầu ít nhất một lần. Điều khoản không liên quan Cơ điện → **Không áp dụng** kèm lý do (bấm điều khoản → ghi lý do).
+- **Gửi duyệt** → Quản trị **Duyệt chương trình** (PIN). Giữa năm cần thêm / dời đợt → **Sửa chương trình** (lý do) → sửa → gửi duyệt lại.
+- **Trước mỗi đợt**: mở đợt → **Sửa** (ngày, giờ, địa điểm, đoàn đánh giá) → **Gợi ý câu hỏi từ điều khoản** (bỏ câu không cần, thêm câu
+  riêng) → **Chốt kế hoạch** → **In kế hoạch đánh giá** gửi bộ phận được đánh giá.
+- **Ngày đánh giá**: **Bắt đầu đánh giá** → **Ghi kết quả** từng câu (điện thoại dùng được tại xưởng). Thư ký ISO ghi thay được cho đánh giá
+  viên ngoài app. **In checklist** khi xong.
+- Phát hiện (Không phù hợp / Cần cải tiến) → phiếu khắc phục, báo cáo đánh giá, đóng đợt: bản **4b**.
+
+## CẬP NHẬT LÊN BẢN 3c (1.0.0-d3.4, Sản phẩm không phù hợp) — đã xong (anh xác nhận 13/11/2026)
 
 Bản 3c **thêm sheet `Ncrs`, cột `Capas.ncr_id` và 5 cài đặt** (`ncr_form_code` = BM-CL-04-01, `ncr_log_form_code` = BM-CL-04-02,
 `ncr_decision_form_code` = BM-CL-04-04, `ncr_decide_days` = 2, `ncr_exec_days` = 7) → chạy `migrateSchema`. **Không** hỏi quyền Google mới,

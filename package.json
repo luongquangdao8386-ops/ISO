@@ -1,7 +1,7 @@
 {
   "name": "iso",
   "private": true,
-  "version": "1.0.0-d3.4",
+  "version": "1.0.0-d4.1",
   "description": "ISO · 体系管理 — kiểm soát tài liệu, biểu mẫu, hồ sơ ISO 9001/14001/45001/50001 + BRCGS Packaging. Google Apps Script + PWA (GitHub Pages)",
   "type": "module",
   "scripts": {

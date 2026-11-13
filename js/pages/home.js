@@ -7,7 +7,7 @@
 import { bi, biText, esc, fmtDate, fmtNumber, session, nameText } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue, ncrOn, ncrOverdue } from '../data.js';
+import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue, ncrOn, ncrOverdue, auditOn, canSeeAudits, auditLate } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { missingMandatory } from '../coverage.js';
@@ -37,6 +37,11 @@ async function pendingHtml() {
     [p.ncr_decide.length, 'home.pend_ncr_decide', p.ncr_decide.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_decide[0].ncr_id) : '/ncr?f=decide', 't-red-text'],
     [p.ncr_due.length, 'home.pend_ncr_due', p.ncr_due.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_due[0].ncr_id) : '/ncr?f=mine', 't-red-text'],
     [p.ncr_capa.length, 'home.pend_ncr_capa', p.ncr_capa.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_capa[0].ncr_id) : '/ncr?f=doing', ''],
+    [p.aud_review.length, 'home.pend_aud_review', '/audits' + (p.aud_review.length === 1 ? '?y=' + encodeURIComponent(p.aud_review[0].year) : ''), 't-red-text'],
+    [p.aud_returned.length, 'home.pend_aud_returned', '/audits' + (p.aud_returned.length === 1 ? '?y=' + encodeURIComponent(p.aud_returned[0].year) : ''), 't-red-text'],
+    [p.aud_doing.length, 'home.pend_aud_doing', p.aud_doing.length === 1 ? '/audit/' + encodeURIComponent(p.aud_doing[0].audit_id) : '/audits', ''],
+    [p.aud_soon.length, 'home.pend_aud_soon', p.aud_soon.length === 1 ? '/audit/' + encodeURIComponent(p.aud_soon[0].audit_id) : '/audits', ''],
+    [p.aud_plan.length, 'home.pend_aud_plan', p.aud_plan.length === 1 ? '/audit/' + encodeURIComponent(p.aud_plan[0].audit_id) : '/audits', ''],
     [p.capa_reply.length, 'home.pend_capa_reply', p.capa_reply.length === 1 ? '/capa/' + encodeURIComponent(p.capa_reply[0].capa_id) : '/capa?f=mine', 't-red-text'],
     [p.drafts.length, 'home.pend_drafts', '/versions?f=drafts', ''],
     [p.nofile.length, 'home.no_file_n', '/catalog?f=nofile', ''],
@@ -148,6 +153,17 @@ async function gridHtml(list) {
     const late = live.filter((n) => ncrOverdue(n)).length;
     ncrTail = live.length ? bi(late ? 'capa.tile_late' : 'capa.tile_open', { N: live.length, L: late }) : '';
   }
+  const aOn = await auditOn();
+  let audTail = '';
+  if (aOn) {
+    const y = today().slice(0, 4);
+    const pg = (await recs('AUD_PROG')).find((x) => !x.archived_at && x.state !== 'CANCELLED' && String(x.year) === y);
+    if (pg) {
+      const as = (await recs('AUDIT')).filter((a) => !a.archived_at && a.program_id === pg.program_id && a.state !== 'CANCELLED');
+      const late = as.filter((a) => auditLate(a)).length;
+      audTail = bi(late ? 'aud.tile_late' : 'aud.tile', { C: esc(pg.code), N: as.length, L: late });
+    }
+  }
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
     { key: 'templates', icon: 'folder', href: '/templates', tail: tplN ? bi('tpl.files_n', { N: tplN }) : '' },
@@ -160,7 +176,7 @@ async function gridHtml(list) {
     { key: 'reports', icon: 'reports', href: '/reports' },
     { key: 'capa', icon: 'repairs', href: '/capa', show: (lvl >= 2 || sec) && cOn, tail: capaTail },
     { key: 'ncr', icon: 'alert', href: '/ncr', show: (lvl >= 2 || sec) && nOn, tail: ncrTail },
-    { key: 'audits', icon: 'inspections', href: '/audits', soon: 1, lvl: 2 },
+    { key: 'audits', icon: 'inspections', href: '/audits', show: canSeeAudits(), soon: aOn ? 0 : 1, tail: audTail },
     { key: 'links', icon: 'link', href: '/links', lvl: 4 },
     { key: 'drafts', icon: 'sync', href: '/account/drafts', tail: q ? bi('sync.queued_count', { N: q }) : bi('home.none_drafts') }
   ].filter((x) => (x.show !== undefined ? x.show : !x.lvl || lvl >= x.lvl));

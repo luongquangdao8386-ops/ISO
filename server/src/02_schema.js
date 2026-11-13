@@ -94,6 +94,24 @@ var SHEETS = {
       'contain_vi contain_zh hold_place cause_vi cause_zh owner_user_id decide_due state files_json decision_json decision_note_vi decision_note_zh ' +
       'decision_date decided_at decided_by exec_due need_capa concession_text decision_history_json done_date result_vi result_zh recheck ' +
       'closed_at closed_by capa_id cancelled_at cancelled_by cancel_reason' },
+  // Đánh giá nội bộ (Đợt 4, phiên 4a, 35_iaudit.js). Chương trình năm: code DG-yy (một chương trình chưa hủy mỗi năm); stds ISO9001,BRC;
+  // na_json [{c: clause_id, r: lý do}] điều khoản / chủ đề không áp dụng; state DRAFT | IN_REVIEW | APPROVED | CANCELLED; rev lần duyệt (01, 02…);
+  // history_json mọi lần duyệt [{rev, at, by, note, reopen_reason, submitted_by, audits}]
+  AuditPrograms: { book: 'B', dot: 1, key: 'program_id', c: true, i18n: true,
+    cols: 'program_id code year title_vi title_zh objective_vi objective_zh scope_vi scope_zh stds na_json state rev submitted_at submitted_by ' +
+      'approved_at approved_by approve_note returned_at returned_by return_reason reopened_at reopened_by reopen_reason history_json ' +
+      'cancelled_at cancelled_by cancel_reason' },
+  // Đợt đánh giá: code DG-yy-01 (cấp khi duyệt chương trình); dept_code bộ phận được đánh giá; title quá trình / nội dung; plan_month tháng dự
+  // kiến; clauses_json [clause_id]; kế hoạch đợt: audit_date, time_text, place_text, team_json [{u: user_id | '', n: tên, d: bộ phận công tác,
+  // r: L trưởng đoàn | M thành viên}], lead_user_id (trưởng đoàn trong app), auditee_text đại diện bộ phận được đánh giá, note ghi chú kế hoạch;
+  // state PLANNED | READY | IN_PROGRESS | REPORTED | CLOSED | CANCELLED
+  Audits: { book: 'B', dot: 1, key: 'audit_id', c: true, i18n: true,
+    cols: 'audit_id program_id code dept_code title_vi title_zh plan_month clauses_json state audit_date time_text place_text lead_user_id team_json ' +
+      'auditee_text note_vi note_zh ready_at ready_by started_at started_by cancelled_at cancelled_by cancel_reason' },
+  // Checklist của đợt: seq thứ tự; clause_id điều khoản (trống = chung); question câu hỏi / nội dung kiểm tra (dịch máy); result C | NC | OBS | NA;
+  // evidence bằng chứng / ghi chép (không dịch máy); checked_at / checked_by
+  AuditChecks: { book: 'B', dot: 1, key: 'check_id', c: true, i18n: true,
+    cols: 'check_id audit_id seq clause_id question_vi question_zh result evidence_vi evidence_zh checked_at checked_by' },
   // Hành động khắc phục / phòng ngừa của phiếu: owner_user_id người phụ trách trong app (nhận Gmail nhắc 7, 1, 0 ngày trước hạn), assignee_name
   // tên người thực hiện ngoài app; round = lần kiểm tra hiệu lực lúc thêm (0: kế hoạch đầu, 1: bổ sung sau lần kiểm tra không hiệu lực thứ nhất…)
   CapaActions: { book: 'B', dot: 1, key: 'action_id', c: true, i18n: true,
@@ -167,7 +185,9 @@ var TYPE_OVERRIDES_ = {
   set_code: 'STRING', sheet_count: 'INT', uploaded_by: 'STRING', deleted_by: 'STRING', mime_type: 'STRING',
   ref_text: 'STRING', found_by_name: 'STRING', completed_by: 'STRING', verified_by: 'STRING', verify_due: 'DATE', verify_count: 'INT',
   verify_result: 'STRING', seq: 'INT', round: 'INT', atype: 'STRING', assignee_name: 'STRING', done_by: 'STRING',
-  stage: 'STRING', decide_due: 'DATE', exec_due: 'DATE', decided_by: 'STRING', closed_by: 'STRING', need_capa: 'STRING', recheck: 'STRING', hold_place: 'STRING'
+  stage: 'STRING', decide_due: 'DATE', exec_due: 'DATE', decided_by: 'STRING', closed_by: 'STRING', need_capa: 'STRING', recheck: 'STRING', hold_place: 'STRING',
+  year: 'INT', stds: 'STRING', plan_month: 'STRING', result: 'STRING', ready_by: 'STRING', started_by: 'STRING', checked_by: 'STRING',
+  time_text: 'STRING', place_text: 'STRING', auditee_text: 'STRING'
 };
 
 /** Kiểu cột suy theo tên. */

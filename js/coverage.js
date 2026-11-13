@@ -58,3 +58,33 @@ export function coverageSummary(rows) {
 export function missingMandatory(items, clauses) {
   return coverageRows(items, clauses, 'ISO9001').filter((r) => r.state === 'MISSING').length;
 }
+
+/* ---------------- Đánh giá nội bộ (4a) ---------------- */
+
+/** Trạng thái phủ của chương trình đánh giá: có đợt đánh giá · Không áp dụng (kèm lý do) · chưa có */
+export const AUDIT_COV_STATES = ['MISSING', 'AUDIT', 'NA'];
+
+/**
+ * Phủ điều khoản của chương trình đánh giá nội bộ năm (giống auditCoverageSrv_ của máy chủ 35_iaudit.js — test so hai bên): mỗi điều
+ * khoản / chủ đề của các chuẩn trong chương trình → [{clause, std, key, audits, na, state: AUDIT | NA | MISSING}].
+ * audits: đợt của chương trình (bỏ đợt đã hủy); na: [{c: clause_id, r: lý do}].
+ */
+export function auditCoverage(clauses, stds, audits, na) {
+  const naMap = new Map((na || []).filter((x) => x && x.c).map((x) => [x.c, x.r || '']));
+  const live = (audits || []).filter((a) => a.state !== 'CANCELLED' && !a.archived_at);
+  const rows = [];
+  for (const std of stds) {
+    for (const c of clausesOf(clauses, std).filter((x) => !x.archived_at)) {
+      const hit = live.filter((a) => (a.clauses_json || []).includes(c.clause_id));
+      const isNa = naMap.has(c.clause_id);
+      rows.push({ clause: c, std, key: c.key, audits: hit, na: hit.length ? '' : (isNa ? naMap.get(c.clause_id) : ''), state: hit.length ? 'AUDIT' : isNa ? 'NA' : 'MISSING' });
+    }
+  }
+  return rows;
+}
+
+/** Đếm phủ của một chuẩn: {total, audit, na, missing} */
+export function auditCovCount(rows, std) {
+  const list = rows.filter((r) => r.std === std);
+  return { total: list.length, audit: list.filter((r) => r.state === 'AUDIT').length, na: list.filter((r) => r.state === 'NA').length, missing: list.filter((r) => r.state === 'MISSING').length };
+}

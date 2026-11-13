@@ -482,3 +482,51 @@ export function ncrOverdue(n, t = today()) {
 }
 /** Cần kiểm tra lại Đạt trước khi đóng (có làm lại / sửa chữa / hạ cấp) */
 export function ncrNeedsRecheck(n) { return (n && n.decision_json || []).some((l) => NCR_RECHECK_DISPOSITIONS.includes(l.d)); }
+
+/* ---------------- Đánh giá nội bộ (phiên 4a) — quyền phía client chỉ để ẩn/hiện nút, máy chủ kiểm lại (35_iaudit.js) ---------------- */
+
+/** Máy chủ đã lên bản 4a (có iaudit.save trong danh sách quyền) — chưa có thì màn Đánh giá nội bộ báo cần cập nhật máy chủ */
+export async function auditOn() { return can('iaudit.save'); }
+export const AUDIT_STDS = ['ISO9001', 'BRC'];
+export const AUDIT_RESULTS = ['C', 'NC', 'OBS', 'NA'];
+/** Đánh giá viên (cờ cộng thêm ở Quản trị → Người dùng) */
+export function isAuditor() { return !!(session.user && session.user.auditor); }
+/** Xem đánh giá nội bộ: cấp 2+, Thư ký ISO, Đánh giá viên */
+export function canSeeAudits() { return isSecretary() || roleLevel() >= 2 || isAuditor(); }
+/** Chuẩn của chương trình (ISO9001, BRC) */
+export function programStds(pg) {
+  const s = String((pg && pg.stds) || '').split(',').map((x) => x.trim()).filter((x) => AUDIT_STDS.includes(x));
+  return s.length ? AUDIT_STDS.filter((x) => s.includes(x)) : AUDIT_STDS.slice();
+}
+export function auditTeam(a) { return Array.isArray(a && a.team_json) ? a.team_json : []; }
+export function auditLead(a) { return auditTeam(a).find((t) => t && t.r === 'L') || null; }
+export function isAuditMember(a) { const id = myId(); return !!id && auditTeam(a).some((t) => t && t.u === id); }
+/** Lập kế hoạch đợt, checklist, chốt kế hoạch: Thư ký ISO, trưởng đoàn */
+export function canPlanAudit(a) { return isSecretary() || (!!a && !!a.lead_user_id && a.lead_user_id === myId()); }
+/** Ghi kết quả checklist, bắt đầu đánh giá: Thư ký ISO, trưởng đoàn, người trong đoàn */
+export function canRecordAudit(a) { return canPlanAudit(a) || isAuditMember(a); }
+/** Thêm / sửa câu hỏi: chưa đánh giá — người lập kế hoạch; đang đánh giá — cả người trong đoàn */
+export function canEditChecks(a) {
+  if (!a) return false;
+  if (a.state === 'PLANNED' || a.state === 'READY') return canPlanAudit(a);
+  return a.state === 'IN_PROGRESS' && canRecordAudit(a);
+}
+/** Duyệt / trả lại chương trình: Quản trị; người gửi duyệt không tự duyệt (được khi admin_self_approval) */
+export function canApproveProgram(pg) {
+  return roleLevel() >= 4 && !!pg && (pg.submitted_by !== myId() || (session.settings || {}).admin_self_approval !== false);
+}
+/** Đợt trễ kế hoạch (như máy chủ auditLate_): chưa đánh giá mà ngày đánh giá đã qua, hoặc chưa có ngày mà tháng dự kiến đã qua */
+export function auditLate(a, t = today()) {
+  if (!a || (a.state !== 'PLANNED' && a.state !== 'READY')) return false;
+  if (a.audit_date) return String(a.audit_date) < t;
+  return !!a.plan_month && String(a.plan_month) < t.slice(0, 7);
+}
+/** Đợt của chương trình (bỏ đợt đã bỏ khỏi nháp), theo tháng rồi mã */
+export async function auditsOf(programId) {
+  return (await recs('AUDIT')).filter((a) => a.program_id === programId && !a.archived_at)
+    .sort((a, b) => String(a.plan_month).localeCompare(String(b.plan_month)) || String(a.code || '~').localeCompare(String(b.code || '~')) || String(a.created_at).localeCompare(String(b.created_at)));
+}
+/** Câu hỏi checklist của đợt theo thứ tự */
+export async function checksOf(auditId) {
+  return (await recs('AUD_CHK')).filter((c) => c.audit_id === auditId && !c.archived_at).sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+}

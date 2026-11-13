@@ -41,6 +41,18 @@ function reportMetaLeft_(snap) {
     if (d.one.party_name) out.push([lab_('capa.party.' + d.one.source), d.one.party_name]);
     return out;
   }
+  if (snap.kind === 'AUDIT') {
+    if (d.one) {
+      out.push([lab_('rpt.f.audit'), d.one.code || '—']);
+      out.push([lab_('rpt.f.dept'), d.one.dept_code]);
+      if (d.one.program && d.one.program.code) out.push([lab_('aud.program'), d.one.program.code]);
+    } else if (d.prog) {
+      out.push([lab_('rpt.f.year'), String(d.prog.year)]);
+      out.push([lab_('aud.program'), d.prog.code]);
+    }
+    if (snap.scope_depts) out.push([lab_('rpt.f.scope_depts'), snap.scope_depts]);
+    return out;
+  }
   if (snap.kind === 'NCR' && d.one) {
     out.push([lab_('rpt.f.ncr'), d.one.code]);
     out.push([lab_('rpt.f.dept'), d.one.dept_code]);
@@ -321,7 +333,7 @@ function reportLayout_(snap) {
   var body = snap.kind === 'CATALOG' ? layoutCatalog_(snap) : snap.kind === 'RECORDS' ? layoutRecords_(snap)
     : snap.kind === 'COVERAGE' ? layoutCoverage_(snap) : snap.kind === 'DIST' ? layoutDist_(snap)
     : snap.kind === 'DOCREQ' ? layoutDocreq_(snap) : snap.kind === 'CAPA' ? layoutCapa_(snap)
-    : snap.kind === 'NCR' ? layoutNcr_(snap) : layoutVersions_(snap);
+    : snap.kind === 'NCR' ? layoutNcr_(snap) : snap.kind === 'AUDIT' ? layoutAudit_(snap) : layoutVersions_(snap);
   var sg = body.sign || {};
   var gen = String(snap.generated_at || '');
   return {

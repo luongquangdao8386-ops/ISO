@@ -80,6 +80,7 @@ export async function updateSyncStatus() {
     app.shell.setBadge('dist', p.dist_due.length);
     app.shell.setBadge('capa', p.capa_acts.length + p.capa_verify.length + p.capa_owner.length + p.capa_reply.length);
     app.shell.setBadge('ncr', p.ncr_decide.length + p.ncr_due.length + p.ncr_capa.length);
+    app.shell.setBadge('audits', p.aud_review.length + p.aud_returned.length + p.aud_soon.length + p.aud_doing.length + p.aud_plan.length);
   } catch (e) { /* không chặn */ }
 }
 
@@ -196,8 +197,13 @@ function registerRoutes() {
   route('/ncr/new', lazy('./pages/ncr.js', 'renderNcrForm'), { nav: 'ncr' });
   route('/ncr/:id/edit', lazy('./pages/ncr.js', 'renderNcrForm'), { nav: 'ncr' });
   route('/ncr/:id', lazy('./pages/ncr.js', 'renderNcr'), { nav: 'ncr' });
-  // Màn của đợt sau: hiện "Sắp có · 即将推出"
-  ['audits'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
+  // Đánh giá nội bộ (Đợt 4, phiên 4a)
+  route('/audits', lazy('./pages/audits.js', 'renderAudits'), { nav: 'audits' });
+  route('/audits/program/new', lazy('./pages/audits.js', 'renderProgramForm'), { nav: 'audits' });
+  route('/audits/program/:id/edit', lazy('./pages/audits.js', 'renderProgramForm'), { nav: 'audits' });
+  route('/audit/new', lazy('./pages/audits.js', 'renderAuditForm'), { nav: 'audits' });
+  route('/audit/:id/edit', lazy('./pages/audits.js', 'renderAuditForm'), { nav: 'audits' });
+  route('/audit/:id', lazy('./pages/audits.js', 'renderAudit'), { nav: 'audits' });
   route('/links', lazy('./pages/links.js', 'renderLinks'), { nav: 'links' });
   route('/account', lazy('./pages/account.js', 'renderAccount'), { nav: 'account' });
   route('/account/drafts', lazy('./pages/drafts.js', 'renderDrafts'), { nav: 'account' });

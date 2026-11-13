@@ -22,7 +22,12 @@ var SYNC_ENTITIES_ = [
   { type: 'CAPA', sheet: 'Capas', scoped: 'capa' },
   { type: 'CAPA_ACT', sheet: 'CapaActions', scoped: 'capa_act' },
   // Sản phẩm không phù hợp (3c): cấp 2+ / Thư ký ISO, bộ phận mình, phiếu mình lập / phụ trách
-  { type: 'NCR', sheet: 'Ncrs', scoped: 'ncr' }
+  { type: 'NCR', sheet: 'Ncrs', scoped: 'ncr' },
+  // Đánh giá nội bộ (4a): chương trình — cấp 2+, Thư ký ISO, Đánh giá viên; đợt — Thư ký ISO, Đánh giá viên, người trong đoàn, cấp 2+ của
+  // bộ phận được đánh giá; checklist theo đợt
+  { type: 'AUD_PROG', sheet: 'AuditPrograms', scoped: 'aud_prog' },
+  { type: 'AUDIT', sheet: 'Audits', scoped: 'audit' },
+  { type: 'AUD_CHK', sheet: 'AuditChecks', scoped: 'aud_chk' }
 ];
 
 /** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */
@@ -45,6 +50,9 @@ function syncProject_(ctx, ent, row, aux) {
   if (ent.scoped === 'tpl') return tplVisible_(ctx.user, row) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'capa') return syncCapaVisible_(ctx, row, aux) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'ncr') return syncNcrVisible_(ctx, row) ? projectRow_(ctx, row) : null;
+  if (ent.scoped === 'aud_prog') return syncAuditProgVisible_(ctx, row) ? projectRow_(ctx, row) : null;
+  if (ent.scoped === 'audit') return syncAuditVisible_(ctx, row) ? projectRow_(ctx, row) : null;
+  if (ent.scoped === 'aud_chk') return !row.archived_at && syncAuditVisible_(ctx, syncAuditMap_(aux)[row.audit_id]) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'capa_act') return syncCapaVisible_(ctx, syncCapaMap_(aux)[row.capa_id], aux) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'record') {
     return canSeeRecords_(ctx.user, syncItemMap_(aux)[row.item_id]) ? projectRow_(ctx, row) : null;
@@ -106,7 +114,10 @@ function syncBootstrap_(ctx) {
 /** Tên người dùng (mã, tên hiển thị) để hiện người soạn, người phụ trách */
 function userDirList_() {
   var dir = userDirectory_();
-  return Object.keys(dir).map(function (id) { return { user_id: id, employee_code: dir[id].employee_code, display_name: dir[id].display_name, active: dir[id].active }; });
+  return Object.keys(dir).map(function (id) {
+    return { user_id: id, employee_code: dir[id].employee_code, display_name: dir[id].display_name, active: dir[id].active,
+      dept_codes: dir[id].dept_codes || '', auditor: !!dir[id].auditor, iso_secretary: !!dir[id].iso_secretary, role_level: dir[id].role_level || 0 };
+  });
 }
 
 function clientSettings_() {

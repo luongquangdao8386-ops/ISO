@@ -224,7 +224,7 @@ test('iPhone: Tiếp nhận khiếu nại → 8D (D1–D7) → đóng bị chặ
     await page.waitForFunction(() => /quá hạn phản hồi/.test(document.body.textContent));
     const st = await page.textContent('.view');
     assert.match(st, /khiếu nại đang mở 0 · SCAR đang mở 0 · quá hạn phản hồi 0/);
-    assert.match(st, /1\.0\.10/);
+    assert.match(st, /1\.0\.11/);
     assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
 });

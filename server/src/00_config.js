@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d3.4';
+var SERVER_VERSION = '1.0.0-d4.1';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.10';
+var SCHEMA_VERSION = '1.0.11';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1, '1.0.10': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1, '1.0.10': 1, '1.0.11': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -97,6 +97,12 @@ var SETTINGS_DEFAULTS = [
   ['ncr_decision_form_code', 'STRING', 'BM-CL-04-04', true, 1, 'Mã biểu của biên bản xử lý sản phẩm không phù hợp', '不合格品处置记录的表单编号'],
   ['ncr_decide_days', 'INT', 2, true, 1, 'Hạn quyết định xử lý sản phẩm không phù hợp (ngày từ khi phát hiện)', '不合格品处置决定期限（自发现日起天数）'],
   ['ncr_exec_days', 'INT', 7, true, 1, 'Hạn thực hiện xử lý sau khi quyết định (ngày, mặc định)', '处置决定后的执行期限（天，默认）'],
+  // Đợt 4 (phiên 4a): đánh giá nội bộ (35_iaudit.js). Người dùng chốt 13/11/2026 giữ phạm vi Cơ điện: đợt đánh giá cho bộ phận trong phạm vi,
+  // in theo mẫu biểu ISO (mã sửa được ở Cấu hình); Gmail báo đợt sắp tới trước audit_notice_days ngày
+  ['audit_program_form_code', 'STRING', 'BM-ISO-03-01', true, 1, 'Mã biểu của chương trình đánh giá nội bộ năm', '年度内部审核方案的表单编号'],
+  ['audit_plan_form_code', 'STRING', 'BM-ISO-03-02', true, 1, 'Mã biểu của kế hoạch đánh giá nội bộ (một đợt)', '内部审核计划（单次）的表单编号'],
+  ['audit_checklist_form_code', 'STRING', 'BM-ISO-03-03', true, 1, 'Mã biểu của checklist đánh giá nội bộ', '内部审核检查表的表单编号'],
+  ['audit_notice_days', 'INT', 7, true, 1, 'Báo đợt đánh giá nội bộ sắp tới trước (ngày)', '提前通知即将进行的内部审核（天）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本'],
   // Ảnh nền màn đăng nhập / trang chủ (Quản trị → Ảnh nền, 33_bg.js): ID tệp trên Drive và mã phiên bản ('' = ảnh mặc định trong app)
@@ -133,6 +139,8 @@ var CODE_PATTERNS = {
   DOC_REQUEST: { prefix: 'DN', digits: 3, yymm: true, sheet: 'DocRequests', col: 'code' },
   CAPA: { prefix: 'KP', digits: 3, yymm: true, sheet: 'Capas', col: 'code' },
   NCR: { prefix: 'NC', digits: 3, yymm: true, sheet: 'Ncrs', col: 'code' },
+  // Đánh giá nội bộ (4a): đợt DG-yy-01 theo năm của chương trình (cấp khi duyệt chương trình); chương trình là DG-yy
+  AUDIT: { prefix: 'DG', digits: 2, yy: true, sheet: 'Audits', col: 'code' },
   REPORT: { prefix: 'BC', digits: 3, yymm: true, sheet: 'ReportRuns', col: 'code' }
 };
 
@@ -185,6 +193,20 @@ var NCR_RECHECK_DISPOSITIONS_ = ['REWORK', 'REPAIR', 'REGRADE'];
 var NCR_RECHECKS_ = ['PASS', 'NA'];
 var NCR_MAX_LINES_ = 6;
 var NCR_MAX_FILES_ = 30;
+
+/** Đánh giá nội bộ (Đợt 4, phiên 4a — BM-ISO-03-01 chương trình năm, 03-02 kế hoạch đánh giá, 03-03 checklist; 35_iaudit.js).
+ *  Chương trình: DRAFT nháp → IN_REVIEW chờ duyệt → APPROVED đã duyệt (Quản trị, PIN; lần 01, 02…) → sửa (PIN, lý do) về DRAFT · CANCELLED.
+ *  Đợt: PLANNED trong chương trình → READY đã chốt kế hoạch (ngày, đoàn, checklist) → IN_PROGRESS đang đánh giá → REPORTED đã báo cáo →
+ *  CLOSED đã đóng (4b) · CANCELLED. Kết quả câu hỏi: C phù hợp · NC không phù hợp · OBS cần cải tiến (quan sát) · NA không áp dụng. */
+var AUDIT_STDS_ = ['ISO9001', 'BRC'];
+var AUDIT_PROG_STATES_ = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'CANCELLED'];
+var AUDIT_STATES_ = ['PLANNED', 'READY', 'IN_PROGRESS', 'REPORTED', 'CLOSED', 'CANCELLED'];
+var AUDIT_RESULTS_ = ['C', 'NC', 'OBS', 'NA'];
+var AUDIT_MAX_TEAM_ = 6;
+var AUDIT_MAX_CHECKS_ = 80;
+var AUDIT_MAX_CLAUSES_ = 80;
+var AUDIT_MAX_PER_PROGRAM_ = 40;
+var AUDIT_MAX_NA_ = 150;
 
 /** Kho tệp mẫu (2e): ACTIVE đang dùng · REPLACED đã thay bằng tệp mới cùng bộ (giữ để tra) · DELETED đã bỏ (tải nhầm).
  *  Mỗi tệp tối đa TPL_MAX_SHEETS_ sheet; mỗi lần tải lên tối đa TPL_MAX_CODES_ mã biểu tự nhận từ tên sheet. */
