@@ -1759,3 +1759,12 @@ html.bg-home .home-hero, html.bg-home .cs-hero { background-image: var(--bg-home
 .aud-row .code, .item.aud .code.big { white-space: nowrap; }
 .aud-check-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .aud-check-top .badge { margin-left: auto; }
+/* Phát hiện đánh giá, báo cáo đánh giá (phiên 4b) */
+.aud-find-list { margin: 4px 0 8px; }
+.aud-find { border-top: 1px solid var(--line); padding: 8px 0; }
+.aud-find p { margin: 4px 0; }
+.aud-find-capa { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.aud-check-fnd { margin: 2px 0; }
+.aud-fnd-missing { margin: 6px 0; }
+.aud-close-wait { margin: 0 0 8px; }
+.capa-from-finding { margin: 4px 0; }

@@ -4,9 +4,9 @@
 // tra hiệu lực, kiểm tra hiệu lực (PIN), hủy phiếu (PIN), in phiếu (báo cáo PDF / Excel); /capa/:id/edit: sửa phiếu.
 // Ghi cần mạng (ảnh / tệp vào hàng chờ như hồ sơ, có mạng tự gửi). Quyền phía app chỉ để ẩn/hiện nút (data.js); máy chủ kiểm lại và trả
 // FORBIDDEN trước khi hỏi PIN.
-import { bi, biText, esc, fmtDate, fmtDateTime, badge, nameText, uuid, session, blobToB64, b64ToBytes, hasLabel } from '../core.js';
+import { bi, biText, esc, fmtDate, fmtDateTime, badge, nameText, uuid, session, blobToB64, b64ToBytes, hasLabel, L } from '../core.js';
 import { ICON, toast, dialog, $ } from '../ui.js';
-import { byId, recs, items, depts, users, userName, isSecretary, roleLevel, today, addDaysIso, can, capaOn, CAPA_SOURCES, canCreateCapa,
+import { byId, recs, items, depts, users, userName, isSecretary, roleLevel, today, addDaysIso, can, capaOn, CAPA_SOURCES, canCreateCapa, auditLead,
   canEditCapa, canDoCapaAction, canVerifyCapa, canCancelCapa, canCapaFiles, capaOverdue, capaActsOf, CAPA_PARTY_SOURCES, CAPA_SEVERITIES,
   capaIsParty, capaReplyLate, capaForms, CAPA_FORM_SETTING, complaintOn } from '../data.js';
 import { navigate, refresh } from '../router.js';
@@ -16,6 +16,11 @@ import { textInput, selectInput, bilingualInputs, dateInput, wireForm, readField
 import { docButton, wireDocButtons, checkFile, recordFileKind, mimeOf, KIND_ACCEPT, viewImage } from '../files.js';
 import { processPhoto } from '../media.js';
 import { statusDot } from './catalog.js';
+
+/** Một nhãn có biến, lấy riêng phần Việt (0) / Trung (1) */
+function fillLang(key, i, vars) {
+  return String((L[key] || [key, key])[i] || '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
+}
 
 const MAX_FILES = 30;
 
@@ -165,9 +170,14 @@ export async function renderCapaForm(view, { shell, params, query }) {
   // Sản phẩm không phù hợp (3c): lập phiếu khắc phục từ phiếu NC (?ncr=) — nguồn NCR, điền sẵn từ phiếu NC; phiếu nguồn NCR không đổi nguồn
   const n0 = !editing && q.ncr ? await byId('NCR', q.ncr) : (c && c.ncr_id ? await byId('NCR', c.ncr_id) : null);
   const fromNcr = !!(editing ? c && c.source === 'NCR' : n0);
-  const backTo = editing ? '/capa/' + encodeURIComponent(params.id) : n0 ? '/ncr/' + encodeURIComponent(n0.ncr_id) : it0 ? '/item/' + encodeURIComponent(it0.item_id) : '/capa';
+  // Đánh giá nội bộ (4b): lập phiếu khắc phục từ phát hiện đánh giá (?finding=) — nguồn AUDIT, điền sẵn từ phát hiện và đợt đánh giá
+  const f0 = !editing && q.finding ? await byId('AUD_FND', q.finding) : (c && c.finding_id ? await byId('AUD_FND', c.finding_id) : null);
+  const fa0 = f0 ? await byId('AUDIT', f0.audit_id) : null;
+  const fromFinding = !!(editing ? c && c.finding_id : f0);
+  const backTo = editing ? '/capa/' + encodeURIComponent(params.id) : f0 ? '/audit/' + encodeURIComponent(f0.audit_id) : n0 ? '/ncr/' + encodeURIComponent(n0.ncr_id) : it0 ? '/item/' + encodeURIComponent(it0.item_id) : '/capa';
   if (!(await capaOn())) { shell.setScreen({ title: 'capa.new', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.server_old')}</p></div>`; return; }
   if (!editing && q.ncr && !n0) { shell.setScreen({ title: 'capa.new', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('ncr.not_found')}</p></div>`; return; }
+  if (!editing && q.finding && (!f0 || f0.archived_at || !fa0)) { shell.setScreen({ title: 'capa.new', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('aud.fnd_not_found')}</p></div>`; return; }
   if (editing && !c) { shell.setScreen({ title: 'capa.edit', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.not_found')}</p></div>`; return; }
   if (editing && (!canEditCapa(c) || c.state !== 'OPEN')) { shell.setScreen({ title: 'capa.edit', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.no_edit')}</p></div>`; return; }
   if (needNet(view)) { shell.setScreen({ title: editing ? 'capa.edit' : 'capa.new', back: backTo }); return; }
@@ -177,13 +187,15 @@ export async function renderCapaForm(view, { shell, params, query }) {
   const st = session.settings || {};
   const t = today();
   // Giá trị đang sửa (giữ chữ đã gõ khi đổi loại phiếu)
-  let kind = c ? kindOf(c) : (!n0 && CAPA_PARTY_SOURCES.includes(q.source) ? q.source : 'INTERNAL');
-  let source = fromNcr ? 'NCR' : c && !capaIsParty(c) ? c.source : (CAPA_SOURCES.includes(q.source) ? q.source : 'EQUIPMENT');
+  let kind = c ? kindOf(c) : (!n0 && !f0 && CAPA_PARTY_SOURCES.includes(q.source) ? q.source : 'INTERNAL');
+  let source = fromNcr ? 'NCR' : fromFinding ? 'AUDIT' : c && !capaIsParty(c) ? c.source : (CAPA_SOURCES.includes(q.source) ? q.source : 'EQUIPMENT');
+  const lead0 = fa0 ? auditLead(fa0) : null;
   const nLine = (n, l) => [n.product_text, n.lot_text, n.qty_text].filter(Boolean).join(' · ') + (n[`problem_${l}`] ? '\n' + n[`problem_${l}`] : '');
   const v = {
-    dept_code: c ? c.dept_code : (n0 && deps.some((d) => d.dept_code === n0.dept_code) ? n0.dept_code : it0 && deps.some((d) => d.dept_code === it0.dept_code) ? it0.dept_code : (deps.length === 1 ? deps[0].dept_code : '')),
-    found_date: c ? c.found_date : (n0 ? n0.found_date : t), found_by_name: c ? c.found_by_name || '' : (n0 ? n0.found_by_name || '' : ''),
-    ref_text: c ? c.ref_text || '' : (n0 ? [n0.code, n0.ref_text].filter(Boolean).join(' · ') : ''),
+    dept_code: c ? c.dept_code : (fa0 && deps.some((d) => d.dept_code === fa0.dept_code) ? fa0.dept_code : n0 && deps.some((d) => d.dept_code === n0.dept_code) ? n0.dept_code : it0 && deps.some((d) => d.dept_code === it0.dept_code) ? it0.dept_code : (deps.length === 1 ? deps[0].dept_code : '')),
+    found_date: c ? c.found_date : (fa0 ? fa0.report_date || fa0.audit_date || t : n0 ? n0.found_date : t),
+    found_by_name: c ? c.found_by_name || '' : (lead0 ? lead0.n || '' : n0 ? n0.found_by_name || '' : ''),
+    ref_text: c ? c.ref_text || '' : (f0 ? f0.code : n0 ? [n0.code, n0.ref_text].filter(Boolean).join(' · ') : ''),
     item_id: c ? c.item_id || '' : (it0 ? it0.item_id : ''), owner_user_id: c ? c.owner_user_id : myId(), due_date: c ? c.due_date : addDaysIso(t, 30),
     severity: c ? c.severity || '' : '', complaint_valid: c ? c.complaint_valid || '' : '', sent_date: c ? c.sent_date || '' : '',
     reply_due: c ? c.reply_due || '' : '', i18n_meta: c ? c.i18n_meta : null
@@ -194,6 +206,12 @@ export async function renderCapaForm(view, { shell, params, query }) {
     v.problem_vi = n0.problem_vi ? nLine(n0, 'vi') : ''; v.problem_zh = n0.problem_zh ? nLine(n0, 'zh') : '';
     v.correction_vi = n0.contain_vi || ''; v.correction_zh = n0.contain_zh || ''; v.cause_vi = n0.cause_vi || ''; v.cause_zh = n0.cause_zh || '';
     if (!v.problem_vi && !v.problem_zh) v.problem_vi = nLine(n0, 'vi');
+  }
+  if (!c && f0) {
+    const fl = (l) => [f0[`content_${l}`], f0[`evidence_${l}`] ? fillLang('capa.fnd_evidence', l === 'vi' ? 0 : 1, { E: f0[`evidence_${l}`] }) : ''].filter(Boolean).join('\n');
+    v.problem_vi = f0.content_vi || f0.evidence_vi ? fl('vi') : ''; v.problem_zh = f0.content_zh || f0.evidence_zh ? fl('zh') : '';
+    v.title_vi = fillLang('capa.fnd_title', 0, { C: f0.code, T: fillLang('aud.ftype.' + f0.ftype, 0, {}) });
+    v.title_zh = fillLang('capa.fnd_title', 1, { C: f0.code, T: fillLang('aud.ftype.' + f0.ftype, 1, {}) });
   }
   const replyDays = Number(st.capa_reply_days || 7);
   const cOn = await complaintOn();
@@ -212,8 +230,9 @@ export async function renderCapaForm(view, { shell, params, query }) {
     const party = kind !== 'INTERNAL';
     shell.setScreen({ title: editing ? lk('capa.edit', kind) : lk('capa.new', kind), back: backTo });
     view.innerHTML = `<form class="card form capa-form" novalidate>
-      ${cOn && !fromNcr ? `<div class="fld" data-field="kind"><label>${bi('capa.kind')}</label>${chipGroup('kind', ['INTERNAL', 'COMPLAINT', 'SUPPLIER'].map((k) => [k, 'capa.kind.' + k]), kind)}</div>` : ''}
-      ${fromNcr ? `<div class="fld" data-field="source"><label>${bi('capa.source')}</label><p class="capa-from-ncr">${badge('capa.src.NCR')} ${n0 ? `<a href="#/ncr/${encodeURIComponent(n0.ncr_id)}"><span class="code">${esc(n0.code)}</span></a> ${esc(n0.product_text || '')}` : ''}</p><div class="ferr"></div></div>`
+      ${cOn && !fromNcr && !fromFinding ? `<div class="fld" data-field="kind"><label>${bi('capa.kind')}</label>${chipGroup('kind', ['INTERNAL', 'COMPLAINT', 'SUPPLIER'].map((k) => [k, 'capa.kind.' + k]), kind)}</div>` : ''}
+      ${fromFinding ? `<div class="fld" data-field="source"><label>${bi('capa.source')}</label><p class="capa-from-finding">${badge('capa.src.AUDIT')} ${f0 ? `<a href="#/audit/${encodeURIComponent(f0.audit_id)}"><span class="code">${esc(f0.code)}</span></a> ${badge('aud.ftype.' + f0.ftype)}` : ''}</p><div class="ferr"></div></div>`
+        : fromNcr ? `<div class="fld" data-field="source"><label>${bi('capa.source')}</label><p class="capa-from-ncr">${badge('capa.src.NCR')} ${n0 ? `<a href="#/ncr/${encodeURIComponent(n0.ncr_id)}"><span class="code">${esc(n0.code)}</span></a> ${esc(n0.product_text || '')}` : ''}</p><div class="ferr"></div></div>`
         : party ? `<p class="muted small">${bi('capa.kind_note.' + kind)}</p>` : `<div class="fld" data-field="source"><label>${bi('capa.source')} <span class="req">*</span></label>
         <div class="chips" role="radiogroup">${CAPA_SOURCES.map((s) => `<button type="button" class="chip${s === source ? ' on' : ''}" data-src="${s}" role="radio" aria-checked="${s === source}">${bi('capa.src.' + s)}</button>`).join('')}</div><div class="ferr"></div></div>`}
       <div class="form-grid">
@@ -279,6 +298,7 @@ export async function renderCapaForm(view, { shell, params, query }) {
       const party = kind !== 'INTERNAL';
       const p = { capa_id: editing ? c.capa_id : uuid(), source: party ? kind : source };
       if (!editing && n0) p.ncr_id = n0.ncr_id;
+      if (!editing && f0) p.finding_id = f0.finding_id;
       const errs = [];
       p.dept_code = readField(form, 'dept_code');
       if (!p.dept_code) errs.push({ field: 'dept_code', key: 'field.required' });
@@ -486,6 +506,7 @@ export async function renderCapa(view, ctx) {
   const gone = acts.filter((a) => a.state === 'CANCELLED');
   const it = c.item_id ? await byId('ITEM', c.item_id) : null;
   const n0 = c.ncr_id ? await byId('NCR', c.ncr_id) : null;
+  const f0 = c.finding_id ? await byId('AUD_FND', c.finding_id) : null;
   const um = await users();
   const who = (id) => esc(userName(um, id) || '');
   const online = navigator.onLine && !app.offline;
@@ -528,6 +549,7 @@ export async function renderCapa(view, ctx) {
       ${kv('capa.dept', esc(c.dept_code))}
       ${it ? kv('capa.item', `<a href="#/item/${encodeURIComponent(it.item_id)}"><span class="code">${esc(it.code)}</span></a> ${statusDot(it.status)} ${esc(nameText(it))}`) : ''}
       ${n0 ? kv('capa.from_ncr', `<a href="#/ncr/${encodeURIComponent(n0.ncr_id)}" id="capa-ncr-link"><span class="code">${esc(n0.code)}</span></a> ${esc(n0.product_text || '')}`) : ''}
+      ${f0 ? kv('capa.from_finding', `<a href="#/audit/${encodeURIComponent(f0.audit_id)}" id="capa-finding-link"><span class="code">${esc(f0.code)}</span></a> ${badge('aud.ftype.' + f0.ftype)}`) : ''}
       ${kv(lk('capa.ref', K), esc(c.ref_text || ''))}
       ${kv(lk('capa.owner', K), who(c.owner_user_id))}
       ${K === 'COMPLAINT' ? kv('capa.team', esc(c.team_text || '')) : ''}

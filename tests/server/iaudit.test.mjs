@@ -417,7 +417,7 @@ test('báo cáo: chương trình (BM-ISO-03-01: lịch, phủ ISO 9001 / BRCGS, 
   // Trạng thái hệ thống
   const h = owner.call('system.status', {}).data.checks.find((x) => x.key === 'iaudit');
   assert.equal(h.status, 'OK');
-  assert.equal(h.value, 'DG-26 Đã duyệt lần 01 · 1 đợt · phủ ISO 9001 11/11 · BRCGS 6/6 · đã chốt kế hoạch 0 · đang đánh giá 1 · trễ kế hoạch 0');
+  assert.equal(h.value, 'DG-26 Đã duyệt lần 01 · 1 đợt · phủ ISO 9001 11/11 · BRCGS 6/6 · đã chốt kế hoạch 0 · đang đánh giá 1 · trễ kế hoạch 0 · đã báo cáo chờ đóng 0 · đã đóng 0 · phát hiện không phù hợp chưa có phiếu khắc phục 0');
 });
 
 test('cập nhật từ bản 3c (chưa có AuditPrograms, Audits, AuditChecks): đăng nhập chạy, Trạng thái hệ thống cảnh báo; lập chương trình đầu tiên tự thêm; migrateSchema báo đúng dòng nhật ký; bộ đệm danh bạ cũ đọc lại', () => {
@@ -455,7 +455,7 @@ test('cập nhật từ bản 3c (chưa có AuditPrograms, Audits, AuditChecks):
   strip(env2);
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: AuditPrograms; Audits; AuditChecks. schema_version=1.0.11'), env2.logs.join('\n'));
+  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: AuditPrograms; Audits; AuditChecks. schema_version=1.0.12'), env2.logs.join('\n'));
   env2.g.dbReset_();
   const keys = env2.g.readRows_('Settings').map((x) => x.setting_key);
   for (const k of ['audit_program_form_code', 'audit_plan_form_code', 'audit_checklist_form_code', 'audit_notice_days']) assert.ok(keys.includes(k), k);

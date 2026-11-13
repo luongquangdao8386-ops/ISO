@@ -78,6 +78,9 @@ var HANDLERS_ = {
   'iaudit.check.save': function (ctx) { return auditCheckSave_(ctx); },
   'iaudit.check.add': function (ctx) { return auditCheckAdd_(ctx); },
   'iaudit.check.record': function (ctx) { return auditCheckRecord_(ctx); },
+  'iaudit.finding.save': function (ctx) { return auditFindingSave_(ctx); },
+  'iaudit.report': function (ctx) { return auditReport_(ctx); },
+  'iaudit.close': function (ctx) { return auditClose_(ctx); },
   'tpl.upload': function (ctx) { return tplUpload_(ctx); },
   'tpl.edit': function (ctx) { return tplEdit_(ctx); },
   'tpl.delete': function (ctx) { return tplDelete_(ctx); },
@@ -131,6 +134,7 @@ var PRECHECK_ = {
   'iaudit.program.return': function (ctx) { precheckAuditReturn_(ctx); },
   'iaudit.program.reopen': function (ctx) { precheckAuditReopen_(ctx); },
   'iaudit.program.cancel': function (ctx) { precheckAuditProgCancel_(ctx); },
+  'iaudit.close': function (ctx) { precheckAuditClose_(ctx); },
   'link.set': function (ctx) { precheckLinkSet_(ctx); },
   'mail.recipient.set': function (ctx) { precheckMailRecipient_(ctx); },
   'mail.test': function (ctx) { precheckMailRecipient_(ctx); }

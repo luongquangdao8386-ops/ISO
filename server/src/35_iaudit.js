@@ -14,7 +14,7 @@
  *     ngoài app kèm bộ phận công tác) — đánh giá viên không đánh giá bộ phận của chính mình; checklist (câu hỏi theo điều khoản, gợi ý từ
  *     các biểu liên quan trong danh mục). Chốt kế hoạch (chương trình đã duyệt, có ngày, trưởng đoàn, ít nhất một câu hỏi) → Gmail báo trước.
  *  5. Bắt đầu đánh giá (từ ngày đánh giá) → ghi kết quả từng câu: Phù hợp · Không phù hợp · Cần cải tiến · Không áp dụng + bằng chứng.
- *     Phát hiện → phiếu khắc phục, báo cáo đánh giá, đóng đợt: phiên 4b (trạng thái REPORTED, CLOSED đã có sẵn).
+ *     Phát hiện → phiếu khắc phục, báo cáo đánh giá (BM-ISO-03-04), đóng đợt: phiên 4b (36_finding.js).
  * Bằng chứng / ghi chép đánh giá không dịch máy (kết luận đánh giá — mục 4 đặc tả); câu hỏi, nội dung, ghi chú kế hoạch có dịch máy. */
 
 /* ---------------- Quyền ---------------- */
@@ -873,6 +873,9 @@ function auditCheckRecord_(ctx) {
   var zh = p.evidence_zh === undefined || p.evidence_zh === null ? String(c.evidence_zh || '') : trimStr_(p.evidence_zh);
   if (vi.length > 3000 || zh.length > 3000) errs.push(fieldError_('evidence', 'TOO_LONG'));
   if ((result === 'NC' || result === 'OBS') && !vi && !zh) errs.push(fieldError_('evidence', 'AUDIT_EVIDENCE'));
+  // 4b: câu đã có phát hiện chỉ đổi sang kết quả hợp với loại phát hiện (bỏ phát hiện trước)
+  var fnd = auditFindingsOf_(c.audit_id).filter(function (f) { return f.check_id === c.check_id; })[0];
+  if (fnd && !findingTypeFits_(result, fnd.ftype)) errs.push(fieldError_('result', 'AUDIT_HAS_FINDING'));
   if (errs.length) throw validationError_(errs);
   return executeWrite_(ctx, {
     entity_type: 'AUD_CHK', entity_id: c.check_id,
@@ -939,9 +942,9 @@ function auditMailNotes_(mc, out) {
 
 /* ---------------- Báo cáo (27_reports.js, loại AUDIT) ---------------- */
 
-var AUDIT_FORMS_ = ['PLAN', 'CHECKLIST'];
-var AUDIT_FORM_SETTING_ = { PROGRAM: 'audit_program_form_code', PLAN: 'audit_plan_form_code', CHECKLIST: 'audit_checklist_form_code' };
-var AUDIT_FORM_SLUG_ = { PROGRAM: 'chuong-trinh-danh-gia-noi-bo', PLAN: 'ke-hoach-danh-gia', CHECKLIST: 'checklist-danh-gia' };
+var AUDIT_FORMS_ = ['PLAN', 'CHECKLIST', 'REPORT'];
+var AUDIT_FORM_SETTING_ = { PROGRAM: 'audit_program_form_code', PLAN: 'audit_plan_form_code', CHECKLIST: 'audit_checklist_form_code', REPORT: 'audit_report_form_code' };
+var AUDIT_FORM_SLUG_ = { PROGRAM: 'chuong-trinh-danh-gia-noi-bo', PLAN: 'ke-hoach-danh-gia', CHECKLIST: 'checklist-danh-gia', REPORT: 'bao-cao-danh-gia' };
 
 function auditClauseLabel_(cl) {
   return cl ? (cl.std === 'BRC' ? 'BRCGS · ' : '') + cl.key : '';
@@ -964,7 +967,8 @@ function reportAuditRow_(a, dir, clMap, depts, today) {
   };
 }
 
-/** Báo cáo AUDIT: {program_id} → chương trình năm (BM-ISO-03-01); {audit_id, form PLAN | CHECKLIST} → kế hoạch đánh giá / checklist của một đợt */
+/** Báo cáo AUDIT: {program_id} → chương trình năm (BM-ISO-03-01); {audit_id, form PLAN | CHECKLIST | REPORT} → kế hoạch đánh giá / checklist /
+ *  báo cáo đánh giá (4b, BM-ISO-03-04) của một đợt */
 function reportAudit_(ctx, f, today) {
   ensureIauditSchema_();
   var dir = userDirectory_();
@@ -986,6 +990,11 @@ function reportAudit_(ctx, f, today) {
     });
     var cnt = { total: checks.length, C: 0, NC: 0, OBS: 0, NA: 0, none: 0 };
     checks.forEach(function (c) { if (c.result) cnt[c.result]++; else cnt.none++; });
+    if (f.form === 'REPORT') {
+      var rd = reportAuditReportData_(a, r, dir, clMap, cnt);
+      return { data: { one: r, checks: checks, counts: cnt, findings: rd.findings, by_type: rd.by_type, capa_need: rd.capa_need, capa_closed: rd.capa_closed },
+        rows: rd.findings.length || 1, tiles: rd.tiles };
+    }
     var tiles = f.form === 'CHECKLIST' ? [
       { k: 'rpt.t.aud_questions', v: String(cnt.total) },
       { k: 'aud.result.C', v: String(cnt.C), tone: cnt.C ? 'green' : '' },
@@ -1043,7 +1052,7 @@ function reportAudit_(ctx, f, today) {
   };
 }
 
-var AUDIT_TONE_ = { PLANNED: 'amber', READY: 'navy', IN_PROGRESS: 'navy', REPORTED: 'green', CLOSED: 'green', CANCELLED: 'muted' };
+var AUDIT_TONE_ = { PLANNED: 'amber', READY: 'navy', IN_PROGRESS: 'navy', REPORTED: 'navy', CLOSED: 'green', CANCELLED: 'muted' };
 var AUDIT_RESULT_TONE_ = { C: 'green', NC: 'red', OBS: 'amber', NA: 'muted' };
 
 function auditTeamText_(team) {
@@ -1059,6 +1068,7 @@ function layoutAudit_(snap) {
       [lab_('aud.dept'), r.dept_code + ' · ' + biText_(r.dept_vi, r.dept_zh)], [lab_('aud.title_f'), biNl_(r.title_vi, r.title_zh)],
       [lab_('aud.date'), [dmy_(r.audit_date), r.time_text].filter(function (x) { return x; }).join(' · ') || lab_('aud.month_only', { M: auditMonthText_(r.plan_month) })],
       [lab_('aud.place'), r.place_text], [lab_('aud.auditee'), r.auditee_text]].filter(function (x) { return x[1]; });
+    if ((snap.filters || {}).form === 'REPORT') return layoutAuditReport_(snap, head);
     if ((snap.filters || {}).form === 'CHECKLIST') {
       var rows = d.checks.map(function (c) {
         return [String(c.seq), c.clause, biNl_(c.question_vi, c.question_zh), biNl_(c.evidence_vi, c.evidence_zh), c.result ? labNl_('aud.result.' + c.result) : ''];
@@ -1157,5 +1167,5 @@ function iauditHealth_() {
   var late = audits.filter(function (a) { return auditLate_(a, today); }).length;
   var stTxt = { DRAFT: 'Nháp', IN_REVIEW: 'Chờ duyệt', APPROVED: 'Đã duyệt' }[pg.state] || pg.state;
   return [true, pg.code + ' ' + stTxt + (pg.rev ? ' lần ' + pg.rev : '') + ' · ' + audits.length + ' đợt · phủ ' + part + ' · đã chốt kế hoạch ' + cnt('READY') +
-    ' · đang đánh giá ' + cnt('IN_PROGRESS') + ' · trễ kế hoạch ' + late, late ? 'Đánh giá nội bộ → đợt trễ kế hoạch' : ''];
+    ' · đang đánh giá ' + cnt('IN_PROGRESS') + ' · trễ kế hoạch ' + late + findingHealthTail_(audits), late ? 'Đánh giá nội bộ → đợt trễ kế hoạch' : ''];
 }

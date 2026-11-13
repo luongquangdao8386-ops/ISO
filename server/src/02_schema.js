@@ -74,12 +74,13 @@ var SHEETS = {
   // product_text sản phẩm / vật tư, lot_text số lô / đơn hàng / PO, qty_text số lượng bị ảnh hưởng, severity MINOR | MAJOR | CRITICAL,
   // complaint_valid '' | YES | NO (khiếu nại có cơ sở), team_text nhóm 8D (D1), escape nguyên nhân lọt / không phát hiện (D4), sent_date ngày
   // gửi SCAR cho nhà cung cấp, reply_due hạn phản hồi, reply_date + reply_note ngày và nội dung phản hồi khách hàng / trả lời của nhà cung cấp
+  // Phiên 3c: ncr_id phiếu sản phẩm không phù hợp; phiên 4b: finding_id phát hiện đánh giá nội bộ (nguồn AUDIT) lập ra phiếu này
   Capas: { book: 'B', dot: 1, key: 'capa_id', c: true, i18n: true,
     cols: 'capa_id code source dept_code item_id ref_text found_date found_by_name title_vi title_zh problem_vi problem_zh ' +
       'correction_vi correction_zh cause_vi cause_zh owner_user_id due_date state files_json completed_at completed_by verify_due ' +
       'verify_count verified_at verified_by verify_date verify_result verify_note_vi verify_note_zh verify_history_json closed_at ' +
       'cancelled_at cancelled_by cancel_reason party_name party_contact product_text lot_text qty_text severity complaint_valid team_text ' +
-      'escape_vi escape_zh sent_date reply_due reply_date reply_note_vi reply_note_zh reply_at reply_by ncr_id' },
+      'escape_vi escape_zh sent_date reply_due reply_date reply_note_vi reply_note_zh reply_at reply_by ncr_id finding_id' },
   // Sản phẩm không phù hợp (Đợt 3, phiên 3c, 34_ncr.js): mã NC-yymm-001; stage nơi phát hiện; dept_code bộ phận quản lý phiếu; ref_text tham
   // chiếu (lệnh sản xuất, thiết bị, phiếu sửa chữa M&E, PO…); product_text / lot_text / qty_text sản phẩm hoặc vật tư, lô, số lượng không phù
   // hợp; party_name khách hàng trả về / nhà cung cấp (tùy chọn); severity MINOR | MAJOR | CRITICAL; problem mô tả; contain biện pháp cách ly,
@@ -104,14 +105,21 @@ var SHEETS = {
   // Đợt đánh giá: code DG-yy-01 (cấp khi duyệt chương trình); dept_code bộ phận được đánh giá; title quá trình / nội dung; plan_month tháng dự
   // kiến; clauses_json [clause_id]; kế hoạch đợt: audit_date, time_text, place_text, team_json [{u: user_id | '', n: tên, d: bộ phận công tác,
   // r: L trưởng đoàn | M thành viên}], lead_user_id (trưởng đoàn trong app), auditee_text đại diện bộ phận được đánh giá, note ghi chú kế hoạch;
-  // state PLANNED | READY | IN_PROGRESS | REPORTED | CLOSED | CANCELLED
+  // state PLANNED | READY | IN_PROGRESS | REPORTED | CLOSED | CANCELLED. Phiên 4b: báo cáo đánh giá (BM-ISO-03-04) report_date, strength điểm mạnh,
+  // summary kết luận (không dịch máy), reported_at / reported_by; đóng đợt closed_at / closed_by / close_note
   Audits: { book: 'B', dot: 1, key: 'audit_id', c: true, i18n: true,
     cols: 'audit_id program_id code dept_code title_vi title_zh plan_month clauses_json state audit_date time_text place_text lead_user_id team_json ' +
-      'auditee_text note_vi note_zh ready_at ready_by started_at started_by cancelled_at cancelled_by cancel_reason' },
+      'auditee_text note_vi note_zh ready_at ready_by started_at started_by cancelled_at cancelled_by cancel_reason report_date strength_vi ' +
+      'strength_zh summary_vi summary_zh reported_at reported_by closed_at closed_by close_note' },
   // Checklist của đợt: seq thứ tự; clause_id điều khoản (trống = chung); question câu hỏi / nội dung kiểm tra (dịch máy); result C | NC | OBS | NA;
   // evidence bằng chứng / ghi chép (không dịch máy); checked_at / checked_by
   AuditChecks: { book: 'B', dot: 1, key: 'check_id', c: true, i18n: true,
     cols: 'check_id audit_id seq clause_id question_vi question_zh result evidence_vi evidence_zh checked_at checked_by' },
+  // Phát hiện đánh giá (phiên 4b): code DG-yy-01/01 (mã đợt / số thứ tự); check_id câu checklist Không phù hợp / Cần cải tiến (trống = nhập tay);
+  // clause_id điều khoản; ftype MAJOR | MINOR | OBS; content nội dung phát hiện (yêu cầu, sự không phù hợp), evidence bằng chứng — không dịch máy
+  // (kết luận đánh giá); capa_id phiếu khắc phục lập từ phát hiện (Capas.finding_id trỏ ngược lại)
+  AuditFindings: { book: 'B', dot: 1, key: 'finding_id', c: true,
+    cols: 'finding_id audit_id code seq check_id clause_id ftype content_vi content_zh evidence_vi evidence_zh capa_id' },
   // Hành động khắc phục / phòng ngừa của phiếu: owner_user_id người phụ trách trong app (nhận Gmail nhắc 7, 1, 0 ngày trước hạn), assignee_name
   // tên người thực hiện ngoài app; round = lần kiểm tra hiệu lực lúc thêm (0: kế hoạch đầu, 1: bổ sung sau lần kiểm tra không hiệu lực thứ nhất…)
   CapaActions: { book: 'B', dot: 1, key: 'action_id', c: true, i18n: true,

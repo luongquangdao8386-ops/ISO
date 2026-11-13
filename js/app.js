@@ -80,7 +80,8 @@ export async function updateSyncStatus() {
     app.shell.setBadge('dist', p.dist_due.length);
     app.shell.setBadge('capa', p.capa_acts.length + p.capa_verify.length + p.capa_owner.length + p.capa_reply.length);
     app.shell.setBadge('ncr', p.ncr_decide.length + p.ncr_due.length + p.ncr_capa.length);
-    app.shell.setBadge('audits', p.aud_review.length + p.aud_returned.length + p.aud_soon.length + p.aud_doing.length + p.aud_plan.length);
+    app.shell.setBadge('audits', p.aud_review.length + p.aud_returned.length + p.aud_soon.length + p.aud_doing.length + p.aud_plan.length +
+      p.aud_report.length + p.aud_capa.length + p.aud_close.length);
   } catch (e) { /* không chặn */ }
 }
 

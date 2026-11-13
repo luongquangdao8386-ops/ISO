@@ -321,7 +321,7 @@ test('cập nhật từ bản 3b (chưa có sheet Ncrs, cột Capas.ncr_id): đ�
   strip(env2);
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: Capas(ncr_id); Ncrs. schema_version=1.0.11'), env2.logs.join('\n'));
+  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: Capas(ncr_id); Ncrs. schema_version=1.0.12'), env2.logs.join('\n'));
   env2.g.dbReset_();
   const keys = env2.g.readRows_('Settings').map((x) => x.setting_key);
   for (const k of ['ncr_form_code', 'ncr_log_form_code', 'ncr_decision_form_code', 'ncr_decide_days', 'ncr_exec_days']) assert.ok(keys.includes(k), k);

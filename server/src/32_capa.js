@@ -206,7 +206,11 @@ function capaSave_(ctx) {
   var source = p.source === undefined ? (cur ? cur.source : '') : String(p.source || '');
   // Sản phẩm không phù hợp (3c): phiếu lập từ phiếu NC (ncr_id) luôn có nguồn NCR; nguồn NCR không chọn tay, không đổi sang nguồn khác
   var ncr = null;
-  if (isNew && trimStr_(p.ncr_id || '')) { ncr = ncrForCapa_(ctx, trimStr_(p.ncr_id), errs); source = 'NCR'; }
+  // Đánh giá nội bộ (4b): phiếu lập từ phát hiện đánh giá (finding_id) luôn có nguồn AUDIT, không đổi nguồn
+  var fx = null;
+  if (isNew && trimStr_(p.finding_id || '')) { fx = findingForCapa_(ctx, trimStr_(p.finding_id), errs); source = 'AUDIT'; }
+  else if (cur && cur.finding_id && source !== 'AUDIT') errs.push(fieldError_('source', 'CAPA_AUDIT_ONLY'));
+  if (!fx && isNew && trimStr_(p.ncr_id || '')) { ncr = ncrForCapa_(ctx, trimStr_(p.ncr_id), errs); source = 'NCR'; }
   else if (source === 'NCR' && !(cur && cur.ncr_id)) errs.push(fieldError_('source', 'CAPA_NCR_ONLY'));
   else if (cur && cur.source === 'NCR' && source !== 'NCR') errs.push(fieldError_('source', 'CAPA_NCR_ONLY'));
   if (CAPA_SOURCES_.indexOf(source) < 0) errs.push(fieldError_('source', source ? 'INVALID_VALUE' : 'REQUIRED'));
@@ -280,7 +284,7 @@ function capaSave_(ctx) {
           verified_at: '', verified_by: '', verify_date: '', verify_result: '', verify_note_vi: '', verify_note_zh: '', verify_history_json: [],
           closed_at: '', cancelled_at: '', cancelled_by: '', cancel_reason: '', party_name: '', party_contact: '', product_text: '', lot_text: '',
           qty_text: '', severity: '', complaint_valid: '', team_text: '', escape_vi: '', escape_zh: '', sent_date: '', reply_due: '', reply_date: '',
-          reply_note_vi: '', reply_note_zh: '', reply_at: '', reply_by: '', ncr_id: ncr ? ncr.ncr_id : ''
+          reply_note_vi: '', reply_note_zh: '', reply_at: '', reply_by: '', ncr_id: ncr ? ncr.ncr_id : '', finding_id: fx ? fx.f.finding_id : ''
         });
       } else {
         row = lockedCapa_(ctx, p.capa_id, true);
@@ -297,13 +301,14 @@ function capaSave_(ctx) {
       row.i18n_meta = Object.assign({}, row.i18n_meta || {}, tr.meta);
       var writes = [{ sheet: 'Capas', mode: isNew ? 'insert' : 'update', row: row }];
       if (ncr) writes.push(ncrLinkCapaWrite_(ncr.ncr_id, row.capa_id)); // phiếu NC trỏ tới phiếu khắc phục mới
+      if (fx) writes.push(findingLinkCapaWrite_(fx.f.finding_id, row.capa_id)); // phát hiện đánh giá trỏ tới phiếu khắc phục mới
       return {
         writes: writes, state: su,
         result: capaResult_(ctx, row), record_version: row.record_version,
         audit: { entity_type: 'CAPA', entity_id: row.capa_id, before_json: before,
           after_json: { code: row.code, source: row.source, dept_code: row.dept_code, due_date: row.due_date, owner_user_id: row.owner_user_id, created: isNew,
             party_name: party ? row.party_name : undefined, reply_due: party ? row.reply_due : undefined, complaint_valid: row.complaint_valid || undefined,
-            ncr: ncr ? ncr.code : undefined } }
+            ncr: ncr ? ncr.code : undefined, finding: fx ? fx.f.code : undefined } }
       };
     }
   });
@@ -790,6 +795,7 @@ function capaOverdue_(c, acts, today) {
 function reportCapaRow_(c, acts, items, dir, today, ncrs) {
   var it = c.item_id ? items[c.item_id] : null;
   var nc = c.ncr_id && ncrs ? ncrs[c.ncr_id] : null;
+  var fd = c.finding_id && sheetExists_('AuditFindings') ? findOne_('AuditFindings', 'finding_id', c.finding_id) : null;
   var live = acts.filter(function (a) { return a.state !== 'CANCELLED'; }).sort(function (a, b) { return (Number(a.seq) || 0) - (Number(b.seq) || 0); });
   var last = (c.verify_history_json || []).slice(-1)[0] || null;
   return {
@@ -819,7 +825,9 @@ function reportCapaRow_(c, acts, items, dir, today, ncrs) {
     reply_date: String(c.reply_date || ''), reply_note_vi: c.reply_note_vi || '', reply_note_zh: c.reply_note_zh || '',
     reply_by: reportUserName_(dir, c.reply_by), reply_late: capaReplyLate_(c, today),
     // Sản phẩm không phù hợp (3c): phiếu NC gốc
-    ncr_code: nc ? nc.code : '', ncr_product: nc ? [nc.product_text, nc.lot_text, nc.qty_text].filter(function (x) { return x; }).join(' · ') : ''
+    ncr_code: nc ? nc.code : '', ncr_product: nc ? [nc.product_text, nc.lot_text, nc.qty_text].filter(function (x) { return x; }).join(' · ') : '',
+    // Đánh giá nội bộ (4b): phát hiện gốc
+    finding_code: fd ? fd.code : '', finding_type: fd ? fd.ftype : ''
   };
 }
 
@@ -1035,6 +1043,7 @@ function layoutCapa_(snap) {
     ];
     if (capaIsParty_(r.source)) nc = nc.concat(capaPartyKv_(r));
     if (r.ncr_code) nc.push([lab_('capa.from_ncr'), r.ncr_code + (r.ncr_product ? ' · ' + r.ncr_product : '')]);
+    if (r.finding_code) nc.push([lab_('capa.from_finding'), r.finding_code + ' · ' + lab_('aud.ftype.' + r.finding_type)]);
     if (r.item_code) nc.push([lab_('capa.item'), r.item_code + ' · ' + biText_(r.item_name_vi, r.item_name_zh)]);
     if (r.ref_text) nc.push([lab_('capa.ref'), r.ref_text]);
     if (r.title_vi || r.title_zh) nc.push([lab_('capa.title_f'), biNl_(r.title_vi, r.title_zh)]);

@@ -164,7 +164,9 @@ triển khai, mục "CẬP NHẬT LÊN BẢN 3a").
 - Chờ bạn xử lý: hành động của tôi ≤ 7 ngày tới hạn / quá hạn, phiếu chờ tôi kiểm tra hiệu lực, phiếu tôi phụ trách chưa có hành động
   đang mở. Chi tiết biểu có thẻ **Khắc phục**. Trạng thái hệ thống dòng **Khắc phục**.
 
-Tiếp: 3b khiếu nại 8D, SCAR · 3c sản phẩm không phù hợp · Đợt 4 đánh giá nội bộ (4a–4c).
+Sau đó: 3b khiếu nại 8D, SCAR (`32_capa.js`) · 3c sản phẩm không phù hợp (`34_ncr.js`) · 4a đánh giá nội bộ — chương trình năm, kế hoạch
+đợt, checklist (`35_iaudit.js`) · 4b phát hiện đánh giá (NC lớn · NC nhỏ · Cần cải tiến), báo cáo đánh giá BM-ISO-03-04, phiếu khắc phục từ
+phát hiện, đóng đợt khi phiếu đã đóng (`36_finding.js`, sheet `AuditFindings`, schema 1.0.12). Tiếp: 4c xem xét lãnh đạo, xóa dữ liệu.
 
 ## Cấu trúc
 

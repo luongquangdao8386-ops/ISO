@@ -24,10 +24,12 @@ var SYNC_ENTITIES_ = [
   // Sản phẩm không phù hợp (3c): cấp 2+ / Thư ký ISO, bộ phận mình, phiếu mình lập / phụ trách
   { type: 'NCR', sheet: 'Ncrs', scoped: 'ncr' },
   // Đánh giá nội bộ (4a): chương trình — cấp 2+, Thư ký ISO, Đánh giá viên; đợt — Thư ký ISO, Đánh giá viên, người trong đoàn, cấp 2+ của
-  // bộ phận được đánh giá; checklist theo đợt
+  // bộ phận được đánh giá; checklist, phát hiện theo đợt
   { type: 'AUD_PROG', sheet: 'AuditPrograms', scoped: 'aud_prog' },
   { type: 'AUDIT', sheet: 'Audits', scoped: 'audit' },
-  { type: 'AUD_CHK', sheet: 'AuditChecks', scoped: 'aud_chk' }
+  { type: 'AUD_CHK', sheet: 'AuditChecks', scoped: 'aud_chk' },
+  // Phát hiện đánh giá (4b): theo đợt, như checklist
+  { type: 'AUD_FND', sheet: 'AuditFindings', scoped: 'aud_chk' }
 ];
 
 /** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */

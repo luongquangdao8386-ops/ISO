@@ -10,10 +10,13 @@
 // phiếu khắc phục mà chưa lập (tôi sửa được phiếu).
 // Phiên 4a: chương trình đánh giá nội bộ chờ tôi duyệt / bị trả lại (Thư ký ISO); đợt đánh giá tôi tham gia trong 7 ngày tới, đang đánh giá;
 // đợt đã đến tháng dự kiến mà chưa chốt kế hoạch (Thư ký ISO, trưởng đoàn).
+// Phiên 4b: đợt đang đánh giá đã ghi đủ kết quả và phát hiện — chờ gửi báo cáo (Thư ký ISO, trưởng đoàn); phát hiện không phù hợp chưa có
+// phiếu khắc phục (tôi lập phiếu được cho bộ phận được đánh giá); đợt đã báo cáo đủ điều kiện đóng (Thư ký ISO).
 import { session } from './core.js';
 import { recs, items, isSecretary, canApprove, versionEditable, reviewSoon, today, addDaysIso, canSeeRecords, canSubmitRecord, recordCheck,
   recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa, capaIsParty, canDecideNcr, canEditNcr,
-  canApproveProgram, isAuditMember, canPlanAudit, canRecordAudit } from './data.js';
+  canApproveProgram, isAuditMember, canPlanAudit, canRecordAudit, canCreateCapa, findingIsNc, findingCapa, auditReportGaps, auditCloseGaps,
+  canCloseAudit } from './data.js';
 import { queueItems } from './sync.js';
 import { covers } from './periods.js';
 
@@ -82,9 +85,25 @@ export async function pendingFor() {
   out.aud_review = progs.filter((x) => x.state === 'IN_REVIEW' && canApproveProgram(x));
   out.aud_returned = sec ? progs.filter((x) => x.state === 'DRAFT' && x.return_reason) : [];
   out.aud_soon = audits.filter((a) => (a.state === 'PLANNED' || a.state === 'READY') && a.audit_date && a.audit_date >= t && a.audit_date <= soon && (isAuditMember(a) || canPlanAudit(a)));
-  out.aud_doing = audits.filter((a) => a.state === 'IN_PROGRESS' && canRecordAudit(a));
+  // Phát hiện, báo cáo, đóng đợt (4b)
+  const fnd = (await recs('AUD_FND')).filter((f) => !f.archived_at);
+  const fndOf = (id) => fnd.filter((f) => f.audit_id === id);
+  const chkAll = (await recs('AUD_CHK')).filter((c) => !c.archived_at);
+  const capaMap = new Map(capas.map((c) => [c.capa_id, c]));
+  const doing = audits.filter((a) => a.state === 'IN_PROGRESS' && canRecordAudit(a));
+  out.aud_report = doing.filter((a) => {
+    if (!canPlanAudit(a)) return false;
+    const ch = chkAll.filter((c) => c.audit_id === a.audit_id);
+    const g = auditReportGaps(ch, fndOf(a.audit_id));
+    return ch.length > 0 && !g.unrecorded.length && !g.missing.length;
+  });
+  out.aud_doing = doing.filter((a) => !out.aud_report.includes(a));
+  const reported = audits.filter((a) => a.state === 'REPORTED');
+  out.aud_capa = reported.filter((a) => canCreateCapa(a.dept_code)).flatMap((a) => fndOf(a.audit_id).filter((f) => findingIsNc(f) && !findingCapa(f, capaMap)));
+  out.aud_close = canCloseAudit() ? reported.filter((a) => { const g = auditCloseGaps(fndOf(a.audit_id), capaMap); return !g.noCapa.length && !g.open.length; }) : [];
   out.aud_plan = audits.filter((a) => a.state === 'PLANNED' && approved.has(a.program_id) && canPlanAudit(a) && !(a.audit_date && a.audit_date >= t) && String(a.plan_month) <= t.slice(0, 7));
   out.total = out.aud_review.length + out.aud_returned.length + out.aud_soon.length + out.aud_doing.length + out.aud_plan.length +
+    out.aud_report.length + out.aud_capa.length + out.aud_close.length +
     out.ncr_decide.length + out.ncr_due.length + out.ncr_capa.length + out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
     out.req_review.length + out.req_todo.length + out.req_rejected.length + out.capa_acts.length + out.capa_verify.length + out.capa_owner.length + out.capa_reply.length +
     (out.nofile.length ? 1 : 0) + (out.review_due.length ? 1 : 0) + (out.rec_late.length ? 1 : 0) + (out.dist_due.length ? 1 : 0);

@@ -114,8 +114,13 @@ var ACTION_TABLE_ = [
   'iaudit.check.save|2|net|W',
   'iaudit.check.add|2|net|W',
   'iaudit.check.record|2|net|W',
-  // Phiên 4b: phát hiện đánh giá → phiếu khắc phục, báo cáo đánh giá (đăng ký trước, chưa có mã → FEATURE_NOT_ENABLED)
+  // Phiên 4b: phát hiện đánh giá (người trong đoàn, khi đang đánh giá), gửi báo cáo đánh giá (Thư ký ISO, trưởng đoàn), đóng đợt khi mọi phát
+  // hiện không phù hợp có phiếu khắc phục đã đóng (Thư ký ISO, PIN). Phiếu khắc phục từ phát hiện: capa.save {finding_id}
   'iaudit.finding.save|2|net|W',
+  'iaudit.report|2|net|W',
+  'iaudit.close|X|pin|W',
+  // Phiên 4c: xem xét lãnh đạo (đăng ký trước, chưa có mã → FEATURE_NOT_ENABLED)
+  'mreview.save|X|net|W',
   // Báo cáo: logo
   'report.logo.get|1|net|R',
   'report.logo.set|4|pin|W',

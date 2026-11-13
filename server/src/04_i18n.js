@@ -136,7 +136,22 @@ var SUB_MSG = {
   AUDIT_CLAUSE_NOT_IN: ['Điều khoản không thuộc đợt đánh giá này', '该条款不属于本次审核'],
   AUDIT_CHECKS_MAX: ['Mỗi checklist tối đa 80 câu hỏi', '每份检查表最多80个问题'],
   AUDIT_EVIDENCE: ['Không phù hợp / Cần cải tiến: ghi bằng chứng, nhận xét', '不符合/需改进：请记录证据和说明'],
-  AUDIT_STARTED: ['Có đợt đã bắt đầu đánh giá — không hủy được chương trình', '已有审核开始进行——无法取消方案']
+  AUDIT_STARTED: ['Có đợt đã bắt đầu đánh giá — không hủy được chương trình', '已有审核开始进行——无法取消方案'],
+  // Phiên 4b: phát hiện, báo cáo đánh giá, đóng đợt
+  AUDIT_CHECK_NOT_NC: ['Chỉ ghi phát hiện từ câu có kết quả Không phù hợp hoặc Cần cải tiến', '只能从结果为“不符合”或“需改进”的问题记录发现项'],
+  AUDIT_FINDING_TYPE: ['Câu Không phù hợp → phát hiện Không phù hợp lớn / nhỏ; câu Cần cải tiến → phát hiện Cần cải tiến', '“不符合”问题→严重/一般不符合项；“需改进”问题→改进建议'],
+  AUDIT_CHECK_HAS_FINDING: ['Câu hỏi này đã có phát hiện — sửa phát hiện đó', '该问题已有发现项——请修改该发现项'],
+  AUDIT_FINDINGS_MAX: ['Mỗi đợt tối đa 40 phát hiện', '每次审核最多40个发现项'],
+  AUDIT_HAS_FINDING: ['Câu hỏi đã có phát hiện — bỏ hoặc sửa phát hiện trước khi đổi kết quả', '该问题已有发现项——更改结果前请先删除或修改发现项'],
+  AUDIT_UNRECORDED: ['Còn câu hỏi chưa ghi kết quả', '仍有问题未记录结果'],
+  AUDIT_FINDING_MISSING: ['Còn câu Không phù hợp / Cần cải tiến chưa ghi phát hiện', '仍有“不符合/需改进”问题未记录发现项'],
+  AUDIT_REPORT_DATE: ['Ngày báo cáo phải từ ngày đánh giá tới hôm nay', '报告日期须在审核日期至今天之间'],
+  AUDIT_HAS_CAPA: ['Đã có phiếu khắc phục lập từ phát hiện — không rút báo cáo được', '已有根据发现项创建的纠正措施单——无法撤回报告'],
+  AUDIT_NOT_REPORTED: ['Đợt chưa gửi báo cáo đánh giá — gửi báo cáo trước khi lập phiếu khắc phục', '审核尚未提交报告——请先提交审核报告再创建纠正措施单'],
+  AUDIT_FINDING_HAS_CAPA: ['Phát hiện này đã có phiếu khắc phục', '该发现项已有纠正措施单'],
+  AUDIT_FINDING_NO_CAPA: ['Còn phát hiện không phù hợp chưa có phiếu khắc phục', '仍有不符合项尚无纠正措施单'],
+  AUDIT_CAPA_OPEN: ['Còn phiếu khắc phục chưa đóng (chưa kiểm tra hiệu lực)', '仍有纠正措施单未关闭（尚未验证有效性）'],
+  CAPA_AUDIT_ONLY: ['Phiếu lập từ phát hiện đánh giá nội bộ giữ nguồn Đánh giá', '根据内部审核发现项创建的纠正措施单须保持来源为“审核”']
 };
 
 function fmtMsg_(pair, vars) {

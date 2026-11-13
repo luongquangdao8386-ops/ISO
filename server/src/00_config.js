@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d4.1';
+var SERVER_VERSION = '1.0.0-d4.2';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.11';
+var SCHEMA_VERSION = '1.0.12';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1, '1.0.10': 1, '1.0.11': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1, '1.0.10': 1, '1.0.11': 1, '1.0.12': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -103,6 +103,8 @@ var SETTINGS_DEFAULTS = [
   ['audit_plan_form_code', 'STRING', 'BM-ISO-03-02', true, 1, 'Mã biểu của kế hoạch đánh giá nội bộ (một đợt)', '内部审核计划（单次）的表单编号'],
   ['audit_checklist_form_code', 'STRING', 'BM-ISO-03-03', true, 1, 'Mã biểu của checklist đánh giá nội bộ', '内部审核检查表的表单编号'],
   ['audit_notice_days', 'INT', 7, true, 1, 'Báo đợt đánh giá nội bộ sắp tới trước (ngày)', '提前通知即将进行的内部审核（天）'],
+  // Phiên 4b: báo cáo đánh giá nội bộ (phát hiện, kết luận) của một đợt
+  ['audit_report_form_code', 'STRING', 'BM-ISO-03-04', true, 1, 'Mã biểu của báo cáo đánh giá nội bộ', '内部审核报告的表单编号'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本'],
   // Ảnh nền màn đăng nhập / trang chủ (Quản trị → Ảnh nền, 33_bg.js): ID tệp trên Drive và mã phiên bản ('' = ảnh mặc định trong app)
@@ -197,7 +199,7 @@ var NCR_MAX_FILES_ = 30;
 /** Đánh giá nội bộ (Đợt 4, phiên 4a — BM-ISO-03-01 chương trình năm, 03-02 kế hoạch đánh giá, 03-03 checklist; 35_iaudit.js).
  *  Chương trình: DRAFT nháp → IN_REVIEW chờ duyệt → APPROVED đã duyệt (Quản trị, PIN; lần 01, 02…) → sửa (PIN, lý do) về DRAFT · CANCELLED.
  *  Đợt: PLANNED trong chương trình → READY đã chốt kế hoạch (ngày, đoàn, checklist) → IN_PROGRESS đang đánh giá → REPORTED đã báo cáo →
- *  CLOSED đã đóng (4b) · CANCELLED. Kết quả câu hỏi: C phù hợp · NC không phù hợp · OBS cần cải tiến (quan sát) · NA không áp dụng. */
+ *  CLOSED đã đóng (4b: mọi phát hiện không phù hợp có phiếu khắc phục đã đóng) · CANCELLED. Kết quả câu hỏi: C phù hợp · NC không phù hợp · OBS cần cải tiến (quan sát) · NA không áp dụng. */
 var AUDIT_STDS_ = ['ISO9001', 'BRC'];
 var AUDIT_PROG_STATES_ = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'CANCELLED'];
 var AUDIT_STATES_ = ['PLANNED', 'READY', 'IN_PROGRESS', 'REPORTED', 'CLOSED', 'CANCELLED'];
@@ -207,6 +209,11 @@ var AUDIT_MAX_CHECKS_ = 80;
 var AUDIT_MAX_CLAUSES_ = 80;
 var AUDIT_MAX_PER_PROGRAM_ = 40;
 var AUDIT_MAX_NA_ = 150;
+/** Phát hiện đánh giá (phiên 4b, AuditFindings — người dùng chốt 13/11/2026): MAJOR không phù hợp lớn · MINOR không phù hợp nhỏ (bắt buộc có
+ *  phiếu khắc phục) · OBS cần cải tiến (phiếu khắc phục tùy chọn). Phát hiện từ câu checklist Không phù hợp → MAJOR / MINOR; Cần cải tiến → OBS. */
+var AUDIT_FINDING_TYPES_ = ['MAJOR', 'MINOR', 'OBS'];
+var AUDIT_FINDING_NC_ = ['MAJOR', 'MINOR'];
+var AUDIT_MAX_FINDINGS_ = 40;
 
 /** Kho tệp mẫu (2e): ACTIVE đang dùng · REPLACED đã thay bằng tệp mới cùng bộ (giữ để tra) · DELETED đã bỏ (tải nhầm).
  *  Mỗi tệp tối đa TPL_MAX_SHEETS_ sheet; mỗi lần tải lên tối đa TPL_MAX_CODES_ mã biểu tự nhận từ tên sheet. */

@@ -74,10 +74,10 @@ function applyQuery(q) {
   if (q.std && ['BOTH', 'ISO9001', 'BRC'].includes(q.std)) state.std = q.std;
   if (q.req) state.req = String(q.req);
   if (q.capa) state.capa = String(q.capa);
-  if (q.form && !['NCR', 'DECISION', 'PLAN', 'CHECKLIST'].includes(q.form)) state.cform = String(q.form);
+  if (q.form && !['NCR', 'DECISION', 'PLAN', 'CHECKLIST', 'REPORT'].includes(q.form)) state.cform = String(q.form);
   if (q.prog) state.aud = 'P:' + String(q.prog);
   if (q.audit) state.aud = 'A:' + String(q.audit);
-  if (q.form && ['PLAN', 'CHECKLIST'].includes(q.form)) state.aform = q.form;
+  if (q.form && ['PLAN', 'CHECKLIST', 'REPORT'].includes(q.form)) state.aform = q.form;
   if (q.ncr) state.ncr = String(q.ncr);
   if (q.form && ['NCR', 'DECISION'].includes(q.form)) state.nform = q.form;
   if (q.source && ['ALL', 'INTERNAL', 'COMPLAINT', 'SUPPLIER'].includes(q.source)) state.csource = q.source;
@@ -250,7 +250,7 @@ export async function renderReports(view, ctx) {
         const list = audList.filter((a) => a.program_id === pg.program_id);
         return `<optgroup label="${esc(pg.code)}"><option value="P:${esc(pg.program_id)}"${state.aud === 'P:' + pg.program_id ? ' selected' : ''}>${esc(pg.code)} · ${esc(biText('rpt.aud_form.PROGRAM'))}</option>${list.map((a) => `<option value="A:${esc(a.audit_id)}"${state.aud === 'A:' + a.audit_id ? ' selected' : ''}>${esc(a.code)} · ${esc(a.dept_code)} · ${esc(String(a.title_vi || a.title_zh || '').slice(0, 50))}</option>`).join('')}</optgroup>`;
       }).join('')}</select></label>`);
-      if (/^A:/.test(state.aud)) out.push(sel('rf-aform', 'rpt.f.capa_form', ['PLAN', 'CHECKLIST'].map((x) => [x, biText('rpt.aud_form.' + x)]), state.aform));
+      if (/^A:/.test(state.aud)) out.push(sel('rf-aform', 'rpt.f.capa_form', ['PLAN', 'CHECKLIST', 'REPORT'].map((x) => [x, biText('rpt.aud_form.' + x)]), state.aform));
     }
     if (k !== 'VERSIONS' && k !== 'AUDIT' && !(k === 'DOCREQ' && state.req) && !(k === 'CAPA' && state.capa) && !(k === 'NCR' && state.ncr)) out.push(sel('rf-dept', k === 'DIST' ? 'dist.recipient' : 'rpt.f.dept', [['', biText(seesAll() ? 'rpt.all_depts' : 'cat.all')]].concat((k === 'DIST' ? deps : deptOpts).map((d) => [d.dept_code, `${d.dept_code} · ${nameText(d)}`])), state.dept));
     if (k === 'DIST') out.push(sel('rf-dstate', 'rpt.f.dist_state', ['ALL', 'ACTIVE', 'DUE', 'RECALLED'].map((x) => [x, biText('rpt.dist_state.' + x)]), state.dstate));

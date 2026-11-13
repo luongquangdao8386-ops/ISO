@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.1 (Đợt 4, phiên 4a — Chương trình, kế hoạch đánh giá nội bộ)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.2 (Đợt 4, phiên 4b — Phát hiện, báo cáo đánh giá, đóng đợt)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -74,7 +74,67 @@ nhất quá hạn hồ sơ) để đoàn biết cần xem hồ sơ nào. Phát h
 cho bộ phận trong phạm vi (Cơ điện); biểu ISO vẫn ẩn — mã biểu in sửa được ở **Cấu hình** (`audit_program_form_code`,
 `audit_plan_form_code`, `audit_checklist_form_code`; `audit_notice_days` = số ngày Gmail báo trước).
 
-## CẬP NHẬT LÊN BẢN 4a (1.0.0-d4.1, Đánh giá nội bộ) — làm một lần, trên máy tính
+Phiên 4b (anh chốt 13/11/2026: phát hiện chia **Không phù hợp lớn · Không phù hợp nhỏ · Cần cải tiến**; **đóng đợt khi phiếu khắc phục đã
+đóng**) thêm phần sau của đánh giá nội bộ, in theo mẫu **BM-ISO-03-04** (báo cáo đánh giá): đang đánh giá, câu ghi **Không phù hợp** /
+**Cần cải tiến** có nút **Ghi phát hiện** (điền sẵn "Chưa đáp ứng: <câu hỏi>", bằng chứng của câu, điều khoản; câu Không phù hợp → chọn
+lớn / nhỏ, câu Cần cải tiến → Cần cải tiến), hoặc **Thêm phát hiện** nhập tay; mã phát hiện `DG-26-01/01, /02…` → **Gửi báo cáo đánh giá**
+(Thư ký ISO hoặc trưởng đoàn; mọi câu đã có kết quả, mọi câu Không phù hợp / Cần cải tiến đã có phát hiện — thiếu thì app báo ngay câu
+nào; ngày báo cáo, **điểm mạnh**, **kết luận** bắt buộc) → phát hiện khóa → bộ phận được đánh giá (hoặc Thư ký ISO) bấm **Lập phiếu
+khắc phục** ở từng phát hiện (điền sẵn bộ phận, ngày, người phát hiện = trưởng đoàn, tham chiếu = mã phát hiện, mô tả + bằng chứng; nguồn
+**Đánh giá**, không đổi được) — Không phù hợp lớn / nhỏ **bắt buộc**, Cần cải tiến **tùy chọn**; mỗi phát hiện một phiếu (phiếu hủy thì
+lập lại được) → phiếu đi luồng khắc phục bình thường (nguyên nhân, hành động, kiểm tra hiệu lực) → khi mọi phiếu đã **đóng**, Thư ký ISO
+bấm **Đóng đợt đánh giá** (PIN). Rút báo cáo được khi chưa phiếu nào lập từ phát hiện. Phát hiện, bằng chứng, điểm mạnh, kết luận **không
+dịch máy** (kết luận đánh giá) — ghi cả hai thứ tiếng nếu cần. Chờ bạn xử lý thêm: đợt chờ gửi báo cáo, phát hiện cần lập phiếu khắc phục,
+đợt đủ điều kiện đóng. Phiếu khắc phục in ghi "Từ phát hiện đánh giá nội bộ DG-26-01/01". Mã biểu báo cáo sửa ở **Cấu hình**
+(`audit_report_form_code`).
+
+## CẬP NHẬT LÊN BẢN 4b (1.0.0-d4.2, Phát hiện, báo cáo đánh giá, đóng đợt) — làm một lần, trên máy tính
+
+Bản 4b **thêm 1 sheet** (`AuditFindings`), **10 cột** cuối sheet `Audits` (ngày báo cáo, điểm mạnh, kết luận, người gửi báo cáo, đóng
+đợt), **1 cột** cuối sheet `Capas` (`finding_id`) và **1 cài đặt** (`audit_report_form_code` = BM-ISO-03-04) → chạy `migrateSchema`.
+**Không** hỏi quyền Google mới, **không** cần `installTriggers`. App 4b vẫn chạy với máy chủ 4a (chưa có thẻ Phát hiện, nút Gửi báo cáo).
+
+**Anh phải làm:**
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký:
+   `migrateSchema xong. Thêm: Capas(finding_id); Audits(report_date,strength_vi,strength_zh,summary_vi,summary_zh,reported_at,reported_by,closed_at,closed_by,close_note); AuditFindings. schema_version=1.0.12`
+   (nếu trigger nền đã kịp tự chạy trước thì báo `Thêm: không có. schema_version=1.0.12` — cũng đúng).
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d4.2 phat hien bao cao danh gia` →
+   **Triển khai**. Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` (đang mở thì đóng hẳn rồi mở lại) → **Tài khoản → Thông tin** ghi `1.0.0-d4.2 · mã vỏ app cbe65f638d10` (màn báo lỗi
+   hoặc mã khác thì bấm **Tải lại bản mới**).
+
+**Nên kiểm (1 phút — phần máy giả lập không kiểm được):**
+1. **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.12** → máy chủ thật đã lên đúng bản. Dòng **Đánh giá nội
+   bộ**: nếu đã có chương trình năm 2026 thì cuối dòng có thêm `· đã báo cáo chờ đóng 0 · đã đóng 0 · phát hiện không phù hợp chưa có
+   phiếu khắc phục 0`; chưa có chương trình thì vẫn `Chưa có chương trình năm 2026` (đúng).
+
+Không cần tạo dữ liệu thử trên THẬT: PDF báo cáo đánh giá dùng đúng bộ dựng PDF (3 ô ký) anh đã xem ở kế hoạch đánh giá 4a và SCAR 3b. Lần
+đánh giá thật đầu tiên, sau khi **Gửi báo cáo đánh giá** → **In báo cáo đánh giá** → **Tải PDF** → xem chữ Việt / Trung, bảng phát hiện.
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/finding.test.mjs` (3 test; iPhone 390×844 và máy tính 1440×900, dữ liệu như thật:
+phạm vi Cơ điện, danh mục ○ ◐, Thư ký ISO cấp 4, trưởng đoàn ngoài app): đợt DG-26-01 đang đánh giá → **Ghi phát hiện** ở câu Không phù
+hợp (điền sẵn loại nhỏ, "Chưa đáp ứng: …", bằng chứng, điều khoản) → đổi Không phù hợp lớn → DG-26-01/01 → Gửi báo cáo khi còn câu chưa
+ghi → báo "Còn 1 câu hỏi chưa ghi kết quả" → ghi nốt → Gửi báo cáo khi câu Cần cải tiến chưa có phát hiện → báo "(câu 2)" → Ghi phát hiện
+câu 2 (chọn sai loại bị nhắc) → Gửi báo cáo (chưa ghi kết luận bị nhắc) → Đã báo cáo, phát hiện khóa, Đóng đợt khóa → Chờ bạn xử lý "1 phát
+hiện đánh giá cần lập phiếu khắc phục" → **Lập phiếu khắc phục** (điền sẵn, nguồn Đánh giá) → KP-2611-001 → quay lại đợt (không còn Rút báo
+cáo) → **In báo cáo đánh giá** BM-ISO-03-04 → PDF `BC-2611-001_bao-cao-danh-gia_DG-26-01.pdf` → phiếu khắc phục đóng → Chờ bạn xử lý "1 đợt
+đánh giá nội bộ đủ điều kiện đóng" → **Đóng đợt** (PIN) → Trạng thái hệ thống; máy tính: thành viên đoàn ghi phát hiện nhập tay (chọn câu →
+điền loại, bằng chứng), không có nút Gửi báo cáo → trưởng đoàn (Đánh giá viên bộ phận CL) gửi báo cáo, không lập phiếu cho CĐ → nhân viên CĐ
+thấy Chờ bạn xử lý, lập phiếu, Excel báo cáo đánh giá → nhân viên SX không thấy đợt; app 4b với máy chủ 4a. Máy chủ
+`tests/server/finding.test.mjs` (4 test): kiểm dữ liệu phát hiện (loại, câu không phải Không phù hợp, sai loại, điều khoản ngoài đợt), quyền
+(chỉ đoàn / Thư ký ISO), mã DG-26-01/01, mỗi câu một phát hiện, câu có phát hiện không đổi sang kết quả sai loại, báo cáo (chỉ Thư ký ISO /
+trưởng đoàn; câu chưa ghi, câu thiếu phát hiện, kết luận, ngày báo cáo), khóa sau báo cáo, rút báo cáo, đồng bộ theo quyền; phiếu khắc
+phục từ phát hiện (nguồn ép Đánh giá, gắn hai chiều, mỗi phát hiện một phiếu, phiếu hủy thì lập lại, không đổi nguồn, không rút báo cáo
+khi đã có phiếu, **mọi phát hiện lập được phiếu** — nghiệm thu Đợt 4); đóng đợt (chỉ Thư ký ISO, thiếu phiếu / phiếu chưa đóng báo trước
+khi hỏi PIN, PIN, không hủy chương trình có đợt đã đóng); báo cáo BM-ISO-03-04 (ô số, bảng phát hiện + phiếu khắc phục, kết luận, 3 ô ký,
+PDF, tên tệp, đổi mã biểu), phiếu khắc phục in ghi phát hiện gốc; cập nhật từ 4a (thiếu sheet / cột → tự thêm; dòng nhật ký ở bước 2). Cả
+bộ: 101 test máy chủ + 47 test giao diện đạt.
+
+Không kiểm được ở đâu cả trước khi dùng thật: PDF thật của báo cáo đánh giá (xem ở lần đánh giá thật đầu tiên), in trên máy in thật.
+
+## CẬP NHẬT LÊN BẢN 4a (1.0.0-d4.1, Đánh giá nội bộ) — đã xong (anh xác nhận 13/11/2026)
 
 Bản 4a **thêm 3 sheet** (`AuditPrograms`, `Audits`, `AuditChecks`) và **4 cài đặt** (`audit_program_form_code` = BM-ISO-03-01,
 `audit_plan_form_code` = BM-ISO-03-02, `audit_checklist_form_code` = BM-ISO-03-03, `audit_notice_days` = 7) → chạy `migrateSchema`.
@@ -131,7 +191,13 @@ máy in thật.
   riêng) → **Chốt kế hoạch** → **In kế hoạch đánh giá** gửi bộ phận được đánh giá.
 - **Ngày đánh giá**: **Bắt đầu đánh giá** → **Ghi kết quả** từng câu (điện thoại dùng được tại xưởng). Thư ký ISO ghi thay được cho đánh giá
   viên ngoài app. **In checklist** khi xong.
-- Phát hiện (Không phù hợp / Cần cải tiến) → phiếu khắc phục, báo cáo đánh giá, đóng đợt: bản **4b**.
+- **Khi đánh giá**: câu Không phù hợp / Cần cải tiến → **Ghi phát hiện** (chọn Không phù hợp lớn / nhỏ, sửa nội dung cho rõ yêu cầu và
+  điều chưa đáp ứng). Xong → trưởng đoàn hoặc Thư ký ISO **Gửi báo cáo đánh giá** (điểm mạnh, kết luận) → **In báo cáo đánh giá** họp kết
+  thúc, ký.
+- **Sau báo cáo**: bộ phận được đánh giá (hoặc Thư ký ISO) mở đợt → **Lập phiếu khắc phục** ở từng phát hiện Không phù hợp (Cần cải tiến:
+  lập nếu muốn) → làm phiếu như mọi phiếu khắc phục (nguyên nhân, hành động, kiểm tra hiệu lực). Mọi phiếu đóng → Chờ bạn xử lý của Thư ký
+  ISO báo "đủ điều kiện đóng" → **Đóng đợt đánh giá** (PIN).
+- Gửi báo cáo nhầm (chưa lập phiếu nào): **Rút báo cáo** → sửa phát hiện → gửi lại.
 
 ## CẬP NHẬT LÊN BẢN 3c (1.0.0-d3.4, Sản phẩm không phù hợp) — đã xong (anh xác nhận 13/11/2026)
 

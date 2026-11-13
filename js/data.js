@@ -530,3 +530,46 @@ export async function auditsOf(programId) {
 export async function checksOf(auditId) {
   return (await recs('AUD_CHK')).filter((c) => c.audit_id === auditId && !c.archived_at).sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
 }
+
+/* ---------------- Phát hiện đánh giá, báo cáo, đóng đợt (phiên 4b) — như máy chủ 36_finding.js ---------------- */
+
+/** Máy chủ đã lên bản 4b (có iaudit.finding.save trong danh sách quyền) */
+export async function findingOn() { return can('iaudit.finding.save'); }
+/** MAJOR không phù hợp lớn · MINOR không phù hợp nhỏ (bắt buộc phiếu khắc phục) · OBS cần cải tiến */
+export const AUDIT_FINDING_TYPES = ['MAJOR', 'MINOR', 'OBS'];
+export const AUDIT_FINDING_NC = ['MAJOR', 'MINOR'];
+export function findingIsNc(f) { return !!f && AUDIT_FINDING_NC.includes(f.ftype); }
+/** Kết quả câu checklist hợp với loại phát hiện: Không phù hợp → lớn / nhỏ; Cần cải tiến → cần cải tiến */
+export function findingTypeFits(result, ftype) { return result === 'NC' ? AUDIT_FINDING_NC.includes(ftype) : result === 'OBS' ? ftype === 'OBS' : false; }
+/** Phát hiện của đợt theo số thứ tự */
+export async function findingsOf(auditId) {
+  return (await recs('AUD_FND')).filter((f) => f.audit_id === auditId && !f.archived_at).sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+}
+/** Phiếu khắc phục còn hiệu lực của phát hiện (capaMap: Map capa_id → phiếu); null khi chưa có / đã hủy / không xem được */
+export function findingCapa(f, capaMap) {
+  const c = f && f.capa_id && capaMap ? capaMap.get(f.capa_id) : null;
+  return c && !c.archived_at && c.state !== 'CANCELLED' ? c : null;
+}
+/** Gửi báo cáo đánh giá, rút báo cáo: Thư ký ISO, trưởng đoàn */
+export function canReportAudit(a) { return canPlanAudit(a); }
+/** Đóng đợt: Thư ký ISO */
+export function canCloseAudit() { return isSecretary(); }
+/** Điều kiện gửi báo cáo (như máy chủ auditReportErrors_): câu chưa ghi kết quả; câu Không phù hợp / Cần cải tiến chưa có phát hiện đúng loại */
+export function auditReportGaps(checks, findings) {
+  const byCheck = new Map(findings.filter((f) => f.check_id).map((f) => [f.check_id, f]));
+  return {
+    unrecorded: checks.filter((c) => !c.result),
+    missing: checks.filter((c) => (c.result === 'NC' || c.result === 'OBS') && !(byCheck.has(c.check_id) && findingTypeFits(c.result, byCheck.get(c.check_id).ftype)))
+  };
+}
+/** Điều kiện đóng đợt (như máy chủ auditCloseErrors_): phát hiện không phù hợp chưa có phiếu; phiếu khắc phục chưa đóng
+ *  (Thư ký ISO xem được mọi phiếu nên tính đúng; người khác chỉ để hiện gợi ý) */
+export function auditCloseGaps(findings, capaMap) {
+  const noCapa = [], open = [];
+  for (const f of findings) {
+    const c = findingCapa(f, capaMap);
+    if (!c) { if (findingIsNc(f)) noCapa.push(f); continue; }
+    if (c.state !== 'CLOSED') open.push(f);
+  }
+  return { noCapa, open };
+}
