@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d3.3 (Đợt 3, phiên 3b — Khiếu nại 8D, SCAR; Ảnh nền)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d3.4 (Đợt 3, phiên 3c — Sản phẩm không phù hợp)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -44,7 +44,76 @@ trên phiếu sửa được ở **Cấu hình** (`complaint_form_code`, `d8_for
 Bản 3.3 (12/11/2026, anh yêu cầu) thêm **Ảnh nền**: Quản trị tự thay ảnh nền **màn đăng nhập** (cả màn chờ lúc mở app) và **trang chủ**
 trong app, hoặc bấm **Dùng ảnh mặc định** để quay lại ảnh cũ. Ảnh lưu riêng tư trên Drive của máy chủ ISO (không đưa lên repo công khai).
 
-## CẬP NHẬT LÊN BẢN 3.3 (1.0.0-d3.3, Ảnh nền) — làm một lần, trên máy tính
+Phiên 3c (anh chốt 13/11/2026: **giữ phạm vi Cơ điện**; **trưởng bộ phận + Quản trị** quyết định, **nhân nhượng / hủy bỏ chỉ Quản trị**)
+thêm **Sản phẩm không phù hợp** — phiếu `NC-yymm-001` in theo mẫu **BM-CL-04-01** (phiếu), **BM-CL-04-04** (biên bản xử lý), **BM-CL-04-02**
+(sổ theo dõi): lập phiếu khi phát hiện hàng / vật tư lỗi (nơi phát hiện, sản phẩm, lô, số lượng, mô tả, **cách ly, nhận dạng**, nơi để
+hàng cách ly, ảnh) → **Quyết định xử lý** (PIN; một phiếu nhiều dòng: làm lại · sửa chữa · hạ cấp · nhân nhượng · trả nhà cung cấp · hủy
+bỏ, kèm số lượng; có cần phiếu khắc phục không; nhân nhượng phải ghi căn cứ — ai chấp thuận) → xử lý → **Xong xử lý, đóng phiếu** (PIN;
+có làm lại / sửa / hạ cấp thì phải **kiểm tra lại Đạt**). Cần phiếu khắc phục thì bấm **Lập phiếu khắc phục** ngay trong phiếu (điền sẵn,
+nguồn "Sản phẩm không phù hợp") — chưa lập thì chưa đóng được. Quyết định lại được khi đang xử lý (vd làm lại không đạt → hủy), mọi lần
+đều lưu. Người lập phiếu không tự quyết định (Quản trị được). Gmail nhắc người quyết định trước hạn quyết định (mặc định 2 ngày từ khi
+phát hiện) và người phụ trách trước hạn xử lý (mặc định 7 ngày từ khi quyết định), mốc 7, 1, 0 ngày, quá hạn mỗi 7 ngày. Phiếu vẫn thuộc
+bộ phận Cơ điện (hàng lỗi do thiết bị, sự cố máy; vật tư, phụ tùng cơ điện lỗi); biểu CL vẫn ẩn — mã biểu in trên phiếu sửa được ở
+**Cấu hình** (`ncr_form_code`, `ncr_decision_form_code`, `ncr_log_form_code`). Muốn quản lý cả bộ phận Chất lượng: **Tài khoản → Quản trị
+→ Bộ phận → Phạm vi áp dụng** tích thêm CL (không cần sửa code).
+
+## CẬP NHẬT LÊN BẢN 3c (1.0.0-d3.4, Sản phẩm không phù hợp) — làm một lần, trên máy tính
+
+Bản 3c **thêm sheet `Ncrs`, cột `Capas.ncr_id` và 5 cài đặt** (`ncr_form_code` = BM-CL-04-01, `ncr_log_form_code` = BM-CL-04-02,
+`ncr_decision_form_code` = BM-CL-04-04, `ncr_decide_days` = 2, `ncr_exec_days` = 7) → chạy `migrateSchema`. **Không** hỏi quyền Google mới,
+**không** cần `installTriggers` (nhắc hạn đi chung trigger Gmail `sendDueMail`). App 3c vẫn chạy với máy chủ 3b (chỉ chưa có ô Sản phẩm
+không phù hợp).
+
+**Anh phải làm:**
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký: `migrateSchema xong. Thêm: Capas(ncr_id); Ncrs. schema_version=1.0.10`
+   (nếu trigger nền đã kịp tự chạy trước thì báo `Thêm: không có. schema_version=1.0.10` — cũng đúng).
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d3.4 sp khong phu hop` → **Triển khai**.
+   Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` (đang mở thì đóng hẳn rồi mở lại; app tự tải lại dữ liệu vì có cài đặt mới) → **Tài khoản → Thông tin** ghi
+   `1.0.0-d3.4` (màn báo lỗi thì bấm **Tải lại bản mới**).
+
+**Nên kiểm (vài phút — phần máy giả lập không kiểm được):**
+1. **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.10**; có dòng **Sản phẩm không phù hợp** =
+   `Chờ quyết định 0 · đang xử lý 0 · đã đóng 0 · quá hạn quyết định 0 · quá hạn xử lý 0 · cần phiếu khắc phục chưa lập 0` → máy chủ thật
+   đã lên đúng bản.
+2. PDF thật của Google Docs (3 ô ký): Trang chủ → ô **SP không phù hợp** → **Lập phiếu sản phẩm không phù hợp** → Sản phẩm `Hàng thử`,
+   Mô tả `Phiếu thử` → **Lập phiếu** → cuối màn phiếu **In phiếu sản phẩm không phù hợp** → **Tải PDF** → **Mở / lưu tệp** → xem chữ
+   Việt / Trung, logo, mã BM-CL-04-01, hàng ký có **3 ô** (Người lập phiếu · Người quyết định xử lý · Người xác nhận đóng) → quay lại
+   phiếu → **Hủy phiếu** → Lý do `Phiếu thử` → **Đúng** → nhập PIN. (Phiếu thử chiếm số NC-2611-001; phiếu thật lấy số kế tiếp.)
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/ncr.test.mjs` (3 test, iPhone 390×844 và máy tính 1440×900): Trang chủ → ô SP
+không phù hợp → Lập phiếu (thiếu sản phẩm báo lỗi tại ô) → NC-2611-001 Chờ quyết định, hạn 2 ngày → Chờ bạn xử lý ở trang chủ → ảnh hàng
+lỗi → Quyết định xử lý: làm lại 300 tờ + hủy 200 tờ, cần phiếu khắc phục → PIN → Đang xử lý, nút đóng khóa → **Lập phiếu khắc phục** (điền
+sẵn sản phẩm, lô, số lượng, mô tả, cách ly; nguồn Sản phẩm không phù hợp) → KP-2611-001 → quay lại phiếu NC → Xong xử lý (Không cần kiểm
+tra lại bị khóa vì có làm lại) → Đã đóng → In phiếu BM-CL-04-01 (3 ô ký) → PDF BC-2611-001 → Biên bản xử lý BM-CL-04-04 → Sổ theo dõi
+BM-CL-04-02 → Trạng thái hệ thống; nhân viên CĐ lập phiếu (không có nút Quyết định) → trưởng BP CĐ thấy nhân nhượng / hủy bỏ bị khóa
+"chỉ Quản trị", chọn Trả nhà cung cấp (PIN) → đóng với Không cần kiểm tra lại → Excel biên bản xử lý; app 3c với máy chủ 3b. Máy chủ
+`tests/server/ncr.test.mjs` (5 test): kiểm dữ liệu, phạm vi Cơ điện, quyền theo bộ phận / cấp, mã NC, hạn quyết định, dịch máy, ảnh; quyền
+quyết định (người lập, bộ phận khác, cấp 3 chọn hủy bỏ → báo trước PIN), quyết định lại có lịch sử, đóng (kiểm tra lại, cần phiếu khắc
+phục), phiếu khắc phục từ NC (gắn hai chiều, không lập trùng, nguồn NCR không chọn tay), hủy, Quản trị tự quyết định / tắt tự duyệt;
+Gmail `NCR_DECIDE` → trưởng BP, `NCR_DUE` → người phụ trách, mốc 7 / 1 / 0 ngày + quá hạn, đóng thì thôi nhắc; báo cáo phiếu / biên bản /
+sổ + PDF + tên tệp + đổi mã biểu; cập nhật từ 3b (thiếu sheet → tự thêm; dòng nhật ký ở bước 2). Cả bộ: 91 test máy chủ + 40 test giao
+diện đạt.
+
+Không kiểm được ở đâu cả trước khi dùng thật: thư Gmail thật "Sản phẩm không phù hợp chờ quyết định xử lý" (người quyết định phải có email
+đã xác nhận), chụp ảnh bằng camera iPhone thật.
+
+### Dùng sản phẩm không phù hợp
+
+- Phát hiện hàng / vật tư lỗi: **cách ly, treo thẻ** trước, rồi **Lập phiếu** (ghi đã cách ly thế nào, để ở đâu; chụp ảnh). Hạn quyết
+  định mặc định 2 ngày.
+- **Quyết định xử lý**: mỗi cách xử lý một dòng kèm số lượng; **Thêm dòng** khi chia nhiều cách. Nhân nhượng / dùng nguyên trạng phải ghi
+  **Căn cứ nhân nhượng** (khách hàng đồng ý bằng email / văn bản ngày…). Lỗi có thể lặp lại (do thiết bị, quy trình) → chọn **Cần phiếu
+  khắc phục** rồi bấm **Lập phiếu khắc phục** trong phiếu.
+- Làm lại / sửa chữa / hạ cấp xong phải **kiểm tra lại**: đạt thì **Xong xử lý, đóng phiếu**; không đạt thì **Quyết định lại** (vd hủy).
+- In: **In phiếu sản phẩm không phù hợp** (BM-CL-04-01), **In biên bản xử lý** (BM-CL-04-04, có các lần quyết định trước); **Sổ theo dõi**
+  cả năm (BM-CL-04-02) ở nút đầu danh sách hoặc **Báo cáo → Sản phẩm không phù hợp**.
+- **Cấu hình**: `ncr_form_code`, `ncr_decision_form_code`, `ncr_log_form_code` (mã biểu in trên phiếu), `ncr_decide_days` (hạn quyết định,
+  ngày), `ncr_exec_days` (hạn xử lý mặc định, ngày).
+
+## CẬP NHẬT LÊN BẢN 3.3 (1.0.0-d3.3, Ảnh nền) — đã xong (Trạng thái hệ thống 13/11/2026: máy chủ 1.0.0-d3.3, schema 1.0.9)
 
 Bản này **gồm luôn bản 3b**. Không hỏi quyền Google mới, không cần `installTriggers`.
 
@@ -75,7 +144,7 @@ giao diện đạt.
 Lưu ý: máy chưa đăng nhập lần nào (máy mới, hoặc đã xóa dữ liệu trang) thấy ảnh mặc định ở màn đăng nhập cho tới lần đăng nhập đầu. Biểu
 tượng app trên màn hình chính iPhone và ô vuông vàng cạnh chữ ISO không đổi trong app (cần Claude thay tệp).
 
-## CẬP NHẬT LÊN BẢN 3b (1.0.0-d3.2) — làm một lần, trên máy tính
+## CẬP NHẬT LÊN BẢN 3b (1.0.0-d3.2) — đã xong (gộp trong bản 3.3)
 
 Bản 3b **thêm 17 cột vào sheet `Capas` và 4 cài đặt** (`complaint_form_code` = BM-KD-02-01, `d8_form_code` = BM-KD-02-02,
 `scar_form_code` = BM-MH-01-06, `capa_reply_days` = 7) → phải chạy `migrateSchema`. **Không** hỏi quyền Google mới, **không** cần

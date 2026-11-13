@@ -92,6 +92,12 @@ var ACTION_TABLE_ = [
   'capa.verify|2|pin|W',
   'capa.cancel|2|pin|W',
   'capa.reply|2|net|W',
+  // Sản phẩm không phù hợp (Đợt 3, phiên 3c): phiếu NC-yymm-001 (BM-CL-04-01) — lập / sửa; quyết định xử lý (PIN; trưởng bộ phận, cấp 4 — nhân
+  // nhượng / hủy bỏ chỉ cấp 4); xác nhận xong xử lý (PIN), hủy phiếu (PIN). Quyền theo phiếu kiểm ở handler / PRECHECK_ (trước PIN)
+  'ncr.save|2|net|W',
+  'ncr.decide|3|pin|W',
+  'ncr.close|2|pin|W',
+  'ncr.cancel|2|pin|W',
   // Đợt 4: đánh giá nội bộ
   'audit.program.edit|X|net|W',
   // Báo cáo: logo

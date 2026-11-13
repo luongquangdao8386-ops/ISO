@@ -396,6 +396,6 @@ test('Trạng thái hệ thống: dòng Khắc phục; quên migrateSchema: lậ
   g3.dbReset_();
   env3.logs.length = 0;
   g3.migrateSchema();
-  assert.ok(env3.logs.some((l) => l === 'migrateSchema xong. Thêm: Capas; CapaActions. schema_version=1.0.9'), env3.logs.join('\n'));
+  assert.ok(env3.logs.some((l) => l === 'migrateSchema xong. Thêm: Capas; CapaActions. schema_version=1.0.10'), env3.logs.join('\n'));
   void g;
 });

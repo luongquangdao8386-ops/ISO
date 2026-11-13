@@ -62,7 +62,7 @@ test('iPhone: Trang chủ → Báo cáo → Danh mục tài liệu → Xem → T
     assert.equal(await page.locator('.grid9 .tile[href="#/reports"].soon').count(), 0, 'ô Báo cáo hết "Sắp có"');
     await page.click('.grid9 .tile[href="#/reports"]');
     await page.waitForSelector('.rp-item[data-kind="CATALOG"].on');
-    assert.equal(await page.locator('.rp-item').count(), 7); // 2d: + Sổ phân phối, Phiếu đề nghị; 3a: + Khắc phục
+    assert.equal(await page.locator('.rp-item').count(), 8); // 2d: + Sổ phân phối, Phiếu đề nghị; 3a: + Khắc phục; 3c: + Sản phẩm không phù hợp
     assert.equal(await page.locator('#rp-saved .muted').count(), 1); // chưa có báo cáo nào
     // Bộ lọc chỉ có ô chọn: không có ô gõ (iPhone không bật bàn phím)
     assert.equal(await page.locator('.rp-filter-card input[type="text"], .rp-filter-card input:not([type]), .rp-filter-card textarea').count(), 0);

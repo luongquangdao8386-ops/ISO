@@ -438,3 +438,47 @@ export function capaOverdue(c, acts, t = today()) {
 export async function capaActsOf(capaId) {
   return (await recs('CAPA_ACT')).filter((a) => a.capa_id === capaId && !a.archived_at).sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
 }
+
+/* ---------------- Sản phẩm không phù hợp (phiên 3c) — quyền phía client chỉ để ẩn/hiện nút, máy chủ kiểm lại (34_ncr.js) ---------------- */
+
+/** Máy chủ đã lên bản 3c (có ncr.save trong danh sách quyền) — chưa có thì màn Sản phẩm không phù hợp báo cần cập nhật máy chủ */
+export async function ncrOn() { return can('ncr.save'); }
+/** Nơi phát hiện */
+export const NCR_STAGES = ['INCOMING', 'PROCESS', 'FINAL', 'STORAGE', 'CUSTOMER', 'OTHER'];
+/** Cách xử lý; nhân nhượng / hủy bỏ chỉ cấp 4 quyết định; làm lại / sửa chữa / hạ cấp phải kiểm tra lại Đạt mới đóng */
+export const NCR_DISPOSITIONS = ['REWORK', 'REPAIR', 'REGRADE', 'CONCESSION', 'RETURN', 'SCRAP'];
+export const NCR_TOP_DISPOSITIONS = ['CONCESSION', 'SCRAP'];
+export const NCR_RECHECK_DISPOSITIONS = ['REWORK', 'REPAIR', 'REGRADE'];
+/** Lập phiếu cho bộ phận: cấp 2+ trong bộ phận, Thư ký ISO */
+export function canCreateNcr(dept) { return canCreateCapa(dept); }
+/** Sửa phiếu (chờ quyết định / đang xử lý): Thư ký ISO, trưởng bộ phận, người phụ trách, người lập */
+export function canEditNcr(n) {
+  if (!n || !inScopeDept(n.dept_code)) return false;
+  if (isSecretary()) return true;
+  if (roleLevel() >= 3 && deptWritable(n.dept_code)) return true;
+  return roleLevel() >= 2 && (n.owner_user_id === myId() || n.created_by === myId());
+}
+/** Quyết định xử lý: trưởng bộ phận (cấp 3 trong bộ phận), Quản trị (cấp 4); người lập không tự quyết định (cấp 4 được khi admin_self_approval) */
+export function canDecideNcr(n) {
+  if (!n || !inScopeDept(n.dept_code)) return false;
+  const lvl = roleLevel();
+  if (lvl >= 4) return n.created_by !== myId() || (session.settings || {}).admin_self_approval !== false;
+  return lvl === 3 && deptWritable(n.dept_code) && n.created_by !== myId();
+}
+/** Được chọn nhân nhượng / hủy bỏ */
+export function canDecideTop() { return roleLevel() >= 4; }
+/** Xác nhận xong xử lý (đóng): người sửa được phiếu, người quyết định được */
+export function canCloseNcr(n) { return canEditNcr(n) || canDecideNcr(n); }
+/** Hủy phiếu: Thư ký ISO, người lập */
+export function canCancelNcr(n) { return !!n && inScopeDept(n.dept_code) && (isSecretary() || (roleLevel() >= 2 && n.created_by === myId())); }
+/** Gắn ảnh / tệp: phiếu chờ quyết định / đang xử lý; người sửa được phiếu, người quyết định */
+export function canNcrFiles(n) { return !!n && (n.state === 'OPEN' || n.state === 'DECIDED') && (canEditNcr(n) || canDecideNcr(n)); }
+/** Phiếu quá hạn (như máy chủ ncrOverdue_): chờ quyết định quá hạn quyết định; đang xử lý quá hạn thực hiện */
+export function ncrOverdue(n, t = today()) {
+  if (!n) return false;
+  if (n.state === 'OPEN') return !!n.decide_due && String(n.decide_due) < t;
+  if (n.state === 'DECIDED') return !!n.exec_due && String(n.exec_due) < t;
+  return false;
+}
+/** Cần kiểm tra lại Đạt trước khi đóng (có làm lại / sửa chữa / hạ cấp) */
+export function ncrNeedsRecheck(n) { return (n && n.decision_json || []).some((l) => NCR_RECHECK_DISPOSITIONS.includes(l.d)); }

@@ -4,7 +4,7 @@ import { bi, biText, esc, fmtDateTime, badge, session, api, resMsg, nameText, BU
 import { ICON, toast, dialog, askPin } from '../ui.js';
 import { getMeta, queueItems, exportBackup } from '../sync.js';
 import { reauth } from '../auth.js';
-import { boot, roleLevel, isOwner, isSecretary, can, myDepts, mapOf, docControlOn } from '../data.js';
+import { boot, roleLevel, isOwner, isSecretary, can, myDepts, mapOf, docControlOn, ncrOn } from '../data.js';
 import { app, syncNow, updateSyncStatus } from '../app.js';
 import { shareFileNow } from '../media.js';
 
@@ -64,6 +64,7 @@ export async function renderAccount(view, { shell }) {
   const mine = myDepts();
   const sec = isSecretary();
   const dcOn = await docControlOn();
+  const nOn = await ncrOn();
   // Mã vỏ app đang chạy (tên cache của Service Worker …-shell-<bản>-<mã>): so với mã Claude báo khi phát hành để biết máy đã nhận đủ bản mới
   let shellHash = '';
   try { const k = (await caches.keys()).filter((x) => /-shell-/.test(x) && x.startsWith(NS + '-shell-')).pop(); if (k) shellHash = k.split('-').pop(); } catch (e) { /* bỏ qua */ }
@@ -96,6 +97,7 @@ export async function renderAccount(view, { shell }) {
     ${lvl >= 2 || sec ? link('nav.coverage', '/coverage') : ''}
     ${link('nav.reports', '/reports')}
     ${lvl >= 2 || sec ? link('nav.capa', '/capa') : ''}
+    ${(lvl >= 2 || sec) && nOn ? link('nav.ncr', '/ncr') : ''}
     ${lvl >= 2 ? link('nav.audits', '/audits', `<span class="tag soon">${bi('soon.tag')}</span>`) : ''}
   </section>
   <section class="card"><h2>${bi('account.sync')}</h2>

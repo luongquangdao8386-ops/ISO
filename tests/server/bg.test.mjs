@@ -97,7 +97,7 @@ test('máy chủ đang ở bản 3b (Settings chưa có dòng bg_*): dán Code.g
   assert.equal(owner.call('sync.bootstrap', {}).data.settings.bg_home_rev, r.data.rev);
   env.logs.length = 0;
   g.migrateSchema();
-  assert.ok(env.logs.some((l) => l === 'migrateSchema xong. Thêm: không có. schema_version=1.0.9'), env.logs.join('\n'));
+  assert.ok(env.logs.some((l) => l === 'migrateSchema xong. Thêm: không có. schema_version=1.0.10'), env.logs.join('\n'));
   g.dbReset_();
   assert.equal(g.readRows_('Settings').filter((x) => /^bg_/.test(x.setting_key)).length, 4);
   assert.equal(g.setting_('bg_home_rev'), r.data.rev, 'migrateSchema không ghi đè ảnh đã đặt');

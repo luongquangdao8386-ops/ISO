@@ -11,28 +11,35 @@
  *             (capa_id) để in ký, hoặc sổ theo dõi khắc phục theo năm phát hiện. Phiên 3b: một phiếu in theo mẫu (form) CAR phiếu khắc phục ·
  *             RECEIPT phiếu tiếp nhận khiếu nại (complaint_form_code) · D8 báo cáo 8D (d8_form_code) · SCAR (scar_form_code); sổ lọc theo loại
  *             (source ALL | INTERNAL | COMPLAINT | SUPPLIER).
+ *  - NCR      Sản phẩm không phù hợp (phiên 3c, 34_ncr.js — mã biểu theo Settings ncr_form_code / ncr_decision_form_code / ncr_log_form_code,
+ *             mặc định BM-CL-04-01 / 04-04 / 04-02): một phiếu (ncr_id) in theo mẫu NCR phiếu · DECISION biên bản xử lý, hoặc sổ theo dõi theo năm.
  * report.run: xem trước (không ghi). report.save: lưu bản chụp (tệp JSON riêng tư trên Drive + dòng ReportRuns, mã BC-yymm-001) rồi
  * trả PDF (máy chủ dựng bằng Google Docs tạm, 28_report_pdf.js) hoặc bản chụp để app dựng Excel; gọi lại cùng report_run_id → cùng mã,
  * cùng số liệu. report.list: báo cáo đã lưu (người lập thấy của mình; Thư ký ISO, cấp 4 thấy tất cả).
  * Quyền: Danh mục, Lịch sử phiên bản — mọi cấp (trong phạm vi biểu); Tình trạng hồ sơ, Phủ điều khoản — cấp 2+ / Thư ký ISO
  * ("Xem tổng hợp, phủ điều khoản" ở bảng quyền). Cấp 1–3 chỉ có biểu trong bộ phận mình + tài liệu chung. */
 
-var REPORT_KINDS_ = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA'];
+var REPORT_KINDS_ = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA', 'NCR'];
 var REPORT_SNAPSHOT_MAX_ = 4 * 1024 * 1024;
 /** Biểu mẫu ISO mà báo cáo thay (in ở khối thông tin bên phải) */
 var REPORT_FORM_CODE_ = { CATALOG: 'BM-ISO-02-01', DOCREQ: 'BM-ISO-02-02', DIST: 'BM-ISO-02-03' };
 /** Tên tệp tải về */
-var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban', DIST: 'so-phan-phoi-thu-hoi', DOCREQ: 'de-nghi-tai-lieu', CAPA: 'so-theo-doi-khac-phuc' };
+var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban', DIST: 'so-phan-phoi-thu-hoi', DOCREQ: 'de-nghi-tai-lieu', CAPA: 'so-theo-doi-khac-phuc', NCR: 'so-theo-doi-sp-khong-phu-hop' };
 
 /** Cài đặt mã biểu theo mẫu in một phiếu khắc phục (3b) */
 var CAPA_FORM_SETTING_ = { CAR: 'capa_form_code', RECEIPT: 'complaint_form_code', D8: 'd8_form_code', SCAR: 'scar_form_code' };
 /** Tên tệp một phiếu theo mẫu in; sổ theo loại */
 var CAPA_FORM_SLUG_ = { CAR: 'phieu-khac-phuc', RECEIPT: 'tiep-nhan-khieu-nai', D8: 'bao-cao-8d', SCAR: 'scar' };
 var CAPA_LOG_SLUG_ = { COMPLAINT: 'so-theo-doi-khieu-nai', SUPPLIER: 'so-theo-doi-scar' };
+/** Sản phẩm không phù hợp (3c): mẫu in một phiếu → cài đặt mã biểu, tên tệp */
+var NCR_FORMS_ = ['NCR', 'DECISION'];
+var NCR_FORM_SETTING_ = { NCR: 'ncr_form_code', DECISION: 'ncr_decision_form_code' };
+var NCR_FORM_SLUG_ = { NCR: 'phieu-sp-khong-phu-hop', DECISION: 'bien-ban-xu-ly' };
 
 /** Mã biểu in trên báo cáo: khắc phục theo cài đặt (phiếu theo mẫu in / sổ), còn lại theo REPORT_FORM_CODE_ */
 function reportFormCode_(kind, f) {
   if (kind === 'CAPA') return String(setting_(f && f.capa_id ? CAPA_FORM_SETTING_[f.form || 'CAR'] || 'capa_form_code' : 'capa_log_form_code') || '');
+  if (kind === 'NCR') return String(setting_(f && f.ncr_id ? NCR_FORM_SETTING_[f.form || 'NCR'] || 'ncr_form_code' : 'ncr_log_form_code') || '');
   return REPORT_FORM_CODE_[kind] || '';
 }
 
@@ -51,7 +58,7 @@ var REPORT_GRAINS_ = { MONTH: { def: 6, max: 12 }, QUARTER: { def: 4, max: 8 } }
 /** Loại báo cáo người dùng được xem */
 function reportKindAllowed_(u, kind) {
   if (REPORT_KINDS_.indexOf(kind) < 0) return false;
-  if (kind === 'RECORDS' || kind === 'COVERAGE' || kind === 'DIST' || kind === 'DOCREQ' || kind === 'CAPA') return isSecretary_(u) || Number(u.role_level) >= 2;
+  if (kind === 'RECORDS' || kind === 'COVERAGE' || kind === 'DIST' || kind === 'DOCREQ' || kind === 'CAPA' || kind === 'NCR') return isSecretary_(u) || Number(u.role_level) >= 2;
   return true;
 }
 
@@ -106,6 +113,12 @@ function reportFilters_(kind, f, today) {
     }
     return { capa_id: String(f.capa_id), form: form };
   }
+  if (kind === 'NCR' && f.ncr_id) {
+    if (!isUuidV4_(f.ncr_id)) throw validationError_([fieldError_('filters.ncr_id', 'ID_INVALID')]);
+    var nform = f.form ? String(f.form) : 'NCR';
+    if (NCR_FORMS_.indexOf(nform) < 0) throw validationError_([fieldError_('filters.form', 'INVALID_VALUE')]);
+    return { ncr_id: String(f.ncr_id), form: nform };
+  }
   if (kind !== 'VERSIONS') {
     if (dept) {
       var d = findOne_('Depts', 'dept_code', dept);
@@ -157,6 +170,13 @@ function reportFilters_(kind, f, today) {
     var src = f.source || 'ALL';
     if (['ALL', 'INTERNAL', 'COMPLAINT', 'SUPPLIER'].indexOf(src) < 0) { errs.push(fieldError_('filters.source', 'INVALID_VALUE')); src = 'ALL'; }
     out.source = src;
+  } else if (kind === 'NCR') {
+    var ny = f.year === undefined || f.year === null || f.year === '' ? Number(today.slice(0, 4)) : Number(f.year);
+    if (!(ny >= 2000 && ny <= Number(today.slice(0, 4))) || Math.floor(ny) !== ny) { errs.push(fieldError_('filters.year', 'INVALID_VALUE')); ny = Number(today.slice(0, 4)); }
+    out.year = ny;
+    var ns = f.state || 'ALL';
+    if (['ALL', 'OPEN', 'DECIDED', 'OVERDUE', 'CLOSED'].indexOf(ns) < 0) { errs.push(fieldError_('filters.state', 'INVALID_VALUE')); ns = 'ALL'; }
+    out.state = ns;
   }
   if (errs.length) throw validationError_(errs);
   return out;
@@ -592,8 +612,8 @@ function reportCompute_(ctx, kind, filters) {
   var f = reportFilters_(kind, filters, today);
   var res = kind === 'CATALOG' ? reportCatalog_(ctx, f, today) : kind === 'RECORDS' ? reportRecords_(ctx, f, today)
     : kind === 'COVERAGE' ? reportCoverage_(ctx, f) : kind === 'DIST' ? reportDist_(ctx, f, today)
-    : kind === 'DOCREQ' ? reportDocreq_(ctx, f) : kind === 'CAPA' ? reportCapa_(ctx, f, today) : reportVersions_(ctx, f);
-  var t = LABELS['rpt.title.' + kind + (kind === 'CAPA' ? capaTitleSuffix_(f) : '')] || [kind, kind];
+    : kind === 'DOCREQ' ? reportDocreq_(ctx, f) : kind === 'CAPA' ? reportCapa_(ctx, f, today) : kind === 'NCR' ? reportNcr_(ctx, f, today) : reportVersions_(ctx, f);
+  var t = LABELS['rpt.title.' + kind + (kind === 'CAPA' ? capaTitleSuffix_(f) : kind === 'NCR' ? (f.ncr_id ? (f.form === 'DECISION' ? '_DECISION' : '') : '_LOG') : '')] || [kind, kind];
   var formCode = reportFormCode_(kind, f);
   var formRev = '';
   if (formCode) {
@@ -623,9 +643,10 @@ function capaTitleSuffix_(f) {
 /** Tên tệp tải về: BC-2611-001_danh-muc-tai-lieu.pdf (lịch sử phiên bản thêm mã biểu) */
 function reportFileName_(snap, ext) {
   var tail = snap.kind === 'VERSIONS' && snap.data && snap.data.item ? '_' + String(snap.data.item.code).replace(/[\/\\:*?"<>|\s]+/g, '-')
-    : (snap.kind === 'DOCREQ' || snap.kind === 'CAPA') && snap.data && snap.data.one ? '_' + String(snap.data.one.code) : '';
+    : (snap.kind === 'DOCREQ' || snap.kind === 'CAPA' || snap.kind === 'NCR') && snap.data && snap.data.one ? '_' + String(snap.data.one.code) : '';
   var cf = snap.filters || {};
-  var slug = snap.kind !== 'CAPA' ? REPORT_SLUG_[snap.kind]
+  var slug = snap.kind === 'NCR' ? (snap.data && snap.data.one ? NCR_FORM_SLUG_[cf.form || 'NCR'] || NCR_FORM_SLUG_.NCR : REPORT_SLUG_.NCR)
+    : snap.kind !== 'CAPA' ? REPORT_SLUG_[snap.kind]
     : snap.data && snap.data.one ? CAPA_FORM_SLUG_[cf.form || 'CAR'] || 'phieu-khac-phuc' : CAPA_LOG_SLUG_[cf.source] || REPORT_SLUG_.CAPA;
   return (snap.code ? snap.code + '_' : '') + slug + tail + '.' + ext;
 }

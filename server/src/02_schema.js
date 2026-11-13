@@ -79,7 +79,21 @@ var SHEETS = {
       'correction_vi correction_zh cause_vi cause_zh owner_user_id due_date state files_json completed_at completed_by verify_due ' +
       'verify_count verified_at verified_by verify_date verify_result verify_note_vi verify_note_zh verify_history_json closed_at ' +
       'cancelled_at cancelled_by cancel_reason party_name party_contact product_text lot_text qty_text severity complaint_valid team_text ' +
-      'escape_vi escape_zh sent_date reply_due reply_date reply_note_vi reply_note_zh reply_at reply_by' },
+      'escape_vi escape_zh sent_date reply_due reply_date reply_note_vi reply_note_zh reply_at reply_by ncr_id' },
+  // Sản phẩm không phù hợp (Đợt 3, phiên 3c, 34_ncr.js): mã NC-yymm-001; stage nơi phát hiện; dept_code bộ phận quản lý phiếu; ref_text tham
+  // chiếu (lệnh sản xuất, thiết bị, phiếu sửa chữa M&E, PO…); product_text / lot_text / qty_text sản phẩm hoặc vật tư, lô, số lượng không phù
+  // hợp; party_name khách hàng trả về / nhà cung cấp (tùy chọn); severity MINOR | MAJOR | CRITICAL; problem mô tả; contain biện pháp cách ly,
+  // nhận dạng (thẻ treo, khu vực riêng); hold_place nơi để hàng cách ly; cause nguyên nhân sơ bộ; owner_user_id người phụ trách xử lý;
+  // decide_due hạn quyết định (ngày phát hiện + ncr_decide_days); state OPEN | DECIDED | CLOSED | CANCELLED; files_json ảnh / tệp như Records.
+  // Quyết định hiện hành: decision_json [{d: REWORK|REPAIR|REGRADE|CONCESSION|RETURN|SCRAP, qty, note}], decision_note, decision_date, decided_at /
+  // decided_by, exec_due hạn thực hiện, need_capa YES | NO (cần phiếu khắc phục), concession_text căn cứ nhân nhượng (ý kiến khách hàng…);
+  // decision_history_json mọi lần quyết định. Đóng: done_date, result kết quả xử lý, recheck PASS | NA (kiểm tra lại sau làm lại / sửa / hạ cấp),
+  // closed_at / closed_by. capa_id phiếu khắc phục lập từ phiếu này (Capas.ncr_id trỏ ngược lại).
+  Ncrs: { book: 'B', dot: 1, key: 'ncr_id', c: true, i18n: true,
+    cols: 'ncr_id code stage dept_code ref_text found_date found_by_name product_text lot_text qty_text party_name severity problem_vi problem_zh ' +
+      'contain_vi contain_zh hold_place cause_vi cause_zh owner_user_id decide_due state files_json decision_json decision_note_vi decision_note_zh ' +
+      'decision_date decided_at decided_by exec_due need_capa concession_text decision_history_json done_date result_vi result_zh recheck ' +
+      'closed_at closed_by capa_id cancelled_at cancelled_by cancel_reason' },
   // Hành động khắc phục / phòng ngừa của phiếu: owner_user_id người phụ trách trong app (nhận Gmail nhắc 7, 1, 0 ngày trước hạn), assignee_name
   // tên người thực hiện ngoài app; round = lần kiểm tra hiệu lực lúc thêm (0: kế hoạch đầu, 1: bổ sung sau lần kiểm tra không hiệu lực thứ nhất…)
   CapaActions: { book: 'B', dot: 1, key: 'action_id', c: true, i18n: true,
@@ -152,7 +166,8 @@ var TYPE_OVERRIDES_ = {
   email_confirmed_by: 'STRING', stage: 'STRING', kind: 'STRING', via: 'STRING', dedupe_key: 'STRING', digest_id: 'STRING', recipient_id: 'STRING',
   set_code: 'STRING', sheet_count: 'INT', uploaded_by: 'STRING', deleted_by: 'STRING', mime_type: 'STRING',
   ref_text: 'STRING', found_by_name: 'STRING', completed_by: 'STRING', verified_by: 'STRING', verify_due: 'DATE', verify_count: 'INT',
-  verify_result: 'STRING', seq: 'INT', round: 'INT', atype: 'STRING', assignee_name: 'STRING', done_by: 'STRING'
+  verify_result: 'STRING', seq: 'INT', round: 'INT', atype: 'STRING', assignee_name: 'STRING', done_by: 'STRING',
+  stage: 'STRING', decide_due: 'DATE', exec_due: 'DATE', decided_by: 'STRING', closed_by: 'STRING', need_capa: 'STRING', recheck: 'STRING', hold_place: 'STRING'
 };
 
 /** Kiểu cột suy theo tên. */

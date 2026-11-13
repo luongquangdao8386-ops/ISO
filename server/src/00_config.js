@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d3.3';
+var SERVER_VERSION = '1.0.0-d3.4';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.9';
+var SCHEMA_VERSION = '1.0.10';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1, '1.0.10': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -90,6 +90,13 @@ var SETTINGS_DEFAULTS = [
   ['d8_form_code', 'STRING', 'BM-KD-02-02', true, 1, 'Mã biểu của báo cáo 8D (khiếu nại khách hàng)', '8D报告（客户投诉）的表单编号'],
   ['scar_form_code', 'STRING', 'BM-MH-01-06', true, 1, 'Mã biểu của phiếu yêu cầu khắc phục nhà cung cấp (SCAR)', '供应商纠正措施要求单（SCAR）的表单编号'],
   ['capa_reply_days', 'INT', 7, true, 1, 'Hạn phản hồi khách hàng / nhà cung cấp trả lời SCAR (ngày từ khi tiếp nhận, mặc định)', '回复客户/供应商回复SCAR的期限（自受理日起天数，默认）'],
+  // Đợt 3 (phiên 3c): sản phẩm không phù hợp (34_ncr.js). Người dùng chốt 13/11/2026 giữ phạm vi Cơ điện: phiếu thuộc bộ phận trong phạm vi
+  // (hàng lỗi do thiết bị / sự cố máy, vật tư cơ điện lỗi), in theo mẫu biểu CL (mã sửa được ở Cấu hình)
+  ['ncr_form_code', 'STRING', 'BM-CL-04-01', true, 1, 'Mã biểu của phiếu sản phẩm không phù hợp', '不合格品处理单的表单编号'],
+  ['ncr_log_form_code', 'STRING', 'BM-CL-04-02', true, 1, 'Mã biểu của sổ theo dõi sản phẩm không phù hợp', '不合格品跟踪台账的表单编号'],
+  ['ncr_decision_form_code', 'STRING', 'BM-CL-04-04', true, 1, 'Mã biểu của biên bản xử lý sản phẩm không phù hợp', '不合格品处置记录的表单编号'],
+  ['ncr_decide_days', 'INT', 2, true, 1, 'Hạn quyết định xử lý sản phẩm không phù hợp (ngày từ khi phát hiện)', '不合格品处置决定期限（自发现日起天数）'],
+  ['ncr_exec_days', 'INT', 7, true, 1, 'Hạn thực hiện xử lý sau khi quyết định (ngày, mặc định)', '处置决定后的执行期限（天，默认）'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本'],
   // Ảnh nền màn đăng nhập / trang chủ (Quản trị → Ảnh nền, 33_bg.js): ID tệp trên Drive và mã phiên bản ('' = ảnh mặc định trong app)
@@ -125,6 +132,7 @@ var CODE_PATTERNS = {
   RECORD: { prefix: 'HS', digits: 4, yymm: true, sheet: 'Records', col: 'code' },
   DOC_REQUEST: { prefix: 'DN', digits: 3, yymm: true, sheet: 'DocRequests', col: 'code' },
   CAPA: { prefix: 'KP', digits: 3, yymm: true, sheet: 'Capas', col: 'code' },
+  NCR: { prefix: 'NC', digits: 3, yymm: true, sheet: 'Ncrs', col: 'code' },
   REPORT: { prefix: 'BC', digits: 3, yymm: true, sheet: 'ReportRuns', col: 'code' }
 };
 
@@ -135,16 +143,18 @@ var DOC_ENTITY_SHEETS_ = {
   // Kho tệp mẫu (2e): một dòng TplFiles = một tệp mẫu (bộ biểu xlsx nhiều sheet, hoặc docx/pdf), tải lên bằng tpl.upload
   TPL: { sheet: 'TplFiles', key: 'tpl_id', kinds: ['TEMPLATE'] },
   // Khắc phục (3a): ảnh hiện trường, bằng chứng thực hiện / kiểm tra hiệu lực (ảnh, PDF, Excel, Word) gắn vào phiếu khắc phục
-  CAPA: { sheet: 'Capas', key: 'capa_id', kinds: ['PHOTO', 'FILE'] }
+  CAPA: { sheet: 'Capas', key: 'capa_id', kinds: ['PHOTO', 'FILE'] },
+  // Sản phẩm không phù hợp (3c): ảnh hàng lỗi, thẻ treo, khu vực cách ly, biên bản hủy / trả hàng…
+  NCR: { sheet: 'Ncrs', key: 'ncr_id', kinds: ['PHOTO', 'FILE'] }
 };
 
 /** Khắc phục (Đợt 3, phiên 3a — thay BM-CĐ-14-02 trong phạm vi Cơ điện; BM-ISO-04-01 phiếu, 04-02 sổ khi mở rộng toàn công ty), mã KP-yymm-001.
  *  Nguồn: sự cố thiết bị · kiểm tra / kiểm định · đánh giá · an toàn – môi trường – năng lượng · không tuân thủ quy trình · khác
- *  khiếu nại khách hàng (3b, 8D) · nhà cung cấp (3b, SCAR) (3c thêm sản phẩm không phù hợp).
+ *  khiếu nại khách hàng (3b, 8D) · nhà cung cấp (3b, SCAR) · sản phẩm không phù hợp (3c, chỉ lập từ phiếu NC — ncr_id).
  *  Phiếu: OPEN đang xử lý → (xong mọi hành động, có nguyên nhân) VERIFYING chờ kiểm tra hiệu lực → CLOSED đã đóng (có hiệu lực) |
  *  OPEN lại (không hiệu lực: thêm hành động, lần kiểm tra sau); CANCELLED hủy (lập nhầm, kèm lý do).
  *  Hành động: OPEN → DONE (ngày hoàn thành + kết quả) | CANCELLED. */
-var CAPA_SOURCES_ = ['EQUIPMENT', 'INSPECTION', 'AUDIT', 'SAFETY', 'PROCESS', 'COMPLAINT', 'SUPPLIER', 'OTHER'];
+var CAPA_SOURCES_ = ['EQUIPMENT', 'INSPECTION', 'AUDIT', 'SAFETY', 'PROCESS', 'COMPLAINT', 'SUPPLIER', 'NCR', 'OTHER'];
 /** Phiên 3b: nguồn có đối tác bên ngoài — COMPLAINT khiếu nại khách hàng (8D), SUPPLIER yêu cầu khắc phục nhà cung cấp / nhà thầu (SCAR).
  *  Thêm: đối tác, sản phẩm / vật tư, lô, số lượng, mức độ, hạn phản hồi; phản hồi (capa.reply) bắt buộc trước khi đóng phiếu. */
 var CAPA_PARTY_SOURCES_ = ['COMPLAINT', 'SUPPLIER'];
@@ -158,6 +168,23 @@ var CAPA_ACT_TYPES_ = ['CORRECTIVE', 'PREVENTIVE'];
 var CAPA_ACT_STATES_ = ['OPEN', 'DONE', 'CANCELLED'];
 var CAPA_MAX_ACTIONS_ = 30;
 var CAPA_MAX_FILES_ = 30;
+
+/** Sản phẩm không phù hợp (Đợt 3, phiên 3c — BM-CL-04-01 phiếu, 04-02 sổ, 04-04 biên bản xử lý), mã NC-yymm-001.
+ *  Nơi phát hiện: đầu vào (vật tư, nguyên liệu, phụ tùng) · trong sản xuất · kiểm tra thành phẩm · kho, vận chuyển · khách hàng trả về · khác.
+ *  Phiếu: OPEN chờ quyết định (đã cách ly, nhận dạng) → (người có thẩm quyền quyết định, PIN) DECIDED đang xử lý → (xong xử lý, kiểm tra lại,
+ *  PIN) CLOSED đã đóng; CANCELLED hủy (lập nhầm). Quyết định lại khi đang xử lý (vd làm lại không đạt → hủy) — mọi lần lưu ở lịch sử.
+ *  Cách xử lý: làm lại · sửa chữa · hạ cấp / dùng vào việc khác · nhân nhượng / dùng nguyên trạng · trả nhà cung cấp · hủy bỏ — một phiếu
+ *  nhiều dòng (vd 300 tờ làm lại, 200 tờ hủy). Nhân nhượng và hủy bỏ chỉ Quản trị (cấp 4) quyết định (người dùng chốt 13/11/2026). */
+var NCR_STAGES_ = ['INCOMING', 'PROCESS', 'FINAL', 'STORAGE', 'CUSTOMER', 'OTHER'];
+var NCR_STATES_ = ['OPEN', 'DECIDED', 'CLOSED', 'CANCELLED'];
+var NCR_DISPOSITIONS_ = ['REWORK', 'REPAIR', 'REGRADE', 'CONCESSION', 'RETURN', 'SCRAP'];
+/** Chỉ cấp 4 quyết định */
+var NCR_TOP_DISPOSITIONS_ = ['CONCESSION', 'SCRAP'];
+/** Sản phẩm sau xử lý phải kiểm tra lại đạt mới đóng (ISO 9001 điều 8.7.1) */
+var NCR_RECHECK_DISPOSITIONS_ = ['REWORK', 'REPAIR', 'REGRADE'];
+var NCR_RECHECKS_ = ['PASS', 'NA'];
+var NCR_MAX_LINES_ = 6;
+var NCR_MAX_FILES_ = 30;
 
 /** Kho tệp mẫu (2e): ACTIVE đang dùng · REPLACED đã thay bằng tệp mới cùng bộ (giữ để tra) · DELETED đã bỏ (tải nhầm).
  *  Mỗi tệp tối đa TPL_MAX_SHEETS_ sheet; mỗi lần tải lên tối đa TPL_MAX_CODES_ mã biểu tự nhận từ tên sheet. */

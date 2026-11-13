@@ -79,6 +79,7 @@ export async function updateSyncStatus() {
     app.shell.setBadge('requests', p.req_review.length + p.req_todo.length);
     app.shell.setBadge('dist', p.dist_due.length);
     app.shell.setBadge('capa', p.capa_acts.length + p.capa_verify.length + p.capa_owner.length + p.capa_reply.length);
+    app.shell.setBadge('ncr', p.ncr_decide.length + p.ncr_due.length + p.ncr_capa.length);
   } catch (e) { /* không chặn */ }
 }
 
@@ -190,6 +191,11 @@ function registerRoutes() {
   route('/capa/new', lazy('./pages/capa.js', 'renderCapaForm'), { nav: 'capa' });
   route('/capa/:id/edit', lazy('./pages/capa.js', 'renderCapaForm'), { nav: 'capa' });
   route('/capa/:id', lazy('./pages/capa.js', 'renderCapa'), { nav: 'capa' });
+  // Sản phẩm không phù hợp (Đợt 3, phiên 3c)
+  route('/ncr', lazy('./pages/ncr.js', 'renderNcrs'), { nav: 'ncr' });
+  route('/ncr/new', lazy('./pages/ncr.js', 'renderNcrForm'), { nav: 'ncr' });
+  route('/ncr/:id/edit', lazy('./pages/ncr.js', 'renderNcrForm'), { nav: 'ncr' });
+  route('/ncr/:id', lazy('./pages/ncr.js', 'renderNcr'), { nav: 'ncr' });
   // Màn của đợt sau: hiện "Sắp có · 即将推出"
   ['audits'].forEach((k) => route('/' + k, lazy('./pages/soon.js', 'renderSoon'), { nav: k, soon: k }));
   route('/links', lazy('./pages/links.js', 'renderLinks'), { nav: 'links' });
@@ -256,7 +262,7 @@ window.addEventListener('resize', () => {
 
 // Màn xem (trang chủ, danh mục, chi tiết biểu, hồ sơ, tài khoản) vẽ lại sau khi tự gửi nháp xong.
 // Không vẽ lại màn nhập (sửa biểu, Excel), khi đang mở hộp thoại hoặc đang gõ.
-const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|templates|capa|capa\/(?!new)[^/]+|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
+const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|templates|capa|capa\/(?!new)[^/]+|ncr|ncr\/(?!new)[^/]+|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
 export function refreshAfterSend(r) {
   if (!app.shell) return;
   const path = currentPath();

@@ -162,8 +162,12 @@ export async function renderCapaForm(view, { shell, params, query }) {
   const c = editing ? await byId('CAPA', params.id) : null;
   const q = query || {};
   const it0 = !editing && q.item ? await byId('ITEM', q.item) : null;
-  const backTo = editing ? '/capa/' + encodeURIComponent(params.id) : it0 ? '/item/' + encodeURIComponent(it0.item_id) : '/capa';
+  // Sản phẩm không phù hợp (3c): lập phiếu khắc phục từ phiếu NC (?ncr=) — nguồn NCR, điền sẵn từ phiếu NC; phiếu nguồn NCR không đổi nguồn
+  const n0 = !editing && q.ncr ? await byId('NCR', q.ncr) : (c && c.ncr_id ? await byId('NCR', c.ncr_id) : null);
+  const fromNcr = !!(editing ? c && c.source === 'NCR' : n0);
+  const backTo = editing ? '/capa/' + encodeURIComponent(params.id) : n0 ? '/ncr/' + encodeURIComponent(n0.ncr_id) : it0 ? '/item/' + encodeURIComponent(it0.item_id) : '/capa';
   if (!(await capaOn())) { shell.setScreen({ title: 'capa.new', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.server_old')}</p></div>`; return; }
+  if (!editing && q.ncr && !n0) { shell.setScreen({ title: 'capa.new', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('ncr.not_found')}</p></div>`; return; }
   if (editing && !c) { shell.setScreen({ title: 'capa.edit', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.not_found')}</p></div>`; return; }
   if (editing && (!canEditCapa(c) || c.state !== 'OPEN')) { shell.setScreen({ title: 'capa.edit', back: backTo }); view.innerHTML = `<div class="card empty-state"><p class="muted">${bi('capa.no_edit')}</p></div>`; return; }
   if (needNet(view)) { shell.setScreen({ title: editing ? 'capa.edit' : 'capa.new', back: backTo }); return; }
@@ -173,17 +177,24 @@ export async function renderCapaForm(view, { shell, params, query }) {
   const st = session.settings || {};
   const t = today();
   // Giá trị đang sửa (giữ chữ đã gõ khi đổi loại phiếu)
-  let kind = c ? kindOf(c) : (CAPA_PARTY_SOURCES.includes(q.source) ? q.source : 'INTERNAL');
-  let source = c && !capaIsParty(c) ? c.source : (CAPA_SOURCES.includes(q.source) ? q.source : 'EQUIPMENT');
+  let kind = c ? kindOf(c) : (!n0 && CAPA_PARTY_SOURCES.includes(q.source) ? q.source : 'INTERNAL');
+  let source = fromNcr ? 'NCR' : c && !capaIsParty(c) ? c.source : (CAPA_SOURCES.includes(q.source) ? q.source : 'EQUIPMENT');
+  const nLine = (n, l) => [n.product_text, n.lot_text, n.qty_text].filter(Boolean).join(' · ') + (n[`problem_${l}`] ? '\n' + n[`problem_${l}`] : '');
   const v = {
-    dept_code: c ? c.dept_code : (it0 && deps.some((d) => d.dept_code === it0.dept_code) ? it0.dept_code : (deps.length === 1 ? deps[0].dept_code : '')),
-    found_date: c ? c.found_date : t, found_by_name: c ? c.found_by_name || '' : '', ref_text: c ? c.ref_text || '' : '',
+    dept_code: c ? c.dept_code : (n0 && deps.some((d) => d.dept_code === n0.dept_code) ? n0.dept_code : it0 && deps.some((d) => d.dept_code === it0.dept_code) ? it0.dept_code : (deps.length === 1 ? deps[0].dept_code : '')),
+    found_date: c ? c.found_date : (n0 ? n0.found_date : t), found_by_name: c ? c.found_by_name || '' : (n0 ? n0.found_by_name || '' : ''),
+    ref_text: c ? c.ref_text || '' : (n0 ? [n0.code, n0.ref_text].filter(Boolean).join(' · ') : ''),
     item_id: c ? c.item_id || '' : (it0 ? it0.item_id : ''), owner_user_id: c ? c.owner_user_id : myId(), due_date: c ? c.due_date : addDaysIso(t, 30),
     severity: c ? c.severity || '' : '', complaint_valid: c ? c.complaint_valid || '' : '', sent_date: c ? c.sent_date || '' : '',
     reply_due: c ? c.reply_due || '' : '', i18n_meta: c ? c.i18n_meta : null
   };
   PARTY_TEXT.forEach((k) => { v[k] = c ? c[k] || '' : ''; });
   BI_FIELDS.forEach((b) => { v[b + '_vi'] = c ? c[b + '_vi'] || '' : ''; v[b + '_zh'] = c ? c[b + '_zh'] || '' : ''; });
+  if (!c && n0) {
+    v.problem_vi = n0.problem_vi ? nLine(n0, 'vi') : ''; v.problem_zh = n0.problem_zh ? nLine(n0, 'zh') : '';
+    v.correction_vi = n0.contain_vi || ''; v.correction_zh = n0.contain_zh || ''; v.cause_vi = n0.cause_vi || ''; v.cause_zh = n0.cause_zh || '';
+    if (!v.problem_vi && !v.problem_zh) v.problem_vi = nLine(n0, 'vi');
+  }
   const replyDays = Number(st.capa_reply_days || 7);
   const cOn = await complaintOn();
   if (!cOn && kind !== 'INTERNAL' && !c) kind = 'INTERNAL';
@@ -201,8 +212,9 @@ export async function renderCapaForm(view, { shell, params, query }) {
     const party = kind !== 'INTERNAL';
     shell.setScreen({ title: editing ? lk('capa.edit', kind) : lk('capa.new', kind), back: backTo });
     view.innerHTML = `<form class="card form capa-form" novalidate>
-      ${cOn ? `<div class="fld" data-field="kind"><label>${bi('capa.kind')}</label>${chipGroup('kind', ['INTERNAL', 'COMPLAINT', 'SUPPLIER'].map((k) => [k, 'capa.kind.' + k]), kind)}</div>` : ''}
-      ${party ? `<p class="muted small">${bi('capa.kind_note.' + kind)}</p>` : `<div class="fld" data-field="source"><label>${bi('capa.source')} <span class="req">*</span></label>
+      ${cOn && !fromNcr ? `<div class="fld" data-field="kind"><label>${bi('capa.kind')}</label>${chipGroup('kind', ['INTERNAL', 'COMPLAINT', 'SUPPLIER'].map((k) => [k, 'capa.kind.' + k]), kind)}</div>` : ''}
+      ${fromNcr ? `<div class="fld" data-field="source"><label>${bi('capa.source')}</label><p class="capa-from-ncr">${badge('capa.src.NCR')} ${n0 ? `<a href="#/ncr/${encodeURIComponent(n0.ncr_id)}"><span class="code">${esc(n0.code)}</span></a> ${esc(n0.product_text || '')}` : ''}</p><div class="ferr"></div></div>`
+        : party ? `<p class="muted small">${bi('capa.kind_note.' + kind)}</p>` : `<div class="fld" data-field="source"><label>${bi('capa.source')} <span class="req">*</span></label>
         <div class="chips" role="radiogroup">${CAPA_SOURCES.map((s) => `<button type="button" class="chip${s === source ? ' on' : ''}" data-src="${s}" role="radio" aria-checked="${s === source}">${bi('capa.src.' + s)}</button>`).join('')}</div><div class="ferr"></div></div>`}
       <div class="form-grid">
         ${selectInput('dept_code', 'capa.dept', deps.map((d) => [d.dept_code, esc(d.dept_code + ' · ' + nameText(d))]), v.dept_code, { required: true })}
@@ -266,6 +278,7 @@ export async function renderCapaForm(view, { shell, params, query }) {
       ev.preventDefault();
       const party = kind !== 'INTERNAL';
       const p = { capa_id: editing ? c.capa_id : uuid(), source: party ? kind : source };
+      if (!editing && n0) p.ncr_id = n0.ncr_id;
       const errs = [];
       p.dept_code = readField(form, 'dept_code');
       if (!p.dept_code) errs.push({ field: 'dept_code', key: 'field.required' });
@@ -472,6 +485,7 @@ export async function renderCapa(view, ctx) {
   const live = acts.filter((a) => a.state !== 'CANCELLED');
   const gone = acts.filter((a) => a.state === 'CANCELLED');
   const it = c.item_id ? await byId('ITEM', c.item_id) : null;
+  const n0 = c.ncr_id ? await byId('NCR', c.ncr_id) : null;
   const um = await users();
   const who = (id) => esc(userName(um, id) || '');
   const online = navigator.onLine && !app.offline;
@@ -513,6 +527,7 @@ export async function renderCapa(view, ctx) {
       ${kv(lk('capa.found_by', K), esc(c.found_by_name || ''))}
       ${kv('capa.dept', esc(c.dept_code))}
       ${it ? kv('capa.item', `<a href="#/item/${encodeURIComponent(it.item_id)}"><span class="code">${esc(it.code)}</span></a> ${statusDot(it.status)} ${esc(nameText(it))}`) : ''}
+      ${n0 ? kv('capa.from_ncr', `<a href="#/ncr/${encodeURIComponent(n0.ncr_id)}" id="capa-ncr-link"><span class="code">${esc(n0.code)}</span></a> ${esc(n0.product_text || '')}`) : ''}
       ${kv(lk('capa.ref', K), esc(c.ref_text || ''))}
       ${kv(lk('capa.owner', K), who(c.owner_user_id))}
       ${K === 'COMPLAINT' ? kv('capa.team', esc(c.team_text || '')) : ''}

@@ -7,7 +7,7 @@
 import { bi, biText, esc, fmtDate, fmtNumber, session, nameText } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue } from '../data.js';
+import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue, ncrOn, ncrOverdue } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { missingMandatory } from '../coverage.js';
@@ -34,6 +34,9 @@ async function pendingHtml() {
     [p.capa_acts.length, 'home.pend_capa_acts', p.capa_acts.length === 1 ? '/capa/' + encodeURIComponent(p.capa_acts[0].capa_id) : '/capa?f=mine', 't-red-text'],
     [p.capa_verify.length, 'home.pend_capa_verify', p.capa_verify.length === 1 ? '/capa/' + encodeURIComponent(p.capa_verify[0].capa_id) : '/capa?f=verify', 't-red-text'],
     [p.capa_owner.length, 'home.pend_capa_owner', p.capa_owner.length === 1 ? '/capa/' + encodeURIComponent(p.capa_owner[0].capa_id) : '/capa?f=mine', ''],
+    [p.ncr_decide.length, 'home.pend_ncr_decide', p.ncr_decide.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_decide[0].ncr_id) : '/ncr?f=decide', 't-red-text'],
+    [p.ncr_due.length, 'home.pend_ncr_due', p.ncr_due.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_due[0].ncr_id) : '/ncr?f=mine', 't-red-text'],
+    [p.ncr_capa.length, 'home.pend_ncr_capa', p.ncr_capa.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_capa[0].ncr_id) : '/ncr?f=doing', ''],
     [p.capa_reply.length, 'home.pend_capa_reply', p.capa_reply.length === 1 ? '/capa/' + encodeURIComponent(p.capa_reply[0].capa_id) : '/capa?f=mine', 't-red-text'],
     [p.drafts.length, 'home.pend_drafts', '/versions?f=drafts', ''],
     [p.nofile.length, 'home.no_file_n', '/catalog?f=nofile', ''],
@@ -138,6 +141,13 @@ async function gridHtml(list) {
     const late = open.filter((c) => capaOverdue(c, acts.filter((a) => a.capa_id === c.capa_id))).length;
     capaTail = open.length ? bi(late ? 'capa.tile_late' : 'capa.tile_open', { N: open.length, L: late }) : '';
   }
+  const nOn = await ncrOn();
+  let ncrTail = '';
+  if (nOn) {
+    const live = (await recs('NCR')).filter((n) => !n.archived_at && (n.state === 'OPEN' || n.state === 'DECIDED'));
+    const late = live.filter((n) => ncrOverdue(n)).length;
+    ncrTail = live.length ? bi(late ? 'capa.tile_late' : 'capa.tile_open', { N: live.length, L: late }) : '';
+  }
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
     { key: 'templates', icon: 'folder', href: '/templates', tail: tplN ? bi('tpl.files_n', { N: tplN }) : '' },
@@ -149,6 +159,7 @@ async function gridHtml(list) {
     { key: 'labels', icon: 'qr', href: '/labels', show: lvl >= 2 || sec },
     { key: 'reports', icon: 'reports', href: '/reports' },
     { key: 'capa', icon: 'repairs', href: '/capa', show: (lvl >= 2 || sec) && cOn, tail: capaTail },
+    { key: 'ncr', icon: 'alert', href: '/ncr', show: (lvl >= 2 || sec) && nOn, tail: ncrTail },
     { key: 'audits', icon: 'inspections', href: '/audits', soon: 1, lvl: 2 },
     { key: 'links', icon: 'link', href: '/links', lvl: 4 },
     { key: 'drafts', icon: 'sync', href: '/account/drafts', tail: q ? bi('sync.queued_count', { N: q }) : bi('home.none_drafts') }

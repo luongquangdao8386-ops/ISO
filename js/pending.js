@@ -6,9 +6,11 @@
 // phiếu của tôi không được chấp thuận (30 ngày), bản in cần thu hồi (Thư ký ISO).
 // Phiên 3a: hành động khắc phục của tôi đến hạn trong 7 ngày / quá hạn; phiếu chờ tôi kiểm tra hiệu lực (hạn trong 7 ngày / quá hạn);
 // phiếu tôi phụ trách chưa có hành động đang mở (cần lập kế hoạch, hoặc đã xong hành động — gửi kiểm tra hiệu lực).
+// Phiên 3c: sản phẩm không phù hợp chờ tôi quyết định xử lý; phiếu tôi phụ trách đang xử lý đến hạn trong 7 ngày / quá hạn; phiếu cần
+// phiếu khắc phục mà chưa lập (tôi sửa được phiếu).
 import { session } from './core.js';
 import { recs, items, isSecretary, canApprove, versionEditable, reviewSoon, today, addDaysIso, canSeeRecords, canSubmitRecord, recordCheck,
-  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa, capaIsParty } from './data.js';
+  recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa, capaIsParty, canDecideNcr, canEditNcr } from './data.js';
 import { queueItems } from './sync.js';
 import { covers } from './periods.js';
 
@@ -63,7 +65,13 @@ export async function pendingFor() {
   out.capa_owner = capas.filter((c) => c.state === 'OPEN' && c.owner_user_id === uid && !capaActs.some((a) => a.capa_id === c.capa_id && a.state === 'OPEN'));
   // Khiếu nại / SCAR (3b) của tôi chưa phản hồi, hạn phản hồi trong 7 ngày hoặc đã quá
   out.capa_reply = capas.filter((c) => capaIsParty(c) && (c.state === 'OPEN' || c.state === 'VERIFYING') && c.owner_user_id === uid && !c.reply_date && c.reply_due && c.reply_due <= soon);
-  out.total = out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
+  // Sản phẩm không phù hợp (3c)
+  const ncrs = (await recs('NCR')).filter((n) => !n.archived_at);
+  const liveCapa = new Set(capas.filter((c) => c.state !== 'CANCELLED').map((c) => c.capa_id));
+  out.ncr_decide = ncrs.filter((n) => n.state === 'OPEN' && canDecideNcr(n));
+  out.ncr_due = ncrs.filter((n) => n.state === 'DECIDED' && n.owner_user_id === uid && n.exec_due && n.exec_due <= soon);
+  out.ncr_capa = ncrs.filter((n) => n.state === 'DECIDED' && n.need_capa === 'YES' && !(n.capa_id && liveCapa.has(n.capa_id)) && canEditNcr(n));
+  out.total = out.ncr_decide.length + out.ncr_due.length + out.ncr_capa.length + out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
     out.req_review.length + out.req_todo.length + out.req_rejected.length + out.capa_acts.length + out.capa_verify.length + out.capa_owner.length + out.capa_reply.length +
     (out.nofile.length ? 1 : 0) + (out.review_due.length ? 1 : 0) + (out.rec_late.length ? 1 : 0) + (out.dist_due.length ? 1 : 0);
   return out;

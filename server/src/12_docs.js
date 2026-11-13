@@ -72,13 +72,23 @@ function docUpload_(ctx) {
   if (typeof p.content_b64 !== 'string' || !p.content_b64) errs.push(fieldError_('content_b64', 'REQUIRED'));
   if (Number(ctx.req.expected_version || 0) !== 0) errs.push(fieldError_('expected_version', 'INVALID_VALUE'));
   if (errs.length) throw validationError_(errs);
-  var isCapa = p.entity_type === 'CAPA';
-  var isRec = p.entity_type === 'RECORD' || isCapa; // ảnh / tệp gắn thêm vào danh sách files_json (hồ sơ, phiếu khắc phục)
-  if (isCapa) ensureCapaSchema_();
+  var isNcr = p.entity_type === 'NCR';
+  var isCapa = p.entity_type === 'CAPA' || isNcr; // phiếu có mã riêng, không gắn biểu (khắc phục, sản phẩm không phù hợp)
+  var isRec = p.entity_type === 'RECORD' || isCapa; // ảnh / tệp gắn thêm vào danh sách files_json (hồ sơ, phiếu khắc phục, phiếu NC)
+  var maxFiles = isNcr ? NCR_MAX_FILES_ : isCapa ? CAPA_MAX_FILES_ : RECORD_MAX_FILES_;
+  if (isNcr) ensureNcrSchema_();
+  else if (isCapa) ensureCapaSchema_();
   var entity = findOne_(et.sheet, et.key, p.entity_id);
   if (!entity || entity.archived_at) throw validationError_([fieldError_('entity_id', 'NOT_FOUND')]);
   var it = isCapa ? null : findOne_('Items', 'item_id', entity.item_id);
-  if (isCapa) {
+  if (isNcr) {
+    // Sản phẩm không phù hợp (3c): người sửa được phiếu, người quyết định; phiếu Chờ quyết định / Đang xử lý
+    var nx = loadNcr_(ctx, p.entity_id);
+    if (!canNcrFiles_(ctx.user, nx)) {
+      if (nx.state !== 'OPEN' && nx.state !== 'DECIDED') throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+      throw apiError_('FORBIDDEN');
+    }
+  } else if (isCapa) {
     // Khắc phục (3a): người sửa được phiếu, người kiểm tra hiệu lực, người phụ trách hành động; phiếu Đang xử lý / Chờ kiểm tra hiệu lực
     var cx = loadCapa_(ctx, p.entity_id);
     if (!canCapaFiles_(ctx.user, cx.c, cx.acts)) {
@@ -102,7 +112,7 @@ function docUpload_(ctx) {
   var ex = findOne_('Operations', 'operation_id', ctx.req.operation_id);
   if (ex) return withWriteLock_(function () { return existingOpResponse_(ctx, ex, payloadHash_(ctx)); });
   if (findRowNums_('Documents', 'document_id', p.document_id).length) throw validationError_([fieldError_('document_id', 'ID_EXISTS')]);
-  if (isRec && (entity.files_json || []).length >= (isCapa ? CAPA_MAX_FILES_ : RECORD_MAX_FILES_)) throw validationError_([fieldError_('content_b64', 'TOO_MANY_FILES')]);
+  if (isRec && (entity.files_json || []).length >= maxFiles) throw validationError_([fieldError_('content_b64', 'TOO_MANY_FILES')]);
 
   var bytes;
   try { bytes = b64d_(p.content_b64); } catch (e) { throw validationError_([fieldError_('content_b64', 'INVALID_VALUE')]); }
@@ -136,9 +146,10 @@ function docUpload_(ctx) {
         var writes = [];
         var oldDocId = '';
         if (isRec) {
-          if (row.status === 'VOID' || (isCapa && row.state !== 'OPEN' && row.state !== 'VERIFYING')) throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
+          var liveStates = isNcr ? ['OPEN', 'DECIDED'] : ['OPEN', 'VERIFYING'];
+          if (row.status === 'VOID' || (isCapa && liveStates.indexOf(row.state) < 0)) throw validationError_([fieldError_('state', 'STATUS_INVALID')]);
           var files = Array.isArray(row.files_json) ? row.files_json.slice() : [];
-          if (files.length >= (isCapa ? CAPA_MAX_FILES_ : RECORD_MAX_FILES_)) throw validationError_([fieldError_('content_b64', 'TOO_MANY_FILES')]);
+          if (files.length >= maxFiles) throw validationError_([fieldError_('content_b64', 'TOO_MANY_FILES')]);
           files.push({ document_id: p.document_id, kind: p.kind, mime_type: p.mime_type, file_name: shown, size_bytes: bytes.length, page_no: pageNo || files.length + 1 });
           files.sort(function (a, b) { return (Number(a.page_no) || 0) - (Number(b.page_no) || 0); });
           row.files_json = files;
@@ -214,6 +225,10 @@ function docGet_(ctx) {
   } else if (d.entity_type === 'CAPA') {
     // Ảnh / tệp phiếu khắc phục: người xem được phiếu
     loadCapa_(ctx, d.entity_id);
+    if (!d.active) throw apiError_('NOT_FOUND');
+  } else if (d.entity_type === 'NCR') {
+    // Ảnh / tệp phiếu sản phẩm không phù hợp (3c): người xem được phiếu
+    loadNcr_(ctx, d.entity_id);
     if (!d.active) throw apiError_('NOT_FOUND');
   } else if (d.entity_type === 'TPL') {
     // Kho tệp mẫu (2e): tệp đang dùng — mọi cấp; tệp đã thay — cấp 3+, Thư ký ISO

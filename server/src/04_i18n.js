@@ -106,7 +106,15 @@ var SUB_MSG = {
   CAPA_DATE: ['Ngày phải từ ngày phát hiện tới hôm nay', '日期须在发现日期至今天之间'],
   // Khiếu nại 8D, SCAR (3b)
   CAPA_NO_REPLY: ['Cần ghi phản hồi khách hàng / trả lời của nhà cung cấp trước khi đóng phiếu', '关闭单据前须记录对客户的回复/供应商的回复'],
-  CAPA_NOT_PARTY: ['Chỉ phiếu khiếu nại khách hàng hoặc SCAR nhà cung cấp mới có phản hồi', '只有客户投诉或供应商SCAR单才有回复']
+  CAPA_NOT_PARTY: ['Chỉ phiếu khiếu nại khách hàng hoặc SCAR nhà cung cấp mới có phản hồi', '只有客户投诉或供应商SCAR单才有回复'],
+  // Sản phẩm không phù hợp (3c)
+  CAPA_NCR_ONLY: ['Phiếu khắc phục nguồn Sản phẩm không phù hợp chỉ lập từ phiếu NC (nút Lập phiếu khắc phục ở phiếu NC)', '来源为不合格品的纠正措施单只能从NC单创建（NC单中的“新建纠正措施单”按钮）'],
+  NCR_HAS_CAPA: ['Phiếu NC này đã có phiếu khắc phục', '该NC单已有纠正措施单'],
+  NCR_TOP_ONLY: ['Nhân nhượng / dùng nguyên trạng và hủy bỏ chỉ Quản trị (cấp 4) quyết định', '让步接收/原样使用和报废只能由管理员（4级）决定'],
+  NCR_RECHECK: ['Có làm lại / sửa chữa / hạ cấp: sản phẩm phải kiểm tra lại Đạt mới đóng phiếu (không đạt thì quyết định lại)', '有返工/返修/降级：产品须复检合格才能关闭（不合格请重新决定）'],
+  NCR_NEED_CAPA: ['Quyết định cần phiếu khắc phục — lập phiếu khắc phục trước khi đóng', '决定需要纠正措施——关闭前请先创建纠正措施单'],
+  NCR_DATE: ['Ngày phải từ ngày phát hiện / ngày quyết định tới hôm nay', '日期须在发现日期/决定日期至今天之间'],
+  TOO_MANY_LINES: ['Tối đa 6 dòng cách xử lý', '最多6行处置方式']
 };
 
 function fmtMsg_(pair, vars) {

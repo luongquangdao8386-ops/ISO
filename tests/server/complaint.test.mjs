@@ -386,7 +386,7 @@ test('cập nhật từ bản 3a (Capas chưa có cột khiếu nại / SCAR): T
   strip(env2);
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  const want = 'migrateSchema xong. Thêm: Capas(' + NEW_COLS.join(',') + '). schema_version=1.0.9';
+  const want = 'migrateSchema xong. Thêm: Capas(' + NEW_COLS.join(',') + '). schema_version=1.0.10';
   assert.ok(env2.logs.some((l) => l === want), env2.logs.join('\n'));
   // Cài đặt mới có trong Settings
   env2.g.dbReset_();

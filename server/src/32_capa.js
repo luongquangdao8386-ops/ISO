@@ -204,6 +204,11 @@ function capaSave_(ctx) {
   var errs = [];
   var today = todayVN_();
   var source = p.source === undefined ? (cur ? cur.source : '') : String(p.source || '');
+  // Sản phẩm không phù hợp (3c): phiếu lập từ phiếu NC (ncr_id) luôn có nguồn NCR; nguồn NCR không chọn tay, không đổi sang nguồn khác
+  var ncr = null;
+  if (isNew && trimStr_(p.ncr_id || '')) { ncr = ncrForCapa_(ctx, trimStr_(p.ncr_id), errs); source = 'NCR'; }
+  else if (source === 'NCR' && !(cur && cur.ncr_id)) errs.push(fieldError_('source', 'CAPA_NCR_ONLY'));
+  else if (cur && cur.source === 'NCR' && source !== 'NCR') errs.push(fieldError_('source', 'CAPA_NCR_ONLY'));
   if (CAPA_SOURCES_.indexOf(source) < 0) errs.push(fieldError_('source', source ? 'INVALID_VALUE' : 'REQUIRED'));
   var dept = p.dept_code === undefined ? (cur ? cur.dept_code : '') : trimStr_(p.dept_code);
   if (!dept) errs.push(fieldError_('dept_code', 'REQUIRED'));
@@ -275,7 +280,7 @@ function capaSave_(ctx) {
           verified_at: '', verified_by: '', verify_date: '', verify_result: '', verify_note_vi: '', verify_note_zh: '', verify_history_json: [],
           closed_at: '', cancelled_at: '', cancelled_by: '', cancel_reason: '', party_name: '', party_contact: '', product_text: '', lot_text: '',
           qty_text: '', severity: '', complaint_valid: '', team_text: '', escape_vi: '', escape_zh: '', sent_date: '', reply_due: '', reply_date: '',
-          reply_note_vi: '', reply_note_zh: '', reply_at: '', reply_by: ''
+          reply_note_vi: '', reply_note_zh: '', reply_at: '', reply_by: '', ncr_id: ncr ? ncr.ncr_id : ''
         });
       } else {
         row = lockedCapa_(ctx, p.capa_id, true);
@@ -290,12 +295,15 @@ function capaSave_(ctx) {
       row.severity = sev; row.complaint_valid = valid; row.sent_date = sent; row.reply_due = rdue;
       Object.keys(tr.values).forEach(function (k) { row[k] = tr.values[k]; });
       row.i18n_meta = Object.assign({}, row.i18n_meta || {}, tr.meta);
+      var writes = [{ sheet: 'Capas', mode: isNew ? 'insert' : 'update', row: row }];
+      if (ncr) writes.push(ncrLinkCapaWrite_(ncr.ncr_id, row.capa_id)); // phiếu NC trỏ tới phiếu khắc phục mới
       return {
-        writes: [{ sheet: 'Capas', mode: isNew ? 'insert' : 'update', row: row }], state: su,
+        writes: writes, state: su,
         result: capaResult_(ctx, row), record_version: row.record_version,
         audit: { entity_type: 'CAPA', entity_id: row.capa_id, before_json: before,
           after_json: { code: row.code, source: row.source, dept_code: row.dept_code, due_date: row.due_date, owner_user_id: row.owner_user_id, created: isNew,
-            party_name: party ? row.party_name : undefined, reply_due: party ? row.reply_due : undefined, complaint_valid: row.complaint_valid || undefined } }
+            party_name: party ? row.party_name : undefined, reply_due: party ? row.reply_due : undefined, complaint_valid: row.complaint_valid || undefined,
+            ncr: ncr ? ncr.code : undefined } }
       };
     }
   });
@@ -779,8 +787,9 @@ function capaOverdue_(c, acts, today) {
   return c.state === 'VERIFYING' && !!c.verify_due && c.verify_due < today;
 }
 
-function reportCapaRow_(c, acts, items, dir, today) {
+function reportCapaRow_(c, acts, items, dir, today, ncrs) {
   var it = c.item_id ? items[c.item_id] : null;
+  var nc = c.ncr_id && ncrs ? ncrs[c.ncr_id] : null;
   var live = acts.filter(function (a) { return a.state !== 'CANCELLED'; }).sort(function (a, b) { return (Number(a.seq) || 0) - (Number(b.seq) || 0); });
   var last = (c.verify_history_json || []).slice(-1)[0] || null;
   return {
@@ -808,7 +817,9 @@ function reportCapaRow_(c, acts, items, dir, today) {
     qty_text: c.qty_text || '', severity: c.severity || '', complaint_valid: c.complaint_valid || '', team_text: c.team_text || '',
     escape_vi: c.escape_vi || '', escape_zh: c.escape_zh || '', sent_date: String(c.sent_date || ''), reply_due: String(c.reply_due || ''),
     reply_date: String(c.reply_date || ''), reply_note_vi: c.reply_note_vi || '', reply_note_zh: c.reply_note_zh || '',
-    reply_by: reportUserName_(dir, c.reply_by), reply_late: capaReplyLate_(c, today)
+    reply_by: reportUserName_(dir, c.reply_by), reply_late: capaReplyLate_(c, today),
+    // Sản phẩm không phù hợp (3c): phiếu NC gốc
+    ncr_code: nc ? nc.code : '', ncr_product: nc ? [nc.product_text, nc.lot_text, nc.qty_text].filter(function (x) { return x; }).join(' · ') : ''
   };
 }
 
@@ -838,6 +849,8 @@ function reportCapa_(ctx, f, today) {
   var all = (sheetExists_('Capas') ? readRows_('Capas') : []).filter(function (c) {
     return !c.archived_at && capaVisible_(ctx.user, c, capaActOwners_(byCapa[c.capa_id] || []));
   });
+  var ncrs = {};
+  if (sheetExists_('Ncrs')) readRows_('Ncrs').forEach(function (n) { ncrs[n.ncr_id] = n; });
   if (f.capa_id) {
     var one = all.filter(function (c) { return c.capa_id === f.capa_id; })[0];
     if (!one) {
@@ -846,7 +859,7 @@ function reportCapa_(ctx, f, today) {
       throw validationError_([fieldError_('filters.capa_id', 'NOT_FOUND')]);
     }
     if (!capaFormOk_(f.form || 'CAR', one.source)) throw validationError_([fieldError_('filters.form', 'INVALID_VALUE')]);
-    var r = reportCapaRow_(one, byCapa[one.capa_id] || [], items, dir, today);
+    var r = reportCapaRow_(one, byCapa[one.capa_id] || [], items, dir, today, ncrs);
     var stTile = { k: 'rpt.t.capa_state', v: lab_('capa.state.' + r.state), tone: r.state === 'CLOSED' ? 'green' : r.state === 'CANCELLED' ? 'muted' : (r.overdue ? 'red' : 'amber') };
     var dueTile = { k: 'rpt.t.capa_due', v: fmtDateVN_(r.due_date), tone: r.overdue && r.state === 'OPEN' ? 'red' : '' };
     return {
@@ -876,7 +889,7 @@ function reportCapa_(ctx, f, today) {
     if (c.state === 'CLOSED') cnt.closed++;
     if (od) cnt.overdue++;
     if (f.state === 'OVERDUE' ? !od : (f.state !== 'ALL' && f.state !== c.state)) return;
-    rows.push(reportCapaRow_(c, acts, items, dir, today));
+    rows.push(reportCapaRow_(c, acts, items, dir, today, ncrs));
   });
   rows.sort(function (a, b) { return String(a.code).localeCompare(String(b.code)); });
   return {
@@ -1021,6 +1034,7 @@ function layoutCapa_(snap) {
       [lab_('capa.found_by'), r.found_by_name || r.created_by]
     ];
     if (capaIsParty_(r.source)) nc = nc.concat(capaPartyKv_(r));
+    if (r.ncr_code) nc.push([lab_('capa.from_ncr'), r.ncr_code + (r.ncr_product ? ' · ' + r.ncr_product : '')]);
     if (r.item_code) nc.push([lab_('capa.item'), r.item_code + ' · ' + biText_(r.item_name_vi, r.item_name_zh)]);
     if (r.ref_text) nc.push([lab_('capa.ref'), r.ref_text]);
     if (r.title_vi || r.title_zh) nc.push([lab_('capa.title_f'), biNl_(r.title_vi, r.title_zh)]);

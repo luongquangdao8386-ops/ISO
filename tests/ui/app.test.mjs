@@ -163,7 +163,7 @@ test('web: menu trái (màn phiên sau mờ "Sắp có"), Excel xuất đúng kh
   try {
     const { page } = app;
     await login(page);
-    assert.equal(await page.locator('.side .side-item').count(), 15); // 2d: + Đề nghị tài liệu, Phân phối & thu hồi, In tem QR; 2e: + Kho tệp mẫu
+    assert.equal(await page.locator('.side .side-item').count(), 16); // 2d: + Đề nghị tài liệu, Phân phối & thu hồi, In tem QR; 2e: + Kho tệp mẫu; 3c: + Sản phẩm không phù hợp
     assert.equal(await page.locator('.side .side-item[data-nav="versions"]').count(), 1);
     assert.equal(await page.locator('.side .side-item.soon').count(), 1, 'Đánh giá (Kết nối có từ 2a, Báo cáo từ 2c, Khắc phục từ 3a)');
     assert.equal(await page.locator('.side .side-item[data-nav="links"]:not(.soon)').count(), 1);
