@@ -257,7 +257,7 @@ test('iPhone: Ghi phát hiện từ câu (NC lớn) → Gửi báo cáo (nhắc 
     // 11. Trạng thái hệ thống
     await go(page, '#/admin/status');
     await page.waitForFunction(() => /đã báo cáo chờ đóng 0 · đã đóng 1 · phát hiện không phù hợp chưa có phiếu khắc phục 0/.test(document.body.textContent), null, { timeout: 20000 });
-    assert.match(await page.textContent('#view'), /1\.0\.12/);
+    assert.match(await page.textContent('#view'), /1\.0\.13/);
     assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
 });

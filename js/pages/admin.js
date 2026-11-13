@@ -357,7 +357,7 @@ function wireMirror(view, again) {
 /* ====================== Nhật ký thao tác ====================== */
 
 const auditFilt = { action: '', from: '', to: '' };
-const AUDIT_ACTIONS = ['item.', 'version.', 'doc.', 'tpl.', 'docreq.', 'dist.', 'capa.', 'ncr.', 'iaudit.', 'import.', 'dept.', 'user.', 'settings.', 'report.', 'bg.', 'backup.'];
+const AUDIT_ACTIONS = ['item.', 'version.', 'doc.', 'tpl.', 'docreq.', 'dist.', 'capa.', 'ncr.', 'iaudit.', 'mreview.', 'import.', 'dept.', 'user.', 'settings.', 'report.', 'bg.', 'backup.', 'system.'];
 
 function jsonLines(o) {
   if (!o || typeof o !== 'object') return '';
@@ -376,7 +376,7 @@ export async function renderAudit(view, { shell }) {
   if (!r.ok) { view.innerHTML = errBox(r); return; }
   const its = new Map((await recs('ITEM')).map((m) => [m.item_id, m.code]));
   const ent = (a) => esc(its.get(a.entity_id) || (a.entity_type === 'DEPT' ? a.entity_id : (a.entity_id ? a.entity_type : '')));
-  const acts = AUDIT_ACTIONS.filter((x) => roleLevel() >= 4 || !['user.', 'settings.', 'dept.', 'backup.', 'bg.'].includes(x));
+  const acts = AUDIT_ACTIONS.filter((x) => roleLevel() >= 4 || !['user.', 'settings.', 'dept.', 'backup.', 'bg.', 'system.'].includes(x));
   view.innerHTML = `<div class="filters"><div class="row">
       <select class="sel inp" id="a-act"><option value="">${esc(biText('adm.audit.all'))}</option>${acts.map((x) => `<option value="${x}"${auditFilt.action === x ? ' selected' : ''}>${esc(biText('audit_grp.' + x.replace('.', '')))}</option>`).join('')}</select>
       </div><div class="form-grid">${dateInput('a_from', 'adm.audit.from', auditFilt.from)}${dateInput('a_to', 'adm.audit.to', auditFilt.to)}</div>

@@ -59,7 +59,7 @@ function auditView_(ctx) {
 var SETTINGS_READONLY_ = { report_logo_file_id: 1, report_logo_rev: 1, bg_login_file_id: 1, bg_login_rev: 1, bg_home_file_id: 1, bg_home_rev: 1, backup_mirror_email: 1, evidence_sources: 1, gmail_enabled: 1, email_hour: 1 };
 /** Cài đặt là mã biểu in trên phiếu / sổ (viết hoa, bỏ dấu cách, đúng dạng mã biểu) */
 var FORM_CODE_SETTINGS_ = ['capa_form_code', 'capa_log_form_code', 'complaint_form_code', 'd8_form_code', 'scar_form_code', 'ncr_form_code', 'ncr_log_form_code', 'ncr_decision_form_code',
-  'audit_program_form_code', 'audit_plan_form_code', 'audit_checklist_form_code', 'audit_report_form_code'];
+  'audit_program_form_code', 'audit_plan_form_code', 'audit_checklist_form_code', 'audit_report_form_code', 'mreview_form_code'];
 
 var SETTINGS_BOUNDS_ = {
   session_days: [1, 90], session_warn_days: [0, 30], change_pin_session_minutes: [5, 60], reauth_window_minutes: [1, 30], temp_pin_hours: [1, 168],
@@ -305,6 +305,12 @@ function healthRows_() {
   // Đánh giá nội bộ (4a)
   var ah = iauditHealth_();
   add('iaudit', ah[0], ah[1], ah[2]);
+  // Xem xét lãnh đạo (4c)
+  var mh = mreviewHealth_();
+  add('mreview', mh[0], mh[1], mh[2]);
+  // Xóa sạch dữ liệu (4c): lần gần nhất, tệp còn chờ bỏ vào thùng rác
+  var xh = resetHealth_(st);
+  add('reset', xh[0], xh[1], xh[2]);
   var cells = 0;
   [prop_('BUSINESS_SPREADSHEET_ID'), prop_('SECURITY_SPREADSHEET_ID')].forEach(function (id) {
     if (!id) return;

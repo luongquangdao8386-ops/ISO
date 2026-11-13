@@ -573,3 +573,25 @@ export function auditCloseGaps(findings, capaMap) {
   }
   return { noCapa, open };
 }
+
+/* ---------------- Xem xét lãnh đạo (phiên 4c) — như máy chủ 37_mreview.js ---------------- */
+
+/** Máy chủ đã lên bản 4c (có mreview.stats trong danh sách quyền) */
+export async function mreviewOn() { return can('mreview.stats'); }
+/** Đầu vào theo ISO 9001 điều 9.3.2 (a, b, c1…c7, d, e, f) */
+export const MR_INPUTS = ['prev', 'context', 'satisfaction', 'objectives', 'process', 'capa', 'monitoring', 'audit', 'supplier', 'resources', 'risks', 'improve'];
+/** Mục chỉ ghi tay (không có số liệu tự gom) */
+export const MR_MANUAL = ['context', 'objectives', 'resources', 'risks', 'improve'];
+export const MR_DECISION_KINDS = ['IMPROVE', 'CHANGE', 'RESOURCE'];
+export function mrDecisions(r) { return Array.isArray(r && r.decisions_json) ? r.decisions_json : []; }
+/** Xem cuộc xem xét: Thư ký ISO, cấp 3+, người phụ trách một quyết định */
+export function canSeeMreview(r) {
+  if (isSecretary() || roleLevel() >= 3) return true;
+  const id = myId();
+  return !!r && !!id && mrDecisions(r).some((d) => d.owner_user_id === id);
+}
+/** Lập / sửa / ghi Đã họp / hủy: Thư ký ISO, cấp 4 */
+export function canEditMreview() { return isSecretary(); }
+/** Báo xong / mở lại quyết định: Thư ký ISO, người phụ trách */
+export function canDoDecision(d) { return isSecretary() || (!!d && !!d.owner_user_id && d.owner_user_id === myId() && d.state !== 'CANCELLED'); }
+export function mrDecisionLate(d, t = today()) { return !!d && (d.state || 'OPEN') === 'OPEN' && !!d.due && String(d.due) < t; }

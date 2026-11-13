@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.2 (Đợt 4, phiên 4b — Phát hiện, báo cáo đánh giá, đóng đợt)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.3 (Đợt 4, phiên 4c — Xem xét lãnh đạo, Xóa sạch dữ liệu)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -88,7 +88,88 @@ dịch máy** (kết luận đánh giá) — ghi cả hai thứ tiếng nếu c�
 đợt đủ điều kiện đóng. Phiếu khắc phục in ghi "Từ phát hiện đánh giá nội bộ DG-26-01/01". Mã biểu báo cáo sửa ở **Cấu hình**
 (`audit_report_form_code`).
 
-## CẬP NHẬT LÊN BẢN 4b (1.0.0-d4.2, Phát hiện, báo cáo đánh giá, đóng đợt) — làm một lần, trên máy tính
+Phiên 4c (anh chốt 13/11/2026: **giữ phạm vi Cơ điện**; Xóa sạch **cho chọn lúc xóa** giữ hay xóa danh mục; **chỉ thử trên giả lập**) thêm:
+**Xem xét lãnh đạo** — in theo mẫu **BM-ISO-05-01** (đầu vào xem xét lãnh đạo, ISO 9001 điều 9.3): Thư ký ISO **lập cuộc xem xét**
+(`XL-26-01`): kỳ xem xét (mặc định từ sau kỳ của lần trước, không có thì từ 01/01 tới hôm nay), ngày họp, địa điểm, chủ trì (Giám đốc),
+thành phần → app **tự gom số liệu** theo kỳ trong phạm vi áp dụng: a) tình trạng các quyết định của lần xem xét trước · c1) khiếu nại khách
+hàng (mức độ, có / không có cơ sở, phản hồi đúng hạn) · c3) sản phẩm không phù hợp (nơi phát hiện, cách xử lý) · c4) khắc phục (nguồn, đã
+đóng, quá hạn, kiểm tra hiệu lực) · c5) tài liệu (% ban hành, quá hạn rà soát), phủ điều khoản, hồ sơ đúng hạn · c6) đánh giá nội bộ (chương
+trình năm, đợt, phát hiện, phiếu khắc phục) · c7) SCAR nhà cung cấp; Thư ký ghi **nhận xét** từng mục (dịch máy) và các mục chỉ ghi tay (b
+thay đổi bối cảnh, c2 mục tiêu chất lượng, d nguồn lực, e rủi ro – cơ hội, f cơ hội cải tiến) → họp → ghi **kết luận** và **quyết định**
+(cơ hội cải tiến · thay đổi hệ thống · nhu cầu nguồn lực; người phụ trách trong app hoặc tên người ngoài app; hạn) → **Ghi Đã họp** (PIN):
+số liệu **chốt lại**, đầu vào khóa (muốn sửa: **Mở lại** khi chưa quyết định nào xong) → **In BM-ISO-05-01** (PDF / Excel, ô ký Thư ký ISO ·
+Chủ trì). Người phụ trách quyết định thấy ở **Chờ bạn xử lý** và tự bấm **Đã xong**; lần xem xét sau tự hiện tình trạng các quyết định đó ở
+mục a. Người xem: Thư ký ISO, Quản trị, trưởng bộ phận (cấp 3), người phụ trách một quyết định. Mã biểu sửa ở **Cấu hình**
+(`mreview_form_code`). **Xóa sạch dữ liệu** (chỉ owner): **Tài khoản → Quản trị → Xóa sạch dữ liệu** → chọn **Giữ danh mục** (giữ biểu /
+tài liệu, tình trạng, lần ban hành, tem QR, nhóm, điều khoản, kho tệp mẫu; biểu ● thành "chưa có tệp" như vừa nhập Excel) hoặc **Xóa cả
+danh mục** (nhập lại file Excel tổng sau đó) → xem số dòng sẽ xóa → gõ **XÓA TOÀN BỘ** → PIN → máy chủ bật bảo trì, **sao lưu (phải
+VERIFIED, không thì không xóa gì)**, xóa, đổi thế hệ dữ liệu → mọi máy đăng nhập lại. Luôn giữ: người dùng, PIN, bộ phận, cài đặt, logo,
+ảnh nền, kết nối M&E / Checksheet, Gmail, nhật ký đăng nhập và quản trị, bộ đếm mã (không quay lại 001), các bản sao lưu. **Trên THẬT
+không bấm** trừ khi thật sự cần bắt đầu lại (màn báo đỏ "Đây là máy chủ THẬT").
+
+## CẬP NHẬT LÊN BẢN 4c (1.0.0-d4.3, Xem xét lãnh đạo, Xóa sạch dữ liệu) — làm một lần, trên máy tính
+
+Bản 4c **thêm 1 sheet** (`MgmtReviews`) và **1 cài đặt** (`mreview_form_code` = BM-ISO-05-01) → chạy `migrateSchema`. **Không** hỏi quyền
+Google mới, **không** cần `installTriggers`. App 4c vẫn chạy với máy chủ 4b (chưa có ô Xem xét lãnh đạo, chưa có Xóa sạch).
+
+**Anh phải làm:**
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký: `migrateSchema xong. Thêm: MgmtReviews. schema_version=1.0.13`
+   (nếu trigger nền đã kịp tự chạy trước thì báo `Thêm: không có. schema_version=1.0.13` — cũng đúng).
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d4.3 xem xet lanh dao xoa sach` →
+   **Triển khai**. Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` (đang mở thì đóng hẳn rồi mở lại) → **Tài khoản → Thông tin** ghi `1.0.0-d4.3 · mã vỏ app 50ea398ac26a` (màn báo lỗi
+   hoặc mã khác thì bấm **Tải lại bản mới**).
+
+**Nên kiểm (2 phút — phần máy giả lập không kiểm được):**
+1. **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.13**; dòng **Xem xét lãnh đạo** = `Chưa có cuộc xem xét đã họp
+   · đang chuẩn bị 0 · quyết định đang làm 0 · quá hạn 0`; dòng **Xóa sạch dữ liệu** = `Chưa xóa sạch lần nào`.
+2. **Trang chủ → ô Xem xét lãnh đạo → Lập cuộc xem xét** → để kỳ mặc định → **Lập cuộc xem xét** → trang XL-26-01 hiện số liệu từng mục
+   (khiếu nại, sản phẩm không phù hợp, khắc phục… đúng như dữ liệu thật của anh) → **In BM-ISO-05-01** → **Tải PDF** → xem chữ Việt / Trung,
+   logo, các mục a–f. Nếu đây chỉ là thử: quay lại XL-26-01 → **Hủy cuộc xem xét** → lý do "thử" → PIN (số XL-26-01 đã dùng, lần thật sẽ là
+   XL-26-02). Nếu dùng thật luôn thì giữ lại, ghi nhận xét, họp rồi **Ghi Đã họp**.
+3. **Không bấm Xóa sạch trên THẬT.** Chỉ cần nhìn: **Tài khoản → Quản trị → Xóa sạch dữ liệu** (chỉ owner thấy) → màn báo đỏ "Đây là máy
+   chủ THẬT…", số dòng sẽ xóa theo hai cách → bấm nút quay lại, không gõ chữ xác nhận.
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/mreview.test.mjs` (4 test; iPhone 390×844 và máy tính 1440×900, dữ liệu như thật:
+phạm vi Cơ điện, danh mục ○ ◐, Thư ký ISO cấp 4; có khiếu nại nặng, SCAR, phiếu NC, khắc phục trong năm): Trang chủ → ô Xem xét lãnh đạo →
+Lập cuộc xem xét (kỳ mặc định 01/01/2026 – 12/11/2026, 12 ô nhận xét) → XL-26-01 Đang chuẩn bị → số liệu tự gom đúng (khiếu nại 1, mức độ
+0 / 1 / 0, NC 1, khắc phục 1, NCC nhiều SCAR nhất, % ban hành, chưa có chương trình đánh giá) → **Ghi Đã họp** khi thiếu ngày họp, kết luận →
+nhắc, không hỏi PIN → Sửa (ngày họp, thành phần, kết luận) → **Thêm quyết định** (người phụ trách trong app, hạn) → **Ghi Đã họp** (xác nhận,
+PIN) → "Đã họp — số liệu chốt" → **In BM-ISO-05-01** → bản xem trước "ĐẦU VÀO VÀ KẾT QUẢ XEM XÉT LÃNH ĐẠO", ô ký Thư ký ISO · Chủ trì →
+**Tải PDF** `BC-2611-001_xem-xet-lanh-dao_XL-26-01.pdf` → Trạng thái hệ thống (schema 1.0.13, dòng Xem xét lãnh đạo, "Chưa xóa sạch lần
+nào"); máy tính: nhân viên CĐ phụ trách quyết định thấy **Chờ bạn xử lý** "1 quyết định xem xét lãnh đạo bạn phụ trách đến hạn" → mở → **Đã
+xong** (ghi chú) — không có menu, không lập / sửa được; trưởng bộ phận (cấp 3) thấy menu, chỉ xem, in được; iPhone owner: **Xóa sạch dữ
+liệu** → Máy chủ THỬ → Giữ danh mục (số dòng sẽ xóa: phiếu khắc phục 3, NC 1, xem xét lãnh đạo 1) / Xóa cả danh mục → gõ sai "XÓA TOÀN BÔ"
+→ nút khóa, báo sai → gõ "xoá toàn bộ" → nút mở → xác nhận → PIN → **Đã xóa sạch** (sao lưu 2026-11-12_…) → **Đăng nhập lại** → danh mục còn
+nguyên, Xem xét lãnh đạo trống, Trạng thái hệ thống "Lần gần nhất … · giữ danh mục · sao lưu trước khi xóa …"; app 4c với máy chủ 4b. Máy
+chủ `tests/server/mreview.test.mjs` (5 test): kiểm dữ liệu (kỳ đảo ngược, quá 2 năm, quá 3 tháng tới, chữ quá dài, quyết định sai), chỉ Thư
+ký ISO lập, mã XL-26-01 / 02, dịch máy nhận xét, đồng bộ theo quyền (cấp 2 chỉ thấy cuộc có quyết định của mình); số liệu tự gom đúng từng
+mục, ngoài kỳ không đếm, **hồ sơ đúng hạn khớp báo cáo Tình trạng hồ sơ**, phủ điều khoản khớp Trạng thái hệ thống, phạm vi Cơ điện chỉ đếm
+bộ phận trong phạm vi; Ghi Đã họp (thiếu / ngày họp chưa tới báo trước PIN, PIN, số liệu chốt không đổi khi có dữ liệu mới, đầu vào khóa,
+kết luận / quyết định sửa được), quyết định (người phụ trách báo xong, người khác bị cấm, người phụ trách không hủy, hủy cần lý do, quyết
+định đã xong không bỏ được), mở lại, hủy; lần sau hiện tình trạng quyết định lần trước (xong / đang làm / quá hạn / hủy); báo cáo (tiêu đề
+theo trạng thái, mục a–f, ô ký, PDF, Excel, tên tệp, đổi mã biểu, quyền); cập nhật từ 4b (thiếu sheet → tự thêm; dòng nhật ký ở bước 2).
+`tests/server/reset.test.mjs` (4 test): chỉ owner (Quản trị khác, Thư ký bị cấm), chữ xác nhận / cách xóa / đang chạy báo trước PIN, nhận cả
+"xoá" chữ thường; giữ danh mục (sao lưu VERIFIED trước, bảng nghiệp vụ trống, biểu ● giữ lần + ngày ban hành + tem QR, thành chưa có tệp,
+tệp mẫu giữ, tệp PDF / ảnh / báo cáo vào thùng rác, nhật ký chỉ giữ thao tác quản trị, Gmail chờ → bỏ, ngày bắt đầu tính hồ sơ = hôm nay,
+mọi phiên phải đăng nhập lại, bộ đếm mã không lùi KP-2612-002); xóa cả danh mục; **sao lưu không đạt thì không xóa gì**, tắt bảo trì, báo lỗi;
+nhiều tệp quá thời gian → trigger nền làm tiếp. Cả bộ: 110 test máy chủ + 51 test giao diện đạt.
+
+Không kiểm được ở đâu cả trước khi dùng thật: PDF thật BM-ISO-05-01 (bước Nên kiểm 2), Xóa sạch trên máy chủ Google thật (anh chốt không chạy
+trên THẬT; nếu sau này cần, làm cùng Claude: thời gian sao lưu thật 10–60 giây, xóa tệp trên Drive thật).
+
+### Nghiệm thu Đợt 4 (4 mục)
+
+| # | Mục | Kết quả |
+|---|---|---|
+| 1 | Chương trình năm phủ hết điều khoản ISO 9001 và chủ đề BRCGS | Có từ 4a (đợt đánh giá hoặc Không áp dụng kèm lý do; chưa phủ hết không gửi duyệt được) — giả lập ĐẠT |
+| 2 | Mỗi phát hiện tạo được phiếu khắc phục | Có từ 4b — giả lập ĐẠT |
+| 3 | Báo cáo đầu vào xem xét lãnh đạo tự gom số liệu | 4c — giả lập ĐẠT; trên THẬT: bước Nên kiểm 2 |
+| 4 | Xóa sạch dữ liệu (owner) chạy được trên THỬ | 4c — anh chốt chỉ thử trên giả lập: ĐẠT (không còn máy chủ THỬ riêng) |
+
+## CẬP NHẬT LÊN BẢN 4b (1.0.0-d4.2, Phát hiện, báo cáo đánh giá, đóng đợt) — đã xong (anh xác nhận 13/11/2026)
 
 Bản 4b **thêm 1 sheet** (`AuditFindings`), **10 cột** cuối sheet `Audits` (ngày báo cáo, điểm mạnh, kết luận, người gửi báo cáo, đóng
 đợt), **1 cột** cuối sheet `Capas` (`finding_id`) và **1 cài đặt** (`audit_report_form_code` = BM-ISO-03-04) → chạy `migrateSchema`.
@@ -1086,7 +1167,7 @@ Sổ dừng máy BM-CĐ-04-03 còn thiếu cột **ca** và **phản hồi** (ng
 | `setup` | Lần đầu dựng máy chủ (đã có thì không làm gì) |
 | `adminSetupOwner` | Tạo owner đầu tiên từ 3 thuộc tính `SETUP_OWNER_*` |
 | `adminResetOwnerPin` | Owner quên PIN: đặt `OWNER_RESET_TEMP_PIN` (6 số) rồi chạy |
-| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần; 2a: sheet `Evidence`; 2b: cột email đã xác nhận, loại nhắc; 2c: sheet `ReportRuns` + quyền Google Docs) |
+| `migrateSchema` | Bản mới thêm sheet/cột (bản 1b: sheet `Versions`; 1c: sheet `Records`; 1d không cần; 2a: sheet `Evidence`; 2b: cột email đã xác nhận, loại nhắc; 2c: sheet `ReportRuns` + quyền Google Docs; … 4c: sheet `MgmtReviews`) |
 | `adminNoiLaiTep` | Khôi phục từ bản chép ở tài khoản thứ hai: nối lại ID tệp theo `file_map.json` (Phần I.5) |
 | `healthCheck` | Xem nhanh tình trạng máy chủ |
 | `installTriggers` | Trigger bị xóa nhầm; bản 2a: cấp quyền gọi ra ngoài + cài `syncEvidenceHourly`; bản 2b: cài `sendDueMail` (4 trigger) |
@@ -1095,6 +1176,7 @@ Sổ dừng máy BM-CĐ-04-03 còn thiếu cột **ca** và **phản hồi** (ng
 | `adminSeedSample` | Dữ liệu mẫu (chỉ THỬ) — PIN tạm in trong nhật ký |
 | `adminChuyenSangTHAT` | Một lần: máy chủ THỬ thành THẬT (xóa dữ liệu thử, đổi tên bỏ `_THU`); đã là THẬT thì không làm gì |
 | `adminMaintenanceOn` / `adminMaintenanceOff` | Tạm khóa / mở lại app khi cần sửa dữ liệu tay |
+| Xóa sạch dữ liệu bị dừng giữa chừng | Không có hàm riêng: **Trạng thái hệ thống** dòng **Xóa sạch dữ liệu** báo lỗi → owner chạy lại Xóa sạch trong app (dữ liệu trước khi xóa ở bản sao lưu ghi trong dòng đó); bảo trì còn bật thì chạy `adminMaintenanceOff` |
 | `adminClearLoginPause`, `adminFlushAuthCache` | Đăng nhập bị tạm dừng / phiên lạ sau khi sửa tay sheet Users |
 | `caiDat`, `chepNgay`, `kiemTra`, `danhSachNguon` | Script **SaoLuu_Phu** ở tài khoản thứ hai (Phần I) |
 

@@ -7,7 +7,7 @@
 import { bi, biText, esc, fmtDate, fmtNumber, session, nameText } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue, ncrOn, ncrOverdue, auditOn, canSeeAudits, auditLate } from '../data.js';
+import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue, ncrOn, ncrOverdue, auditOn, canSeeAudits, auditLate, mreviewOn, mrDecisions } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { missingMandatory } from '../coverage.js';
@@ -37,6 +37,9 @@ async function pendingHtml() {
     [p.ncr_decide.length, 'home.pend_ncr_decide', p.ncr_decide.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_decide[0].ncr_id) : '/ncr?f=decide', 't-red-text'],
     [p.ncr_due.length, 'home.pend_ncr_due', p.ncr_due.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_due[0].ncr_id) : '/ncr?f=mine', 't-red-text'],
     [p.ncr_capa.length, 'home.pend_ncr_capa', p.ncr_capa.length === 1 ? '/ncr/' + encodeURIComponent(p.ncr_capa[0].ncr_id) : '/ncr?f=doing', ''],
+    [p.mr_prepare.length, 'home.pend_mr_prepare', p.mr_prepare.length === 1 ? '/mreview/' + encodeURIComponent(p.mr_prepare[0].review_id) : '/mreview', p.mr_prepare.some((r) => r.meeting_date < today()) ? 't-red-text' : ''],
+    [p.mr_decisions.length, 'home.pend_mr_decisions', p.mr_decisions.length === 1 ? '/mreview/' + encodeURIComponent(p.mr_decisions[0].review_id) : '/mreview', 't-red-text'],
+    [p.mr_late.length, 'home.pend_mr_late', p.mr_late.length === 1 ? '/mreview/' + encodeURIComponent(p.mr_late[0].review_id) : '/mreview', 't-red-text'],
     [p.aud_review.length, 'home.pend_aud_review', '/audits' + (p.aud_review.length === 1 ? '?y=' + encodeURIComponent(p.aud_review[0].year) : ''), 't-red-text'],
     [p.aud_returned.length, 'home.pend_aud_returned', '/audits' + (p.aud_returned.length === 1 ? '?y=' + encodeURIComponent(p.aud_returned[0].year) : ''), 't-red-text'],
     [p.aud_doing.length, 'home.pend_aud_doing', p.aud_doing.length === 1 ? '/audit/' + encodeURIComponent(p.aud_doing[0].audit_id) : '/audits', ''],
@@ -167,6 +170,16 @@ async function gridHtml(list) {
       audTail = bi(late ? 'aud.tile_late' : 'aud.tile', { C: esc(pg.code), N: as.length, L: late });
     }
   }
+  const mOn = await mreviewOn();
+  let mrTail = '';
+  if (mOn) {
+    const live = (await recs('MREVIEW')).filter((r) => !r.archived_at && r.state !== 'CANCELLED').sort((a, b) => String(b.code).localeCompare(String(a.code)));
+    const last = live[0];
+    if (last) {
+      const open = live.filter((r) => r.state === 'HELD').reduce((n, r) => n + mrDecisions(r).filter((d) => (d.state || 'OPEN') === 'OPEN').length, 0);
+      mrTail = `${esc(last.code)} · ${bi('mr.state.' + last.state)}${open ? ' · ' + bi('mr.tile_open', { N: open }) : ''}`;
+    }
+  }
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
     { key: 'templates', icon: 'folder', href: '/templates', tail: tplN ? bi('tpl.files_n', { N: tplN }) : '' },
@@ -180,6 +193,7 @@ async function gridHtml(list) {
     { key: 'capa', icon: 'repairs', href: '/capa', show: (lvl >= 2 || sec) && cOn, tail: capaTail },
     { key: 'ncr', icon: 'alert', href: '/ncr', show: (lvl >= 2 || sec) && nOn, tail: ncrTail },
     { key: 'audits', icon: 'inspections', href: '/audits', show: canSeeAudits(), soon: aOn ? 0 : 1, tail: audTail },
+    { key: 'mreview', icon: 'trend', href: '/mreview', show: (lvl >= 3 || sec) && mOn, tail: mrTail },
     { key: 'links', icon: 'link', href: '/links', lvl: 4 },
     { key: 'drafts', icon: 'sync', href: '/account/drafts', tail: q ? bi('sync.queued_count', { N: q }) : bi('home.none_drafts') }
   ].filter((x) => (x.show !== undefined ? x.show : !x.lvl || lvl >= x.lvl));

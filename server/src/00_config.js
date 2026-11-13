@@ -5,14 +5,14 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d4.2';
+var SERVER_VERSION = '1.0.0-d4.3';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.12';
+var SCHEMA_VERSION = '1.0.13';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
 
-var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1, '1.0.10': 1, '1.0.11': 1, '1.0.12': 1 };
+var SCHEMA_DOTS_ = { '1.0.0': 1, '1.0.1': 1, '1.0.2': 1, '1.0.3': 1, '1.0.4': 1, '1.0.5': 1, '1.0.6': 1, '1.0.7': 1, '1.0.8': 1, '1.0.9': 1, '1.0.10': 1, '1.0.11': 1, '1.0.12': 1, '1.0.13': 1 };
 var NAME_PREFIX = 'ISO_';    // tên spreadsheet, thư mục Drive
 
 /** Bản ghi do máy chủ tạo thay mặt hệ thống (trigger, dịch nền) */
@@ -105,6 +105,9 @@ var SETTINGS_DEFAULTS = [
   ['audit_notice_days', 'INT', 7, true, 1, 'Báo đợt đánh giá nội bộ sắp tới trước (ngày)', '提前通知即将进行的内部审核（天）'],
   // Phiên 4b: báo cáo đánh giá nội bộ (phát hiện, kết luận) của một đợt
   ['audit_report_form_code', 'STRING', 'BM-ISO-03-04', true, 1, 'Mã biểu của báo cáo đánh giá nội bộ', '内部审核报告的表单编号'],
+  // Phiên 4c: xem xét lãnh đạo (37_mreview.js) — người dùng chốt 13/11/2026 giữ phạm vi Cơ điện: số liệu tự gom trong phạm vi áp dụng, in theo
+  // mẫu biểu ISO (mã sửa được ở Cấu hình)
+  ['mreview_form_code', 'STRING', 'BM-ISO-05-01', true, 1, 'Mã biểu của báo cáo đầu vào xem xét lãnh đạo', '管理评审输入报告的表单编号'],
   ['report_logo_file_id', 'STRING', '', false, 1, 'Tệp logo trên báo cáo (Drive)', '报表标志文件（云端硬盘）'],
   ['report_logo_rev', 'STRING', '', true, 1, 'Phiên bản logo trên báo cáo', '报表标志版本'],
   // Ảnh nền màn đăng nhập / trang chủ (Quản trị → Ảnh nền, 33_bg.js): ID tệp trên Drive và mã phiên bản ('' = ảnh mặc định trong app)
@@ -143,6 +146,8 @@ var CODE_PATTERNS = {
   NCR: { prefix: 'NC', digits: 3, yymm: true, sheet: 'Ncrs', col: 'code' },
   // Đánh giá nội bộ (4a): đợt DG-yy-01 theo năm của chương trình (cấp khi duyệt chương trình); chương trình là DG-yy
   AUDIT: { prefix: 'DG', digits: 2, yy: true, sheet: 'Audits', col: 'code' },
+  // Xem xét lãnh đạo (4c): XL-yy-01 theo năm của kỳ xem xét
+  MREVIEW: { prefix: 'XL', digits: 2, yy: true, sheet: 'MgmtReviews', col: 'code' },
   REPORT: { prefix: 'BC', digits: 3, yymm: true, sheet: 'ReportRuns', col: 'code' }
 };
 
@@ -214,6 +219,18 @@ var AUDIT_MAX_NA_ = 150;
 var AUDIT_FINDING_TYPES_ = ['MAJOR', 'MINOR', 'OBS'];
 var AUDIT_FINDING_NC_ = ['MAJOR', 'MINOR'];
 var AUDIT_MAX_FINDINGS_ = 40;
+
+/** Xem xét lãnh đạo (Đợt 4, phiên 4c — BM-ISO-05-01; 37_mreview.js), mã XL-yy-01. Đầu vào theo ISO 9001 điều 9.3.2: a tình trạng hành động từ
+ *  lần xem xét trước · b thay đổi bối cảnh · c1 sự thỏa mãn của khách hàng · c2 mục tiêu chất lượng · c3 kết quả quá trình, sự phù hợp sản phẩm ·
+ *  c4 sự không phù hợp, hành động khắc phục · c5 theo dõi, đo lường · c6 kết quả đánh giá · c7 nhà cung cấp bên ngoài · d nguồn lực · e rủi ro, cơ
+ *  hội · f cơ hội cải tiến. Đầu ra (9.3.3): kết luận + quyết định (cải tiến · thay đổi hệ thống · nguồn lực) có người phụ trách, hạn.
+ *  DRAFT đang chuẩn bị (số liệu tính lúc xem) → HELD đã họp (PIN; số liệu chốt) · CANCELLED. Quyết định: OPEN → DONE | CANCELLED. */
+var MR_INPUTS_ = ['prev', 'context', 'satisfaction', 'objectives', 'process', 'capa', 'monitoring', 'audit', 'supplier', 'resources', 'risks', 'improve'];
+var MR_STATES_ = ['DRAFT', 'HELD', 'CANCELLED'];
+var MR_DECISION_KINDS_ = ['IMPROVE', 'CHANGE', 'RESOURCE'];
+var MR_DECISION_STATES_ = ['OPEN', 'DONE', 'CANCELLED'];
+var MR_MAX_DECISIONS_ = 30;
+var MR_MAX_DAYS_ = 731;
 
 /** Kho tệp mẫu (2e): ACTIVE đang dùng · REPLACED đã thay bằng tệp mới cùng bộ (giữ để tra) · DELETED đã bỏ (tải nhầm).
  *  Mỗi tệp tối đa TPL_MAX_SHEETS_ sheet; mỗi lần tải lên tối đa TPL_MAX_CODES_ mã biểu tự nhận từ tên sheet. */

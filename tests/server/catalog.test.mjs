@@ -54,13 +54,16 @@ test('quyền: cấp 1–3 không phải Thư ký bị FORBIDDEN (trước khi h
   assert.equal(look.write('settings.edit', { changes: { record_grace_days: 4 } }).code, 'FORBIDDEN');
   assert.equal(look.write('user.create', { user_id: uuid() }).code, 'FORBIDDEN');
   assert.equal(head.call('user.view', {}).code, 'FORBIDDEN');
-  // Phiên 4c: action đã đăng ký nhưng chưa có mã
+  // Phiên 4c: mọi action đã đăng ký đều có mã; action đăng ký mà chưa có mã (chức năng sau) trả FEATURE_NOT_ENABLED
+  assert.deepEqual(Object.keys(env.g.ACTION_REGISTRY).filter((k) => !env.g.HANDLERS_[k]), []);
+  env.g.ACTION_REGISTRY['zz.later'] = { code: 'zz.later', level: 'X', net: 'net', write: true, dot: 1 };
   const tk = userClient(env, 'TK2', 2, '583926', { depts: 'ISO', secretary: true });
-  assert.equal(tk.write('mreview.save', {}).code, 'FEATURE_NOT_ENABLED');
+  assert.equal(tk.write('zz.later', {}).code, 'FEATURE_NOT_ENABLED');
+  delete env.g.ACTION_REGISTRY['zz.later'];
   assert.ok(tk.call('sync.bootstrap', {}).data.permissions.actions.includes('iaudit.program.save'));
   const p = head.call('sync.bootstrap', {}).data.permissions.actions;
   assert.ok(!p.includes('item.edit') && !p.includes('import.preview') && !p.includes('version.issue') && !p.includes('iaudit.program.save') && !p.includes('mreview.save') && !p.includes('iaudit.close'));
-  assert.ok(p.includes('iaudit.finding.save') && p.includes('iaudit.report'));
+  assert.ok(p.includes('iaudit.finding.save') && p.includes('iaudit.report') && p.includes('mreview.stats') && !p.includes('system.reset'));
   assert.ok(p.includes('iaudit.save') && p.includes('iaudit.check.record'));
   assert.ok(p.includes('capa.save') && p.includes('capa.verify'));
   assert.ok(p.includes('version.save') && p.includes('version.approve') && p.includes('doc.get') && p.includes('record.submit') && p.includes('record.return'));

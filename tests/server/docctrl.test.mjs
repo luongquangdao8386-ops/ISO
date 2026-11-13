@@ -371,7 +371,7 @@ test('dán Code.gs 2d chưa chạy migrateSchema: đăng nhập chạy, gửi ph
   env2.g.dbReset_();
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: Versions(request_id); DocRequests; Distributions. schema_version=1.0.12'), env2.logs.join('\n'));
+  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: Versions(request_id); DocRequests; Distributions. schema_version=1.0.13'), env2.logs.join('\n'));
   // Quên migrateSchema: gửi phiếu đầu tiên tự thêm
   const r = owner.write('docreq.save', { request_id: uuid(), req_type: 'REVISE', item_id: item(env, 'BM-SX-02-01').item_id, reason_vi: 'r', content_vi: 'c' });
   assert.equal(r.ok, true, JSON.stringify(r));

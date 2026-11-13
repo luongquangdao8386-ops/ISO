@@ -6,23 +6,23 @@
 // logo công ty) / Tải Excel (dựng trên máy, js/report-xlsx.js): lần tải đầu lưu báo cáo và cấp số BC-yymm-001; tải tiếp (PDF rồi
 // Excel) cùng bộ lọc → cùng số, cùng số liệu. Báo cáo đã lưu: tải lại PDF / Excel đúng như lúc lập.
 // Cần mạng. Bộ lọc là nút chọn, không có ô gõ (iPhone không bật bàn phím).
-import { api, bi, biText, esc, nameText, resMsg, uuid, b64ToBytes, fmtDateTime, session } from '../core.js';
+import { api, bi, biText, esc, nameText, resMsg, uuid, b64ToBytes, fmtDateTime, fmtDate, session } from '../core.js';
 import { $, ICON, toast, dialog, freshFilters } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, depts, recs, can, seesAll, canSeeRecords, isSecretary, today, capaOn, capaForms, capaDefaultForm, ncrOn, auditOn } from '../data.js';
+import { items, depts, recs, can, seesAll, canSeeRecords, isSecretary, today, capaOn, capaForms, capaDefaultForm, ncrOn, auditOn, mreviewOn, canSeeMreview } from '../data.js';
 import { busy } from '../form.js';
 import { openFile } from '../files.js';
 import { reportLogo } from '../report-logo.js';
 import { reportExcelFile } from '../report-xlsx.js';
 
-const KINDS = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA', 'NCR', 'AUDIT'];
-const KIND_ICON = { CATALOG: 'library', RECORDS: 'file', COVERAGE: 'checklist', VERSIONS: 'archive', DIST: 'print', DOCREQ: 'edit', CAPA: 'repairs', NCR: 'alert', AUDIT: 'inspections' };
-const NEED_RECORDS = { RECORDS: 1, COVERAGE: 1, DIST: 1, DOCREQ: 1, CAPA: 1, NCR: 1, AUDIT: 1 };
+const KINDS = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA', 'NCR', 'AUDIT', 'MREVIEW'];
+const KIND_ICON = { CATALOG: 'library', RECORDS: 'file', COVERAGE: 'checklist', VERSIONS: 'archive', DIST: 'print', DOCREQ: 'edit', CAPA: 'repairs', NCR: 'alert', AUDIT: 'inspections', MREVIEW: 'trend' };
+const NEED_RECORDS = { RECORDS: 1, COVERAGE: 1, DIST: 1, DOCREQ: 1, CAPA: 1, NCR: 1, AUDIT: 1, MREVIEW: 1 };
 const N_OPTS = { MONTH: [3, 6, 12], QUARTER: [2, 4, 8] };
 const N_DEF = { MONTH: 6, QUARTER: 4 };
 const LONG = 180000; // máy chủ dựng PDF bằng Google Docs: tới cả phút với danh mục lớn
 
-const INIT = { kind: 'CATALOG', dept: '', scope: 'ISSUED', grain: 'MONTH', end: '', n: 6, std: 'BOTH', codes: true, item: '', dstate: 'ALL', year: 0, rstate: 'ALL', req: '', capa: '', cstate: 'ALL', cform: '', csource: 'ALL', ncr: '', nform: 'NCR', nstate: 'ALL', aud: '', aform: 'PLAN' };
+const INIT = { kind: 'CATALOG', dept: '', scope: 'ISSUED', grain: 'MONTH', end: '', n: 6, std: 'BOTH', codes: true, item: '', dstate: 'ALL', year: 0, rstate: 'ALL', req: '', capa: '', cstate: 'ALL', cform: '', csource: 'ALL', ncr: '', nform: 'NCR', nstate: 'ALL', aud: '', aform: 'PLAN', mr: '' };
 const state = { ...INIT };
 /** Bản xem trước / báo cáo đang làm: {sig, runId, code, layout, logo} — đổi bộ lọc thì bỏ */
 let cur = null;
@@ -50,6 +50,7 @@ function lastKeys(grain, n) {
   }
   return out;
 }
+const fmtD = (iso) => fmtDate(iso) || '';
 const keyLabel = (grain, k) => (grain === 'MONTH' ? `${k.slice(5, 7)}/${k.slice(0, 4)}` : `${k.slice(5)}/${k.slice(0, 4)}`);
 
 /** Bộ lọc gửi máy chủ theo loại báo cáo */
@@ -59,6 +60,7 @@ function filtersOf(s) {
   if (s.kind === 'COVERAGE') return { dept: s.dept, std: s.std, codes: !!s.codes };
   if (s.kind === 'DIST') return { dept: s.dept, state: s.dstate };
   if (s.kind === 'DOCREQ') return s.req ? { request_id: s.req } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.rstate };
+  if (s.kind === 'MREVIEW') return { review_id: s.mr };
   if (s.kind === 'AUDIT') return /^A:/.test(s.aud) ? { audit_id: s.aud.slice(2), form: s.aform || 'PLAN' } : { program_id: String(s.aud || '').replace(/^P:/, '') };
   if (s.kind === 'NCR') return s.ncr ? { ncr_id: s.ncr, form: s.nform || 'NCR' } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.nstate };
   if (s.kind === 'CAPA') return s.capa ? { capa_id: s.capa, form: s.cform || 'CAR' } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.cstate, source: s.csource || 'ALL' };
@@ -79,6 +81,7 @@ function applyQuery(q) {
   if (q.audit) state.aud = 'A:' + String(q.audit);
   if (q.form && ['PLAN', 'CHECKLIST', 'REPORT'].includes(q.form)) state.aform = q.form;
   if (q.ncr) state.ncr = String(q.ncr);
+  if (q.review) state.mr = String(q.review);
   if (q.form && ['NCR', 'DECISION'].includes(q.form)) state.nform = q.form;
   if (q.source && ['ALL', 'INTERNAL', 'COMPLAINT', 'SUPPLIER'].includes(q.source)) state.csource = q.source;
 }
@@ -167,7 +170,7 @@ async function download(btn, job, after) {
 /* ---------------- Màn Báo cáo ---------------- */
 
 /** Mô tả bộ lọc của một báo cáo đã lưu */
-function filterText(run, deptMap, itemMap, reqMap = new Map(), capaMap = new Map(), ncrMap = new Map(), audMap = new Map()) {
+function filterText(run, deptMap, itemMap, reqMap = new Map(), capaMap = new Map(), ncrMap = new Map(), audMap = new Map(), mrMap = new Map()) {
   const f = run.filters || {};
   const parts = [];
   if (run.kind === 'VERSIONS') { const it = itemMap.get(f.item_id); parts.push(it ? esc(it.code) : ''); } else parts.push(f.dept ? esc(nameText(deptMap.get(f.dept)) || f.dept) : bi('rpt.all_depts'));
@@ -188,6 +191,7 @@ function filterText(run, deptMap, itemMap, reqMap = new Map(), capaMap = new Map
     if (f.audit_id) { parts.push(esc((audMap.get(f.audit_id) || {}).code || '')); parts.push(bi('rpt.aud_form.' + (f.form || 'PLAN'))); }
     else parts.push(esc((audMap.get(f.program_id) || {}).code || ''));
   }
+  if (run.kind === 'MREVIEW') { parts.length = 0; parts.push(esc((mrMap.get(f.review_id) || {}).code || '')); }
   if (run.kind === 'DOCREQ') { if (f.request_id) { parts.length = 0; parts.push(esc((reqMap.get(f.request_id) || {}).code || '')); } else parts.push(esc(String(f.year || '')) + ' · ' + bi('rpt.req_state.' + (f.state || 'ALL'))); }
   return parts.filter(Boolean).join(' · ');
 }
@@ -209,7 +213,13 @@ export async function renderReports(view, ctx) {
   const audMap = new Map(progList.map((x) => [x.program_id, x]).concat(audList.map((a) => [a.audit_id, a])));
   if (state.aud && !audMap.has(state.aud.slice(2))) state.aud = '';
   if (!state.aud && progList.length) state.aud = 'P:' + (progList.find((x) => x.state !== 'CANCELLED') || progList[0]).program_id;
-  const kindOk = (k) => kindAllowed(k) && (k !== 'CAPA' || capaReady) && (k !== 'NCR' || ncrReady) && (k !== 'AUDIT' || (audReady && progList.length > 0));
+  // Xem xét lãnh đạo (4c): một cuộc xem xét (BM-ISO-05-01)
+  const mrReady = await mreviewOn();
+  const mrList = (await recs('MREVIEW')).filter((r) => !r.archived_at && r.state !== 'CANCELLED' && canSeeMreview(r)).sort((a, b) => String(b.code).localeCompare(String(a.code)));
+  const mrMap = new Map(mrList.map((r) => [r.review_id, r]));
+  if (!mrMap.has(state.mr)) state.mr = mrList.length ? mrList[0].review_id : '';
+  const kindOk = (k) => kindAllowed(k) && (k !== 'CAPA' || capaReady) && (k !== 'NCR' || ncrReady) && (k !== 'AUDIT' || (audReady && progList.length > 0)) &&
+    (k !== 'MREVIEW' || (mrReady && mrList.length > 0));
   if (!kindOk(state.kind)) state.kind = 'CATALOG';
   const all = await items();
   const deps = await depts();
@@ -245,6 +255,7 @@ export async function renderReports(view, ctx) {
     if (k === 'DOCREQ') out.push(sel('rf-req', 'rpt.f.req', [['', biText('rp.req_log')]].concat(reqList.slice(0, 300).map((r) => [r.request_id, `${r.code} · ${biText('dr.type.' + r.req_type).split(' · ')[0]} · ${(itemMap.get(r.item_id) || {}).code || r.new_code || ''}`])), state.req));
     if (k === 'CAPA') out.push(sel('rf-capa', 'rpt.f.capa', [['', biText('rp.capa_log')]].concat(capaList.slice(0, 300).map((c) => [c.capa_id, `${c.code} · ${String(c.title_vi || c.title_zh || c.problem_vi || c.problem_zh || '').split('\n')[0].slice(0, 60)}`])), state.capa));
     if (k === 'NCR') out.push(sel('rf-ncr', 'rpt.f.ncr', [['', biText('rp.ncr_log')]].concat(ncrList.slice(0, 300).map((n) => [n.ncr_id, `${n.code} · ${String(n.product_text || '').slice(0, 40)} · ${String(n.problem_vi || n.problem_zh || '').split('\n')[0].slice(0, 40)}`])), state.ncr));
+    if (k === 'MREVIEW') out.push(sel('rf-mr', 'rpt.f.mreview', mrList.map((r) => [r.review_id, `${r.code} · ${fmtD(r.period_from)} – ${fmtD(r.period_to)} · ${biText('mr.state.' + r.state).split(' · ')[0]}`]), state.mr));
     if (k === 'AUDIT') {
       out.push(`<label class="fld wide"><span>${bi('rpt.f.audit')}</span><select class="inp sel" id="rf-aud">${progList.map((pg) => {
         const list = audList.filter((a) => a.program_id === pg.program_id);
@@ -252,7 +263,7 @@ export async function renderReports(view, ctx) {
       }).join('')}</select></label>`);
       if (/^A:/.test(state.aud)) out.push(sel('rf-aform', 'rpt.f.capa_form', ['PLAN', 'CHECKLIST', 'REPORT'].map((x) => [x, biText('rpt.aud_form.' + x)]), state.aform));
     }
-    if (k !== 'VERSIONS' && k !== 'AUDIT' && !(k === 'DOCREQ' && state.req) && !(k === 'CAPA' && state.capa) && !(k === 'NCR' && state.ncr)) out.push(sel('rf-dept', k === 'DIST' ? 'dist.recipient' : 'rpt.f.dept', [['', biText(seesAll() ? 'rpt.all_depts' : 'cat.all')]].concat((k === 'DIST' ? deps : deptOpts).map((d) => [d.dept_code, `${d.dept_code} · ${nameText(d)}`])), state.dept));
+    if (k !== 'VERSIONS' && k !== 'AUDIT' && k !== 'MREVIEW' && !(k === 'DOCREQ' && state.req) && !(k === 'CAPA' && state.capa) && !(k === 'NCR' && state.ncr)) out.push(sel('rf-dept', k === 'DIST' ? 'dist.recipient' : 'rpt.f.dept', [['', biText(seesAll() ? 'rpt.all_depts' : 'cat.all')]].concat((k === 'DIST' ? deps : deptOpts).map((d) => [d.dept_code, `${d.dept_code} · ${nameText(d)}`])), state.dept));
     if (k === 'DIST') out.push(sel('rf-dstate', 'rpt.f.dist_state', ['ALL', 'ACTIVE', 'DUE', 'RECALLED'].map((x) => [x, biText('rpt.dist_state.' + x)]), state.dstate));
     if (k === 'DOCREQ' && !state.req) {
       out.push(sel('rf-year', 'rpt.f.year', years.map((y) => [y, String(y)]), state.year));
@@ -298,7 +309,7 @@ export async function renderReports(view, ctx) {
     return `<ul class="cat-list rp-saved">${saved.items.slice(0, 50).map((r) => `<li class="rp-run" data-run="${esc(r.report_run_id)}">
       <div class="cat-top"><span class="code">${esc(r.code)}</span><span class="muted small">${esc(fmtDateTime(r.generated_at))}</span></div>
       <div class="cat-name">${bi('rpt.kind.' + r.kind)}</div>
-      <div class="cat-meta">${filterText(r, deptMap, itemMap, reqMap, capaMap, ncrMap, audMap)}${isSecretary() && r.generated_by_name ? ' · ' + esc(r.generated_by_name) : ''}</div>
+      <div class="cat-meta">${filterText(r, deptMap, itemMap, reqMap, capaMap, ncrMap, audMap, mrMap)}${isSecretary() && r.generated_by_name ? ' · ' + esc(r.generated_by_name) : ''}</div>
       <div class="row"><button type="button" class="btn small" data-rpdf="${esc(r.report_run_id)}">${ICON.file}<span>${bi('rp.pdf')}</span></button>
         <button type="button" class="btn small" data-rxlsx="${esc(r.report_run_id)}">${ICON.excel}<span>${bi('rp.excel')}</span></button></div></li>`).join('')}</ul>`;
   };
@@ -391,6 +402,7 @@ export async function renderReports(view, ctx) {
     on('rf-nstate', (el) => { state.nstate = el.value; });
     on('rf-aud', (el) => { state.aud = el.value; });
     on('rf-aform', (el) => { state.aform = el.value; });
+    on('rf-mr', (el) => { state.mr = el.value; });
     $('#rp-run', view).addEventListener('click', async (ev) => {
       const btn = ev.currentTarget;
       if (!navigator.onLine) { toast(bi('rp.need_network'), 'err'); return; }

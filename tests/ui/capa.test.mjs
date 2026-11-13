@@ -170,7 +170,7 @@ test('iPhone: đúng các bước "Thử bản 3a" — lập phiếu → nguyên
     await page.waitForFunction(() => /quá hạn kiểm tra hiệu lực/.test(document.body.textContent));
     const st = await page.textContent('.view');
     assert.match(st, /Đang xử lý 0 · chờ kiểm tra hiệu lực 0 · đã đóng 0 · hành động quá hạn 0 · quá hạn kiểm tra hiệu lực 0/);
-    assert.match(st, /1\.0\.12/);
+    assert.match(st, /1\.0\.13/);
     assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
 });

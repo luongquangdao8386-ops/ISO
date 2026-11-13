@@ -4,7 +4,7 @@ import { bi, biText, esc, fmtDateTime, badge, session, api, resMsg, nameText, BU
 import { ICON, toast, dialog, askPin } from '../ui.js';
 import { getMeta, queueItems, exportBackup } from '../sync.js';
 import { reauth } from '../auth.js';
-import { boot, roleLevel, isOwner, isSecretary, can, myDepts, mapOf, docControlOn, ncrOn, auditOn } from '../data.js';
+import { boot, roleLevel, isOwner, isSecretary, can, myDepts, mapOf, docControlOn, ncrOn, auditOn, mreviewOn } from '../data.js';
 import { app, syncNow, updateSyncStatus } from '../app.js';
 import { shareFileNow } from '../media.js';
 
@@ -66,6 +66,7 @@ export async function renderAccount(view, { shell }) {
   const dcOn = await docControlOn();
   const nOn = await ncrOn();
   const aOn = await auditOn();
+  const mOn = await mreviewOn();
   // Mã vỏ app đang chạy (tên cache của Service Worker …-shell-<bản>-<mã>): so với mã Claude báo khi phát hành để biết máy đã nhận đủ bản mới
   let shellHash = '';
   try { const k = (await caches.keys()).filter((x) => /-shell-/.test(x) && x.startsWith(NS + '-shell-')).pop(); if (k) shellHash = k.split('-').pop(); } catch (e) { /* bỏ qua */ }
@@ -79,6 +80,7 @@ export async function renderAccount(view, { shell }) {
   if (await can('link.info')) admin.push(['nav.links', '/links']);
   if (await can('mail.view')) admin.push(['admin.mail', '/admin/mail']);
   if (await can('system.status')) admin.push(['admin.status', '/admin/status']);
+  if (await can('system.reset')) admin.push(['admin.reset', '/admin/reset']);
   if (isOwner() && b.env === 'THU' && await can('sample.seed')) admin.push(['admin.sample', '/admin/sample']);
   view.innerHTML = `
   <section class="card"><h2>${bi('account.profile')}</h2>
@@ -100,6 +102,7 @@ export async function renderAccount(view, { shell }) {
     ${lvl >= 2 || sec ? link('nav.capa', '/capa') : ''}
     ${(lvl >= 2 || sec) && nOn ? link('nav.ncr', '/ncr') : ''}
     ${lvl >= 2 || sec || u.auditor ? link('nav.audits', '/audits', aOn ? '' : `<span class="tag soon">${bi('soon.tag')}</span>`) : ''}
+    ${(lvl >= 3 || sec) && mOn ? link('nav.mreview', '/mreview') : ''}
   </section>
   <section class="card"><h2>${bi('account.sync')}</h2>
     ${row(bi('col.status'), `<span class="pill ${online ? 't-green' : 't-red'}">${bi(online ? 'sync.online' : 'sync.offline')}</span>`)}

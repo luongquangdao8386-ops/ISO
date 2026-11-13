@@ -29,7 +29,9 @@ var SYNC_ENTITIES_ = [
   { type: 'AUDIT', sheet: 'Audits', scoped: 'audit' },
   { type: 'AUD_CHK', sheet: 'AuditChecks', scoped: 'aud_chk' },
   // Phát hiện đánh giá (4b): theo đợt, như checklist
-  { type: 'AUD_FND', sheet: 'AuditFindings', scoped: 'aud_chk' }
+  { type: 'AUD_FND', sheet: 'AuditFindings', scoped: 'aud_chk' },
+  // Xem xét lãnh đạo (4c): Thư ký ISO, cấp 3+, người phụ trách một quyết định
+  { type: 'MREVIEW', sheet: 'MgmtReviews', scoped: 'mreview' }
 ];
 
 /** Bảng đồng bộ có sheet trên máy chủ (bản mới thêm sheet mà máy chủ chưa chạy migrateSchema thì bỏ qua, không làm hỏng đăng nhập) */
@@ -54,6 +56,7 @@ function syncProject_(ctx, ent, row, aux) {
   if (ent.scoped === 'ncr') return syncNcrVisible_(ctx, row) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'aud_prog') return syncAuditProgVisible_(ctx, row) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'audit') return syncAuditVisible_(ctx, row) ? projectRow_(ctx, row) : null;
+  if (ent.scoped === 'mreview') return syncMreviewVisible_(ctx, row) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'aud_chk') return !row.archived_at && syncAuditVisible_(ctx, syncAuditMap_(aux)[row.audit_id]) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'capa_act') return syncCapaVisible_(ctx, syncCapaMap_(aux)[row.capa_id], aux) ? projectRow_(ctx, row) : null;
   if (ent.scoped === 'record') {

@@ -53,6 +53,12 @@ function reportMetaLeft_(snap) {
     if (snap.scope_depts) out.push([lab_('rpt.f.scope_depts'), snap.scope_depts]);
     return out;
   }
+  if (snap.kind === 'MREVIEW' && d.one) {
+    out.push([lab_('rpt.f.mreview'), d.one.code]);
+    out.push([lab_('mr.period'), dmy_(d.one.period_from) + ' – ' + dmy_(d.one.period_to)]);
+    if (d.st && d.st.data && d.st.data.scope) out.push([lab_('rpt.f.scope_depts'), d.st.data.scope]);
+    return out;
+  }
   if (snap.kind === 'NCR' && d.one) {
     out.push([lab_('rpt.f.ncr'), d.one.code]);
     out.push([lab_('rpt.f.dept'), d.one.dept_code]);
@@ -333,7 +339,7 @@ function reportLayout_(snap) {
   var body = snap.kind === 'CATALOG' ? layoutCatalog_(snap) : snap.kind === 'RECORDS' ? layoutRecords_(snap)
     : snap.kind === 'COVERAGE' ? layoutCoverage_(snap) : snap.kind === 'DIST' ? layoutDist_(snap)
     : snap.kind === 'DOCREQ' ? layoutDocreq_(snap) : snap.kind === 'CAPA' ? layoutCapa_(snap)
-    : snap.kind === 'NCR' ? layoutNcr_(snap) : snap.kind === 'AUDIT' ? layoutAudit_(snap) : layoutVersions_(snap);
+    : snap.kind === 'NCR' ? layoutNcr_(snap) : snap.kind === 'AUDIT' ? layoutAudit_(snap) : snap.kind === 'MREVIEW' ? layoutMreview_(snap) : layoutVersions_(snap);
   var sg = body.sign || {};
   var gen = String(snap.generated_at || '');
   return {

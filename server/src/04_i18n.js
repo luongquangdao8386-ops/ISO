@@ -151,7 +151,18 @@ var SUB_MSG = {
   AUDIT_FINDING_HAS_CAPA: ['Phát hiện này đã có phiếu khắc phục', '该发现项已有纠正措施单'],
   AUDIT_FINDING_NO_CAPA: ['Còn phát hiện không phù hợp chưa có phiếu khắc phục', '仍有不符合项尚无纠正措施单'],
   AUDIT_CAPA_OPEN: ['Còn phiếu khắc phục chưa đóng (chưa kiểm tra hiệu lực)', '仍有纠正措施单未关闭（尚未验证有效性）'],
-  CAPA_AUDIT_ONLY: ['Phiếu lập từ phát hiện đánh giá nội bộ giữ nguồn Đánh giá', '根据内部审核发现项创建的纠正措施单须保持来源为“审核”']
+  CAPA_AUDIT_ONLY: ['Phiếu lập từ phát hiện đánh giá nội bộ giữ nguồn Đánh giá', '根据内部审核发现项创建的纠正措施单须保持来源为“审核”'],
+  // Phiên 4c: xem xét lãnh đạo, xóa sạch dữ liệu
+  MR_PERIOD_LONG: ['Kỳ xem xét tối đa 2 năm', '评审期间最长2年'],
+  MR_PERIOD_FUTURE: ['Ngày cuối kỳ không quá 3 tháng sau hôm nay', '期间结束日期不得晚于今天起3个月'],
+  MR_HELD_LOCKED: ['Cuộc xem xét đã họp: kỳ, ngày họp và nhận xét đầu vào đã chốt — mở lại để sửa', '评审已召开：期间、会议日期及输入意见已锁定——请重新打开后修改'],
+  MR_DECISIONS_MAX: ['Mỗi cuộc xem xét tối đa 30 quyết định', '每次评审最多30项决定'],
+  MR_DECISION_KEEP: ['Quyết định đã xong hoặc đã hủy không bỏ khỏi danh sách được', '已完成或已取消的决定不能从列表中删除'],
+  MR_DECISION_DONE: ['Đã có quyết định xong — không mở lại cuộc xem xét được', '已有决定完成——无法重新打开评审'],
+  MR_MEETING_FUTURE: ['Ngày họp không được sau hôm nay — ghi Đã họp sau buổi họp', '会议日期不得晚于今天——请在会后记录“已召开”'],
+  RESET_CONFIRM: ['Gõ đúng chữ XÓA TOÀN BỘ để xác nhận', '请准确输入“XÓA TOÀN BỘ”以确认'],
+  RESET_BACKUP_FAILED: ['Sao lưu trước khi xóa không đạt (cần VERIFIED) — chưa xóa gì, thử lại sau ít phút', '清空前备份未通过（需为VERIFIED）——未删除任何数据，请稍后重试'],
+  RESET_RUNNING: ['Đang xóa sạch dữ liệu — chờ vài phút rồi mở lại app', '正在清空数据——请等待几分钟后重新打开应用']
 };
 
 function fmtMsg_(pair, vars) {

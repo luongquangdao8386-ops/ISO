@@ -76,7 +76,9 @@ function translateText_(text, src, tgt) {
 var MT_SHEETS_ = {
   Items: ['name', 'purpose', 'freq'], Groups: ['name'], Depts: ['name'], Clauses: ['name', 'group'], Versions: ['change_summary'],
   // Đánh giá nội bộ (4a): câu hỏi checklist thêm nhiều dòng một lần dịch ở nền; nội dung, ghi chú kế hoạch khi quá thời gian dịch lúc lưu
-  AuditChecks: ['question'], Audits: ['title', 'note'], AuditPrograms: ['title', 'objective', 'scope']
+  AuditChecks: ['question'], Audits: ['title', 'note'], AuditPrograms: ['title', 'objective', 'scope'],
+  // Xem xét lãnh đạo (4c): nhận xét đầu vào, kết luận khi quá thời gian dịch lúc lưu
+  MgmtReviews: MR_INPUTS_.map(function (k) { return 'in_' + k; }).concat(['conclusion'])
 };
 
 /**
@@ -120,6 +122,8 @@ function runBackgroundJobs() {
   var t0 = Date.now();
   dbReset_();
   autoMigrate_();
+  // Xóa sạch (4c): tệp còn lại chưa kịp bỏ vào thùng rác
+  try { resetTrashLeftover_(t0); } catch (e) { log_('resetTrashLeftover_: ' + (e && e.message)); }
   if (!mtEnabled_()) { recordTriggerRun_('runBackgroundJobs', t0); return; }
   var done = 0;
   Object.keys(MT_SHEETS_).forEach(function (sheet) {

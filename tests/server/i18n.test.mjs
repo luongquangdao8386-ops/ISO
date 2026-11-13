@@ -113,7 +113,24 @@ test('họ khóa ghép động đủ thành viên', () => {
   const more = (p, list) => { fam[p] = (fam[p] || []).concat(list); };
   ['mail.kind.', 'mail.kind_short.', 'mail.rule.', 'mail.due.'].forEach((p) => more(p, ['CAPA_REPLY', 'NCR_DECIDE', 'NCR_DUE', 'AUDIT_SOON']));
   ['rpt.kind.', 'rpt.desc.'].forEach((p) => more(p, ['NCR', 'AUDIT']));
-  more('audit_grp.', ['ncr', 'iaudit']);
+  more('audit_grp.', ['ncr', 'iaudit', 'mreview', 'system']);
+  // Xem xét lãnh đạo, xóa sạch (4c)
+  ['rpt.kind.', 'rpt.desc.'].forEach((p) => more(p, ['MREVIEW']));
+  more('rpt.title.', ['MREVIEW', 'MREVIEW_HELD']);
+  more('tile.', ['mreview']);
+  const MR_IN = ['prev', 'context', 'satisfaction', 'objectives', 'process', 'capa', 'monitoring', 'audit', 'supplier', 'resources', 'risks', 'improve'];
+  fam['mr.in.'] = MR_IN;
+  fam['mr.state.'] = ['DRAFT', 'HELD', 'CANCELLED'];
+  fam['mr.kind.'] = ['IMPROVE', 'CHANGE', 'RESOURCE'];
+  fam['mr.dstate.'] = ['OPEN', 'DONE', 'CANCELLED'];
+  ['reset.mode.', 'reset.mode_short.', 'reset.mode_hint.', 'reset.last_confirm.'].forEach((p) => { fam[p] = ['KEEP_CATALOG', 'ALL']; });
+  fam['reset.st.'] = ['OK', 'FAILED'];
+  fam['reset.t.'] = ['Items', 'Groups', 'Clauses', 'TplFiles', 'Versions', 'Records', 'Evidence', 'DocRequests', 'Distributions', 'Capas', 'CapaActions', 'Ncrs',
+    'AuditPrograms', 'Audits', 'AuditChecks', 'AuditFindings', 'MgmtReviews', 'ReportRuns', 'ImportBatches', 'ImportRows', 'Documents', 'AuditLogs'];
+  // Nhãn số liệu tự gom do máy chủ gửi (37_mreview.js mrBlocks_ row('mr.s.…'))
+  const mr = fs.readFileSync(path.join(ROOT, 'server', 'src', '37_mreview.js'), 'utf8');
+  fam['mr.s.'] = [...mr.matchAll(/'mr\.s\.([a-z_]+)'/g)].map((m) => m[1]);
+  assert.ok(fam['mr.s.'].length > 40);
   // Dòng kiểm tra sức khỏe máy chủ (24_system.js add('khóa', …))
   const sys = fs.readFileSync(path.join(ROOT, 'server', 'src', '24_system.js'), 'utf8');
   fam['health.'] = [...sys.matchAll(/\badd\('([a-z_0-9]+)'/g)].map((m) => m[1]).concat([...sys.matchAll(/'(link_[a-z]+)'/g)].map((m) => m[1]));

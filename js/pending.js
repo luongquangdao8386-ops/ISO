@@ -16,7 +16,7 @@ import { session } from './core.js';
 import { recs, items, isSecretary, canApprove, versionEditable, reviewSoon, today, addDaysIso, canSeeRecords, canSubmitRecord, recordCheck,
   recordStatusMap, recordsOn, canDecideReq, distDue, distOverdue, canVerifyCapa, capaIsParty, canDecideNcr, canEditNcr,
   canApproveProgram, isAuditMember, canPlanAudit, canRecordAudit, canCreateCapa, findingIsNc, findingCapa, auditReportGaps, auditCloseGaps,
-  canCloseAudit } from './data.js';
+  canCloseAudit, mrDecisions, mrDecisionLate } from './data.js';
 import { queueItems } from './sync.js';
 import { covers } from './periods.js';
 
@@ -102,7 +102,15 @@ export async function pendingFor() {
   out.aud_capa = reported.filter((a) => canCreateCapa(a.dept_code)).flatMap((a) => fndOf(a.audit_id).filter((f) => findingIsNc(f) && !findingCapa(f, capaMap)));
   out.aud_close = canCloseAudit() ? reported.filter((a) => { const g = auditCloseGaps(fndOf(a.audit_id), capaMap); return !g.noCapa.length && !g.open.length; }) : [];
   out.aud_plan = audits.filter((a) => a.state === 'PLANNED' && approved.has(a.program_id) && canPlanAudit(a) && !(a.audit_date && a.audit_date >= t) && String(a.plan_month) <= t.slice(0, 7));
-  out.total = out.aud_review.length + out.aud_returned.length + out.aud_soon.length + out.aud_doing.length + out.aud_plan.length +
+  // Xem xét lãnh đạo (4c): quyết định tôi phụ trách đến hạn trong 7 ngày / quá hạn; quyết định quá hạn của người khác, cuộc xem xét sắp họp /
+  // đã qua ngày họp mà chưa ghi Đã họp (Thư ký ISO)
+  const mrs = (await recs('MREVIEW')).filter((r) => !r.archived_at);
+  const held = mrs.filter((r) => r.state === 'HELD');
+  const decOf = (pred) => held.flatMap((r) => mrDecisions(r).filter((d) => (d.state || 'OPEN') === 'OPEN' && pred(d)).map((d) => ({ ...d, review_id: r.review_id, code: r.code })));
+  out.mr_decisions = decOf((d) => d.owner_user_id === uid && (!d.due || d.due <= soon));
+  out.mr_late = sec ? decOf((d) => d.owner_user_id !== uid && mrDecisionLate(d)) : [];
+  out.mr_prepare = sec ? mrs.filter((r) => r.state === 'DRAFT' && r.meeting_date && r.meeting_date <= soon) : [];
+  out.total = out.mr_decisions.length + out.mr_late.length + out.mr_prepare.length + out.aud_review.length + out.aud_returned.length + out.aud_soon.length + out.aud_doing.length + out.aud_plan.length +
     out.aud_report.length + out.aud_capa.length + out.aud_close.length +
     out.ncr_decide.length + out.ncr_due.length + out.ncr_capa.length + out.review.length + out.issue.length + out.returned.length + out.rec_returned.length + out.send_problems.length +
     out.req_review.length + out.req_todo.length + out.req_rejected.length + out.capa_acts.length + out.capa_verify.length + out.capa_owner.length + out.capa_reply.length +

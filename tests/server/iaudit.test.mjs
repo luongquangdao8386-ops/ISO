@@ -455,7 +455,7 @@ test('cập nhật từ bản 3c (chưa có AuditPrograms, Audits, AuditChecks):
   strip(env2);
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: AuditPrograms; Audits; AuditChecks. schema_version=1.0.12'), env2.logs.join('\n'));
+  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: AuditPrograms; Audits; AuditChecks. schema_version=1.0.13'), env2.logs.join('\n'));
   env2.g.dbReset_();
   const keys = env2.g.readRows_('Settings').map((x) => x.setting_key);
   for (const k of ['audit_program_form_code', 'audit_plan_form_code', 'audit_checklist_form_code', 'audit_notice_days']) assert.ok(keys.includes(k), k);

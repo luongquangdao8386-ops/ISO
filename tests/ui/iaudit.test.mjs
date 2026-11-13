@@ -343,7 +343,7 @@ test('đúng các bước "Nên kiểm" của HUONG_DAN 4a: Trạng thái hệ t
     await login(page, 'TK', '583922');
     await go(page, '#/admin/status');
     await page.waitForFunction(() => /Chưa có chương trình năm 2026/.test(document.body.textContent), null, { timeout: 20000 });
-    assert.match(await page.textContent('.view'), /1\.0\.12/);
+    assert.match(await page.textContent('.view'), /1\.0\.13/);
     await go(page, '#/');
     await page.waitForSelector('.grid9 .tile[href="#/audits"]');
     await page.click('.grid9 .tile[href="#/audits"]');

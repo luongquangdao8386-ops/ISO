@@ -166,7 +166,11 @@ triển khai, mục "CẬP NHẬT LÊN BẢN 3a").
 
 Sau đó: 3b khiếu nại 8D, SCAR (`32_capa.js`) · 3c sản phẩm không phù hợp (`34_ncr.js`) · 4a đánh giá nội bộ — chương trình năm, kế hoạch
 đợt, checklist (`35_iaudit.js`) · 4b phát hiện đánh giá (NC lớn · NC nhỏ · Cần cải tiến), báo cáo đánh giá BM-ISO-03-04, phiếu khắc phục từ
-phát hiện, đóng đợt khi phiếu đã đóng (`36_finding.js`, sheet `AuditFindings`, schema 1.0.12). Tiếp: 4c xem xét lãnh đạo, xóa dữ liệu.
+phát hiện, đóng đợt khi phiếu đã đóng (`36_finding.js`, sheet `AuditFindings`, schema 1.0.12) · 4c **xem xét lãnh đạo** BM-ISO-05-01
+(`37_mreview.js`, sheet `MgmtReviews`, mã `XL-yy-01`: số liệu tự gom theo kỳ trong phạm vi áp dụng — quyết định lần trước, khiếu nại, sản
+phẩm không phù hợp, khắc phục, tài liệu, phủ điều khoản, hồ sơ đúng hạn, đánh giá nội bộ, SCAR; nhận xét 12 mục theo 9.3.2 (dịch máy); Ghi
+Đã họp (PIN) chốt số liệu; quyết định có người phụ trách, hạn; báo cáo PDF / Excel) và **xóa sạch dữ liệu** (`38_reset.js`, chỉ owner, PIN,
+gõ XÓA TOÀN BỘ; sao lưu VERIFIED trước; giữ hoặc xóa danh mục; đổi DATASET_EPOCH, thu hồi mọi phiên), schema 1.0.13 — xong Đợt 4.
 
 ## Cấu trúc
 

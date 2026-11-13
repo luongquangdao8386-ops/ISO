@@ -333,7 +333,7 @@ test('cập nhật từ bản 4a (chưa có sheet AuditFindings, cột báo cáo
   strip(env2);
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  const want = 'migrateSchema xong. Thêm: Capas(finding_id); Audits(' + AUD_COLS.join(',') + '); AuditFindings. schema_version=1.0.12';
+  const want = 'migrateSchema xong. Thêm: Capas(finding_id); Audits(' + AUD_COLS.join(',') + '); AuditFindings. schema_version=1.0.13';
   assert.ok(env2.logs.some((l) => l === want), env2.logs.join('\n'));
   env2.g.dbReset_();
   assert.ok(env2.g.readRows_('Settings').some((x) => x.setting_key === 'audit_report_form_code'));

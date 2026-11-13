@@ -80,6 +80,7 @@ export async function updateSyncStatus() {
     app.shell.setBadge('dist', p.dist_due.length);
     app.shell.setBadge('capa', p.capa_acts.length + p.capa_verify.length + p.capa_owner.length + p.capa_reply.length);
     app.shell.setBadge('ncr', p.ncr_decide.length + p.ncr_due.length + p.ncr_capa.length);
+    app.shell.setBadge('mreview', p.mr_decisions.length + p.mr_late.length + p.mr_prepare.length);
     app.shell.setBadge('audits', p.aud_review.length + p.aud_returned.length + p.aud_soon.length + p.aud_doing.length + p.aud_plan.length +
       p.aud_report.length + p.aud_capa.length + p.aud_close.length);
   } catch (e) { /* không chặn */ }
@@ -205,6 +206,11 @@ function registerRoutes() {
   route('/audit/new', lazy('./pages/audits.js', 'renderAuditForm'), { nav: 'audits' });
   route('/audit/:id/edit', lazy('./pages/audits.js', 'renderAuditForm'), { nav: 'audits' });
   route('/audit/:id', lazy('./pages/audits.js', 'renderAudit'), { nav: 'audits' });
+  // Xem xét lãnh đạo (4c)
+  route('/mreview', lazy('./pages/mreview.js', 'renderMreviews'), { nav: 'mreview' });
+  route('/mreview/new', lazy('./pages/mreview.js', 'renderMreviewForm'), { nav: 'mreview' });
+  route('/mreview/:id/edit', lazy('./pages/mreview.js', 'renderMreviewForm'), { nav: 'mreview' });
+  route('/mreview/:id', lazy('./pages/mreview.js', 'renderMreview'), { nav: 'mreview' });
   route('/links', lazy('./pages/links.js', 'renderLinks'), { nav: 'links' });
   route('/account', lazy('./pages/account.js', 'renderAccount'), { nav: 'account' });
   route('/account/drafts', lazy('./pages/drafts.js', 'renderDrafts'), { nav: 'account' });
@@ -218,6 +224,7 @@ function registerRoutes() {
   route('/admin/audit', lazy('./pages/admin.js', 'renderAudit'), { nav: 'account' });
   route('/admin/sample', lazy('./pages/admin.js', 'renderSample'), { nav: 'account' });
   route('/admin/mail', lazy('./pages/mail.js', 'renderMail'), { nav: 'account' });
+  route('/admin/reset', lazy('./pages/sysreset.js', 'renderReset'), { nav: 'account' });
   // Tem QR của biểu: APP_BASE_URL/#/f/<qr_key>?r=<lần ban hành> (mở bằng Camera rồi chọn mở app, hoặc nút Quét)
   route('/f/:key', async (view, ctx) => {
     const r = await resolveScan(parseScan(location.href, false));

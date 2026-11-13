@@ -1768,3 +1768,23 @@ html.bg-home .home-hero, html.bg-home .cs-hero { background-image: var(--bg-home
 .aud-fnd-missing { margin: 6px 0; }
 .aud-close-wait { margin: 0 0 8px; }
 .capa-from-finding { margin: 4px 0; }
+/* Xem xét lãnh đạo (phiên 4c) */
+.mr-actions { flex-wrap: wrap; }
+.mr-sec { border-top: 1px solid var(--line); padding: 8px 0; }
+.mr-sec:first-child { border-top: 0; }
+.mr-sec h3 { margin: 4px 0 6px; font-size: 0.95rem; }
+.mr-stats .kv strong { text-align: right; }
+.mr-stats:empty { display: none; }
+.mr-prev { margin: 4px 0 6px; }
+.mr-prev li { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; border-top: 1px dashed var(--line); }
+.mr-decs .mr-dec { border-top: 1px solid var(--line); padding: 8px 0; }
+.mr-decs .mr-dec p { margin: 4px 0; }
+.mr-decs .row { flex-wrap: wrap; margin-top: 4px; }
+.mr-in-edit { margin-bottom: 6px; }
+.mr-in-edit > p { margin: -4px 0 8px; }
+/* Xóa sạch dữ liệu (phiên 4c) */
+.xs-counts li { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-top: 1px solid var(--line); }
+.xs-counts li:first-child { border-top: 0; }
+.xs-confirm #rs-text { text-transform: uppercase; letter-spacing: 0.05em; }
+#rs-mode.chips { flex-wrap: wrap; overflow: visible; }
+#rs-mode .chip { white-space: normal; text-align: left; }

@@ -22,12 +22,12 @@
  * Quyền: Danh mục, Lịch sử phiên bản — mọi cấp (trong phạm vi biểu); Tình trạng hồ sơ, Phủ điều khoản — cấp 2+ / Thư ký ISO
  * ("Xem tổng hợp, phủ điều khoản" ở bảng quyền). Cấp 1–3 chỉ có biểu trong bộ phận mình + tài liệu chung. */
 
-var REPORT_KINDS_ = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA', 'NCR', 'AUDIT'];
+var REPORT_KINDS_ = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA', 'NCR', 'AUDIT', 'MREVIEW'];
 var REPORT_SNAPSHOT_MAX_ = 4 * 1024 * 1024;
 /** Biểu mẫu ISO mà báo cáo thay (in ở khối thông tin bên phải) */
 var REPORT_FORM_CODE_ = { CATALOG: 'BM-ISO-02-01', DOCREQ: 'BM-ISO-02-02', DIST: 'BM-ISO-02-03' };
 /** Tên tệp tải về */
-var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban', DIST: 'so-phan-phoi-thu-hoi', DOCREQ: 'de-nghi-tai-lieu', CAPA: 'so-theo-doi-khac-phuc', NCR: 'so-theo-doi-sp-khong-phu-hop' };
+var REPORT_SLUG_ = { CATALOG: 'danh-muc-tai-lieu', RECORDS: 'tinh-trang-ho-so', COVERAGE: 'phu-dieu-khoan', VERSIONS: 'lich-su-phien-ban', DIST: 'so-phan-phoi-thu-hoi', DOCREQ: 'de-nghi-tai-lieu', CAPA: 'so-theo-doi-khac-phuc', NCR: 'so-theo-doi-sp-khong-phu-hop', MREVIEW: 'xem-xet-lanh-dao' };
 
 /** Cài đặt mã biểu theo mẫu in một phiếu khắc phục (3b) */
 var CAPA_FORM_SETTING_ = { CAR: 'capa_form_code', RECEIPT: 'complaint_form_code', D8: 'd8_form_code', SCAR: 'scar_form_code' };
@@ -44,6 +44,7 @@ function reportFormCode_(kind, f) {
   if (kind === 'CAPA') return String(setting_(f && f.capa_id ? CAPA_FORM_SETTING_[f.form || 'CAR'] || 'capa_form_code' : 'capa_log_form_code') || '');
   if (kind === 'NCR') return String(setting_(f && f.ncr_id ? NCR_FORM_SETTING_[f.form || 'NCR'] || 'ncr_form_code' : 'ncr_log_form_code') || '');
   if (kind === 'AUDIT') return String(setting_(AUDIT_FORM_SETTING_[f && f.audit_id ? f.form || 'PLAN' : 'PROGRAM']) || '');
+  if (kind === 'MREVIEW') return String(setting_('mreview_form_code') || '');
   return REPORT_FORM_CODE_[kind] || '';
 }
 
@@ -63,6 +64,8 @@ var REPORT_GRAINS_ = { MONTH: { def: 6, max: 12 }, QUARTER: { def: 4, max: 8 } }
 function reportKindAllowed_(u, kind) {
   if (REPORT_KINDS_.indexOf(kind) < 0) return false;
   if (kind === 'RECORDS' || kind === 'COVERAGE' || kind === 'DIST' || kind === 'DOCREQ' || kind === 'CAPA' || kind === 'NCR' || kind === 'AUDIT') return isSecretary_(u) || Number(u.role_level) >= 2;
+  // Xem xét lãnh đạo: quyền theo cuộc xem xét (Thư ký ISO, cấp 3+, người phụ trách quyết định) kiểm ở reportMreview_
+  if (kind === 'MREVIEW') return isSecretary_(u) || Number(u.role_level) >= 2;
   return true;
 }
 
@@ -126,6 +129,10 @@ function reportFilters_(kind, f, today) {
     }
     if (!isUuidV4_(f.program_id)) throw validationError_([fieldError_('filters.program_id', f.program_id ? 'ID_INVALID' : 'REQUIRED')]);
     return { program_id: String(f.program_id) };
+  }
+  if (kind === 'MREVIEW') {
+    if (!isUuidV4_(f.review_id)) throw validationError_([fieldError_('filters.review_id', f.review_id ? 'ID_INVALID' : 'REQUIRED')]);
+    return { review_id: String(f.review_id) };
   }
   if (kind === 'NCR' && f.ncr_id) {
     if (!isUuidV4_(f.ncr_id)) throw validationError_([fieldError_('filters.ncr_id', 'ID_INVALID')]);
@@ -626,9 +633,10 @@ function reportCompute_(ctx, kind, filters) {
   var f = reportFilters_(kind, filters, today);
   var res = kind === 'CATALOG' ? reportCatalog_(ctx, f, today) : kind === 'RECORDS' ? reportRecords_(ctx, f, today)
     : kind === 'COVERAGE' ? reportCoverage_(ctx, f) : kind === 'DIST' ? reportDist_(ctx, f, today)
-    : kind === 'DOCREQ' ? reportDocreq_(ctx, f) : kind === 'CAPA' ? reportCapa_(ctx, f, today) : kind === 'NCR' ? reportNcr_(ctx, f, today) : kind === 'AUDIT' ? reportAudit_(ctx, f, today) : reportVersions_(ctx, f);
+    : kind === 'DOCREQ' ? reportDocreq_(ctx, f) : kind === 'CAPA' ? reportCapa_(ctx, f, today) : kind === 'NCR' ? reportNcr_(ctx, f, today) : kind === 'AUDIT' ? reportAudit_(ctx, f, today)
+    : kind === 'MREVIEW' ? reportMreview_(ctx, f, today) : reportVersions_(ctx, f);
   var t = LABELS['rpt.title.' + kind + (kind === 'CAPA' ? capaTitleSuffix_(f) : kind === 'NCR' ? (f.ncr_id ? (f.form === 'DECISION' ? '_DECISION' : '') : '_LOG')
-    : kind === 'AUDIT' ? (f.audit_id ? '_' + f.form : '') : '')] || [kind, kind];
+    : kind === 'AUDIT' ? (f.audit_id ? '_' + f.form : '') : kind === 'MREVIEW' ? (res.data.one.state === 'HELD' ? '_HELD' : '') : '')] || [kind, kind];
   var formCode = reportFormCode_(kind, f);
   var formRev = '';
   if (formCode) {
@@ -658,7 +666,7 @@ function capaTitleSuffix_(f) {
 /** Tên tệp tải về: BC-2611-001_danh-muc-tai-lieu.pdf (lịch sử phiên bản thêm mã biểu) */
 function reportFileName_(snap, ext) {
   var tail = snap.kind === 'VERSIONS' && snap.data && snap.data.item ? '_' + String(snap.data.item.code).replace(/[\/\\:*?"<>|\s]+/g, '-')
-    : (snap.kind === 'DOCREQ' || snap.kind === 'CAPA' || snap.kind === 'NCR' || snap.kind === 'AUDIT') && snap.data && snap.data.one ? '_' + String(snap.data.one.code || 'DG') :
+    : (snap.kind === 'DOCREQ' || snap.kind === 'CAPA' || snap.kind === 'NCR' || snap.kind === 'AUDIT' || snap.kind === 'MREVIEW') && snap.data && snap.data.one ? '_' + String(snap.data.one.code || 'DG') :
     snap.kind === 'AUDIT' && snap.data && snap.data.prog ? '_' + String(snap.data.prog.code) : '';
   var cf = snap.filters || {};
   var slug = snap.kind === 'AUDIT' ? AUDIT_FORM_SLUG_[cf.audit_id ? cf.form || 'PLAN' : 'PROGRAM']

@@ -119,8 +119,16 @@ var ACTION_TABLE_ = [
   'iaudit.finding.save|2|net|W',
   'iaudit.report|2|net|W',
   'iaudit.close|X|pin|W',
-  // Phiên 4c: xem xét lãnh đạo (đăng ký trước, chưa có mã → FEATURE_NOT_ENABLED)
+  // Phiên 4c: xem xét lãnh đạo (BM-ISO-05-01) — lập / sửa, đã họp (chốt số liệu, PIN; mở lại khi chưa quyết định nào xong), hủy (PIN) — Thư ký
+  // ISO / cấp 4; theo dõi quyết định — Thư ký ISO, người phụ trách quyết định; số liệu tự gom — Thư ký ISO, cấp 3+, người phụ trách quyết định
   'mreview.save|X|net|W',
+  'mreview.hold|X|pin|W',
+  'mreview.cancel|X|pin|W',
+  'mreview.decision|2|net|W',
+  'mreview.stats|S|net|R',
+  // Phiên 4c: xóa sạch dữ liệu (chỉ owner, PIN, gõ XÓA TOÀN BỘ; sao lưu VERIFIED trước khi xóa; giữ hoặc xóa danh mục)
+  'system.reset.info|O|net|R',
+  'system.reset|O|pin|W',
   // Báo cáo: logo
   'report.logo.get|1|net|R',
   'report.logo.set|4|pin|W',

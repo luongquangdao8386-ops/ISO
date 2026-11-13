@@ -81,6 +81,13 @@ var HANDLERS_ = {
   'iaudit.finding.save': function (ctx) { return auditFindingSave_(ctx); },
   'iaudit.report': function (ctx) { return auditReport_(ctx); },
   'iaudit.close': function (ctx) { return auditClose_(ctx); },
+  'mreview.save': function (ctx) { return mreviewSave_(ctx); },
+  'mreview.hold': function (ctx) { return mreviewHold_(ctx); },
+  'mreview.cancel': function (ctx) { return mreviewCancel_(ctx); },
+  'mreview.decision': function (ctx) { return mreviewDecision_(ctx); },
+  'mreview.stats': function (ctx) { return mreviewStats_(ctx); },
+  'system.reset.info': function (ctx) { return systemResetInfo_(ctx); },
+  'system.reset': function (ctx) { return systemReset_(ctx); },
   'tpl.upload': function (ctx) { return tplUpload_(ctx); },
   'tpl.edit': function (ctx) { return tplEdit_(ctx); },
   'tpl.delete': function (ctx) { return tplDelete_(ctx); },
@@ -135,6 +142,9 @@ var PRECHECK_ = {
   'iaudit.program.reopen': function (ctx) { precheckAuditReopen_(ctx); },
   'iaudit.program.cancel': function (ctx) { precheckAuditProgCancel_(ctx); },
   'iaudit.close': function (ctx) { precheckAuditClose_(ctx); },
+  'mreview.hold': function (ctx) { precheckMreviewHold_(ctx); },
+  'mreview.cancel': function (ctx) { precheckMreviewCancel_(ctx); },
+  'system.reset': function (ctx) { precheckSystemReset_(ctx); },
   'link.set': function (ctx) { precheckLinkSet_(ctx); },
   'mail.recipient.set': function (ctx) { precheckMailRecipient_(ctx); },
   'mail.test': function (ctx) { precheckMailRecipient_(ctx); }
@@ -276,7 +286,8 @@ function dispatchInner_(req, viaPush) {
   if (out && out.__envelope) return out.__envelope; // sync.push: phản hồi giống action gốc
   var env = out && out.state === 'COMMITTED' && out.ok ? envelope_(req, out)
     : envelope_(req, { ok: true, code: 'OK', data: out, sync_cursor: out && out.sync_cursor ? String(out.sync_cursor) : null });
-  if (def.write && !viaPush && env.ok && req.changes_since !== undefined && req.changes_since !== null) attachChanges_(ctx, req, env);
+  // Xóa sạch: thế hệ dữ liệu đã đổi — app đăng nhập lại và tải từ đầu, không kèm thay đổi theo cursor cũ
+  if (def.write && !viaPush && env.ok && req.action !== 'system.reset' && req.changes_since !== undefined && req.changes_since !== null) attachChanges_(ctx, req, env);
   return env;
 }
 

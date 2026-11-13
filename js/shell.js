@@ -30,6 +30,7 @@ export const SIDE = [
   { key: 'capa', label: 'nav.capa', icon: 'repairs', path: '/capa', lvl: 2 },
   { key: 'ncr', label: 'nav.ncr', icon: 'alert', path: '/ncr', lvl: 2 },
   { key: 'audits', label: 'nav.audits', icon: 'inspections', path: '/audits', lvl: 2 },
+  { key: 'mreview', label: 'nav.mreview', icon: 'trend', path: '/mreview', lvl: 3 },
   { key: 'links', label: 'nav.links', icon: 'link', path: '/links', lvl: 4 },
   { key: 'account', label: 'nav.account', icon: 'user', path: '/account', lvl: 1 }
 ];
@@ -46,7 +47,7 @@ export function mountShell(root, { env, onScan }) {
     <aside class="side" aria-label="${esc(biText('menu.title'))}">
       <div class="side-title">${bi('menu.title')}</div>
       <nav class="side-nav">
-        ${SIDE.filter((it) => lvl >= it.lvl || (['excel', 'versions', 'records', 'coverage', 'requests', 'dist', 'labels', 'capa', 'ncr', 'audits'].includes(it.key) && sec) || (it.key === 'audits' && session.user && session.user.auditor)).map((it, i) => `${i && it.key === 'account' ? '<hr>' : ''}<a class="side-item${it.soon ? ' soon' : ''}" href="#${it.path}" data-nav="${it.key}">${ICON[it.icon]}<span class="side-label">${bi(it.label)}${it.soon ? `<span class="tag soon">${bi('soon.tag')}</span>` : ''}</span></a>`).join('')}
+        ${SIDE.filter((it) => lvl >= it.lvl || (['excel', 'versions', 'records', 'coverage', 'requests', 'dist', 'labels', 'capa', 'ncr', 'audits', 'mreview'].includes(it.key) && sec) || (it.key === 'audits' && session.user && session.user.auditor)).map((it, i) => `${i && it.key === 'account' ? '<hr>' : ''}<a class="side-item${it.soon ? ' soon' : ''}" href="#${it.path}" data-nav="${it.key}">${ICON[it.icon]}<span class="side-label">${bi(it.label)}${it.soon ? `<span class="tag soon">${bi('soon.tag')}</span>` : ''}</span></a>`).join('')}
       </nav>
       <button type="button" class="scan-btn side-scan" id="side-scan">${ICON.scan}<span>${bi('nav.scan_qr')}</span></button>
     </aside>

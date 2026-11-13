@@ -120,6 +120,15 @@ var SHEETS = {
   // (kết luận đánh giá); capa_id phiếu khắc phục lập từ phát hiện (Capas.finding_id trỏ ngược lại)
   AuditFindings: { book: 'B', dot: 1, key: 'finding_id', c: true,
     cols: 'finding_id audit_id code seq check_id clause_id ftype content_vi content_zh evidence_vi evidence_zh capa_id' },
+  // Xem xét lãnh đạo (Đợt 4, phiên 4c, 37_mreview.js): code XL-yy-01; year năm của kỳ xem xét; period_from / period_to kỳ xem xét (số liệu tự gom
+  // trong khoảng này); meeting_date ngày họp; chair_name chủ trì (Giám đốc); attendees_text thành phần; state DRAFT | HELD | CANCELLED;
+  // in_<mục>_vi/zh nhận xét đầu vào theo 9.3.2 (dịch máy); conclusion kết luận về sự phù hợp, thỏa đáng, hiệu lực của hệ thống (dịch máy);
+  // decisions_json [{id, kind IMPROVE | CHANGE | RESOURCE, text_vi, text_zh, owner_user_id, owner_name, due, state OPEN | DONE | CANCELLED,
+  // done_date, note, by, at}] (không dịch máy); stats_json số liệu chốt lúc ghi Đã họp {at, from, to, data, blocks}; held_at / held_by
+  MgmtReviews: { book: 'B', dot: 1, key: 'review_id', c: true, i18n: true,
+    cols: 'review_id code year period_from period_to meeting_date place_text chair_name attendees_text state ' +
+      'in_prev_vi in_prev_zh in_context_vi in_context_zh in_satisfaction_vi in_satisfaction_zh in_objectives_vi in_objectives_zh in_process_vi in_process_zh in_capa_vi in_capa_zh in_monitoring_vi in_monitoring_zh in_audit_vi in_audit_zh in_supplier_vi in_supplier_zh in_resources_vi in_resources_zh in_risks_vi in_risks_zh in_improve_vi in_improve_zh conclusion_vi conclusion_zh decisions_json stats_json stats_at ' +
+      'held_at held_by cancelled_at cancelled_by cancel_reason' },
   // Hành động khắc phục / phòng ngừa của phiếu: owner_user_id người phụ trách trong app (nhận Gmail nhắc 7, 1, 0 ngày trước hạn), assignee_name
   // tên người thực hiện ngoài app; round = lần kiểm tra hiệu lực lúc thêm (0: kế hoạch đầu, 1: bổ sung sau lần kiểm tra không hiệu lực thứ nhất…)
   CapaActions: { book: 'B', dot: 1, key: 'action_id', c: true, i18n: true,
@@ -195,7 +204,8 @@ var TYPE_OVERRIDES_ = {
   verify_result: 'STRING', seq: 'INT', round: 'INT', atype: 'STRING', assignee_name: 'STRING', done_by: 'STRING',
   stage: 'STRING', decide_due: 'DATE', exec_due: 'DATE', decided_by: 'STRING', closed_by: 'STRING', need_capa: 'STRING', recheck: 'STRING', hold_place: 'STRING',
   year: 'INT', stds: 'STRING', plan_month: 'STRING', result: 'STRING', ready_by: 'STRING', started_by: 'STRING', checked_by: 'STRING',
-  time_text: 'STRING', place_text: 'STRING', auditee_text: 'STRING'
+  time_text: 'STRING', place_text: 'STRING', auditee_text: 'STRING',
+  meeting_date: 'DATE', chair_name: 'STRING', attendees_text: 'STRING', held_by: 'STRING', stats_at: 'DATETIME'
 };
 
 /** Kiểu cột suy theo tên. */

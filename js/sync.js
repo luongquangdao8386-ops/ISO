@@ -46,7 +46,7 @@ export async function bootstrap({ onPage, page1 = null } = {}) {
 export const KEY = {
   DEPT: 'dept_code', GROUP: 'group_key', ITEM: 'item_id', CLAUSE: 'clause_id', VERSION: 'version_id', RECORD: 'record_id', EVIDENCE: 'evidence_id',
   DOCREQ: 'request_id', DIST: 'dist_id', TPL: 'tpl_id', CAPA: 'capa_id', CAPA_ACT: 'action_id', NCR: 'ncr_id', AUD_PROG: 'program_id', AUDIT: 'audit_id', AUD_CHK: 'check_id',
-  AUD_FND: 'finding_id'
+  AUD_FND: 'finding_id', MREVIEW: 'review_id'
 };
 
 function keyOf(type, rec) {
