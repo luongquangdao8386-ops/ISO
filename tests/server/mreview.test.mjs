@@ -121,7 +121,10 @@ test('số liệu tự gom theo kỳ: khiếu nại, SCAR, sản phẩm không p
   assert.equal(d.docs.issued, items.filter((x) => x.status === 'ISSUED').length);
   const cov = env.g.coverageCounts_(items, env.rows('Clauses'));
   assert.equal(d.coverage.iso_covered, cov.iso_covered);
-  assert.equal(d.coverage.iso_missing, cov.missing);
+  assert.equal(d.coverage.iso_missing, cov.by_std.ISO9001.missing);
+  // ISO 14001 / 45001 / 50001: mỗi chuẩn một dòng "có biểu/tổng · bắt buộc chưa có biểu"
+  assert.deepEqual(JSON.parse(JSON.stringify(d.coverage.stds)).map((x) => x.std), ['ISO14001', 'ISO45001', 'ISO50001']);
+  assert.equal(b.monitoring.cov_ISO14001, cov.by_std.ISO14001.covered + '/26 · ' + cov.by_std.ISO14001.missing);
   // c5 hồ sơ: khớp báo cáo Tình trạng hồ sơ theo tháng 01–11/2026
   const rr = owner.call('report.run', { kind: 'RECORDS', filters: { grain: 'MONTH', end: '2026-11', n: 11 } });
   assert.equal(rr.ok, true, JSON.stringify(rr));
@@ -134,7 +137,7 @@ test('số liệu tự gom theo kỳ: khiếu nại, SCAR, sản phẩm không p
   assert.equal(d.audit.program, null);
   assert.equal(b.audit.aud_prog_none, '—');
   // Có chương trình năm (nháp) → hiện mã + trạng thái + phủ
-  assert.equal(tk.write('iaudit.program.save', { program_id: uuid(), year: 2026 }).ok, true);
+  assert.equal(tk.write('iaudit.program.save', { program_id: uuid(), year: 2026, stds: ['ISO9001', 'BRC'] }).ok, true);
   const st2 = tk.call('mreview.stats', { review_id: id }).data.stats;
   assert.equal(st2.data.audit.program.code, 'DG-26');
   const row = st2.blocks.audit.find((x) => x.k === 'mr.s.aud_prog');
@@ -315,5 +318,5 @@ test('cập nhật từ bản 4b: chưa chạy migrateSchema — lập cuộc đ
   env2.g.dbReset_();
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: MgmtReviews. schema_version=1.0.13'), env2.logs.join('\n'));
+  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: MgmtReviews. schema_version=1.0.14'), env2.logs.join('\n'));
 });

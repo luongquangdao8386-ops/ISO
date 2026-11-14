@@ -1478,9 +1478,18 @@ a.day { display: block; text-decoration: none; color: inherit; }
  * Phiên 1d: Phủ điều khoản, lịch tuần hồ sơ đến hạn (trang chủ)
  * ===================================================================== */
 .cov-tabs { margin: 0 0 8px; }
-.cov-tabs .tab { flex: 1 1 0; }
-.cov-tabs .tab .cov-tab-n { display: block; font-size: 0.9375rem; }
+.cov-tabs .tab { flex: 1 1 0; min-width: 0; padding-left: 4px; padding-right: 4px; }
+.cov-tabs .tab .cov-tab-n { display: block; font-size: 0.9375rem; white-space: nowrap; }
 .cov-tabs .tab .small { display: block; font-weight: 500; }
+.cov-tabs .tab .cov-tab-cn { display: none; }
+@media (max-width: 899px) {
+  .cov-tabs .tab .cov-tab-iso, .cov-tabs .tab .cov-tab-c { display: none; }
+  .cov-tabs .tab .cov-tab-cn { display: block; }
+}
+.cov-std-h { margin: 8px 0 2px; font-size: 1rem; color: var(--navy); }
+.cov-odd { margin: 12px 0 0; padding: 8px 12px; border: 1px solid #F1D9A6; border-radius: 10px; background: #FFFBF2; font-size: 0.875rem; }
+.cov-odd summary { cursor: pointer; color: var(--graphite); }
+.cov-odd ul { margin: 6px 0; padding-left: 18px; }
 .cov .chips { margin-bottom: 6px; }
 .cov-chip.s-MISSING:not(.on) { border-color: #F3C6C0; color: var(--red); }
 .cov-list { display: flex; flex-direction: column; gap: 6px; }
@@ -1717,6 +1726,9 @@ html.bg-home .home-hero, html.bg-home .cs-hero { background-image: var(--bg-home
 /* ---------------- Đánh giá nội bộ (4a) ---------------- */
 .aud-years { margin-bottom: 8px; }
 .aud-cov .chips { flex-wrap: wrap; margin-bottom: 6px; }
+/* Chuẩn đánh giá: 5 chuẩn (ISO 9001, 14001, 45001, 50001, BRCGS) xuống dòng, không cuộn ngang */
+#pf-stds.chips { flex-wrap: wrap; overflow: visible; }
+#pf-stds .chip { white-space: normal; text-align: left; }
 .aud-cov-list { margin: 4px 0; }
 .aud-cov-group { padding: 8px 0 2px; font-weight: 600; }
 .aud-cov-row { display: flex; width: 100%; gap: 8px; align-items: flex-start; justify-content: space-between; text-align: left; background: none; border: 0;

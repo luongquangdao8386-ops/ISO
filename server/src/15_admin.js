@@ -80,8 +80,10 @@ function setup() {
   installTriggers();
 }
 
-/** Nạp Settings, SystemState, bộ phận còn thiếu (dùng chung cho setup và migrateSchema) */
+/** Nạp Settings, SystemState, bộ phận, điều khoản ISO 14001/45001/50001 còn thiếu (dùng chung cho setup và migrateSchema).
+ *  Trả danh sách chuẩn vừa nạp điều khoản. */
 function seedBaseRows_() {
+  var stds = [];
   withWriteLock_(function () {
     var have = {};
     readRows_('Settings').forEach(function (r) { have[r.setting_key] = true; });
@@ -106,7 +108,10 @@ function seedBaseRows_() {
     stateWrite_(st, su, SYSTEM_USER);
     // 10 bộ phận mặc định (ISO, KD, CB, SX, CL, MH, KV, NS, BRC, CĐ)
     seedDepts_();
+    // Điều khoản ISO 14001 / 45001 / 50001 (39_stds.js) — chỉ chuẩn chưa có dòng nào
+    stds = seedStdClauses_();
   });
+  return stds;
 }
 
 /** Thêm sheet/cột/Settings còn thiếu; chạy nhiều lần vẫn cùng kết quả */
@@ -133,7 +138,7 @@ function migrateSchema() {
     formatColumns_(sheet, name, header.concat(missing), 0);
   });
   dbReset_();
-  seedBaseRows_();
+  seedBaseRows_().forEach(function (std) { added.push('điều khoản ' + STD_SHORT_[std] + ' (' + STD_CLAUSES_SEED_[std].length + ')'); });
   clearSysCaches_();
   log_('migrateSchema xong. Thêm: ' + (added.length ? added.join('; ') : 'không có') + '. schema_version=' + SCHEMA_VERSION);
 }

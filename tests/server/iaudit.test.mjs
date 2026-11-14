@@ -31,9 +31,10 @@ const clauseIds = (env, std) => { env.g.dbReset_(); return env.rows('Clauses').f
 const ISO = (k) => 'ISO9001|' + k;
 const BRC = (k) => 'BRC|' + k;
 
+/** Chương trình ISO 9001 + BRCGS như trước khi có ISO 14001/45001/50001 (bỏ trống stds = mọi chuẩn — xem test riêng) */
 function newProgram(c, extra = {}) {
   const id = uuid();
-  const r = c.write('iaudit.program.save', { program_id: id, year: 2026, ...extra });
+  const r = c.write('iaudit.program.save', { program_id: id, year: 2026, stds: ['ISO9001', 'BRC'], ...extra });
   assert.equal(r.ok, true, JSON.stringify(r));
   return id;
 }
@@ -455,8 +456,65 @@ test('cập nhật từ bản 3c (chưa có AuditPrograms, Audits, AuditChecks):
   strip(env2);
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: AuditPrograms; Audits; AuditChecks. schema_version=1.0.13'), env2.logs.join('\n'));
+  assert.ok(env2.logs.some((l) => l === 'migrateSchema xong. Thêm: AuditPrograms; Audits; AuditChecks. schema_version=1.0.14'), env2.logs.join('\n'));
   env2.g.dbReset_();
   const keys = env2.g.readRows_('Settings').map((x) => x.setting_key);
   for (const k of ['audit_program_form_code', 'audit_plan_form_code', 'audit_checklist_form_code', 'audit_notice_days']) assert.ok(keys.includes(k), k);
+});
+
+test('ISO 14001 / 45001 / 50001 (14/11/2026): máy chủ tự nạp điều khoản; chương trình mới mặc định mọi chuẩn; phủ hết mới gửi duyệt; báo cáo và Trạng thái hệ thống theo từng chuẩn; chương trình cũ không ghi chuẩn = ISO 9001 + BRCGS', () => {
+  const { env, owner, tk } = seeded();
+  // Điều khoản nạp sẵn (39_stds.js): số điều khoản, bắt buộc lưu hồ sơ, nhóm
+  const cls = (std) => { env.g.dbReset_(); return env.rows('Clauses').filter((c) => c.std === std); };
+  assert.deepEqual(['ISO14001', 'ISO45001', 'ISO50001'].map((s) => [cls(s).length, cls(s).filter((c) => c.mandatory_record).length]), [[26, 16], [30, 18], [27, 16]]);
+  const c612 = cls('ISO14001').find((c) => c.key === '6.1.2');
+  assert.deepEqual([c612.name_vi, c612.name_zh, c612.group_vi, c612.group_zh], ['Khía cạnh môi trường', '环境因素', '6. Hoạch định', '6. 策划']);
+  // Lập chương trình không ghi chuẩn → mọi chuẩn
+  const pid = uuid();
+  let r = tk.write('iaudit.program.save', { program_id: pid, year: 2026 });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(prog(env, pid).stds, 'ISO9001,ISO14001,ISO45001,ISO50001,BRC');
+  const aid = addAudit(tk, pid, { plan_month: '2026-11', clauses: ['ISO50001|6.3', 'ISO14001|8.2', ISO('7.1.3'), 'ISO45001|8.1.4'] });
+  assert.deepEqual(aud(env, aid).clauses_json, [ISO('7.1.3'), 'ISO14001|8.2', 'ISO45001|8.1.4', 'ISO50001|6.3'], 'theo thứ tự chuẩn rồi điều khoản');
+  // Phủ: máy chủ = app với 5 chuẩn
+  const covApp = () => {
+    env.g.dbReset_();
+    return auditCoverage(env.rows('Clauses'), ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001', 'BRC'], env.rows('Audits').filter((x) => x.program_id === pid), prog(env, pid).na_json || [])
+      .map((x) => x.clause.clause_id + ':' + x.state);
+  };
+  const covSrv = () => { env.g.dbReset_(); return JSON.parse(JSON.stringify(env.g.auditCoverageOf_(prog(env, pid)).map((x) => x.clause.clause_id + ':' + x.state))); };
+  assert.deepEqual(covSrv(), covApp());
+  assert.equal(covSrv().length, 11 + 26 + 30 + 27 + 6);
+  r = submit(tk, env, pid);
+  assert.deepEqual(fields(r), ['coverage:AUDIT_NOT_COVERED']);
+  const missing = covSrv().filter((x) => x.endsWith(':MISSING')).map((x) => x.split(':')[0]);
+  assert.ok(missing.includes('ISO45001|6.1.2'));
+  r = tk.write('iaudit.program.save', { program_id: pid, na: missing.map((c) => ({ c, r: 'Đợt sau' })) }, { expected_version: prog(env, pid).record_version });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(submit(tk, env, pid).ok, true);
+  assert.equal(owner.pin(OWNER_PIN).ok, true);
+  assert.equal(approve(owner, env, pid).ok, true);
+  // Trạng thái hệ thống: phủ theo từng chuẩn
+  const h = owner.call('system.status', {}).data.checks.find((x) => x.key === 'iaudit');
+  assert.match(h.value, /phủ ISO 9001 11\/11 · ISO 14001 26\/26 · ISO 45001 30\/30 · ISO 50001 27\/27 · BRCGS 6\/6/);
+  // Báo cáo chương trình: mỗi chuẩn một ô số và một mục phủ; lịch ghi điều khoản kèm tên chuẩn
+  r = tk.call('report.run', { kind: 'AUDIT', filters: { program_id: pid } });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const lay = r.data.layout;
+  const t = Object.fromEntries(lay.tiles.map((x) => [x.label, x.value]));
+  assert.equal(t['Phủ ISO 14001 · ISO 14001覆盖'], '26/26');
+  assert.equal(t['Phủ ISO 50001 · ISO 50001覆盖'], '27/27');
+  const heads = lay.sections.map((s) => s.heading || '').filter((x) => /^Phủ /.test(x)).map((x) => x.split(' — ')[0]);
+  assert.deepEqual(heads, ['Phủ điều khoản ISO 9001 · ISO 9001条款覆盖', 'Phủ điều khoản ISO 14001 · ISO 14001条款覆盖', 'Phủ điều khoản ISO 45001 · ISO 45001条款覆盖',
+    'Phủ điều khoản ISO 50001 · ISO 50001条款覆盖', 'Phủ chủ đề BRCGS Packaging · BRCGS包装主题覆盖']);
+  const sched = lay.sections.find((s) => /Lịch đánh giá/.test(s.heading || ''));
+  assert.equal(sched.table.rows[0][4], '7.1.3; ISO 14001: 8.2; ISO 45001: 8.1.4; ISO 50001: 6.3');
+  // Kế hoạch đợt: bảng chuẩn mực ghi tên chuẩn
+  r = tk.call('report.run', { kind: 'AUDIT', filters: { audit_id: aid } });
+  const crit = r.data.layout.sections.find((s) => s.table && /Chuẩn mực/.test(s.heading || ''));
+  assert.deepEqual(crit.table.rows.map((x) => x[0] + ' ' + x[1]), ['ISO 9001 7.1.3', 'ISO 14001 8.2', 'ISO 45001 8.1.4', 'ISO 50001 6.3']);
+  assert.equal(env.g.auditClauseLabel_({ std: 'ISO45001', key: '8.1.4' }), 'ISO 45001 · 8.1.4');
+  assert.equal(env.g.auditClauseLabel_({ std: 'ISO9001', key: '7.1.3' }), '7.1.3');
+  // Chương trình cũ không ghi chuẩn (trước bản này) → ISO 9001 + BRCGS
+  assert.deepEqual(JSON.parse(JSON.stringify(env.g.auditStdsOf_({ stds: '' }))), ['ISO9001', 'BRC']);
 });

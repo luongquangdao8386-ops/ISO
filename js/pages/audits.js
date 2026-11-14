@@ -16,12 +16,11 @@ import { byId, recs, items, depts, allDepts, users, userName, isSecretary, roleL
 import { navigate, refresh } from '../router.js';
 import { afterCommit } from '../app.js';
 import { textInput, selectInput, bilingualInputs, dateInput, wireForm, readField, showErrors, writeOnline, writeWithPin, writeFail, busy } from '../form.js';
-import { auditCoverage, auditCovCount, clauseMatch } from '../coverage.js';
+import { auditCoverage, auditCovCount, clauseMatch, STD_SHORT } from '../coverage.js';
 import { stIcon } from './catalog.js';
 
 const MAX_TEAM = 6;
 /** Tên ngắn của chuẩn trên nút chọn (tên riêng, giống nhau ở hai thứ tiếng) */
-const STD_SHORT = { ISO9001: 'ISO 9001', BRC: 'BRCGS' };
 
 const pair = (vi, zh, meta, base) => {
   const m = meta && meta[base];
@@ -38,7 +37,9 @@ const needNet = (view) => {
 };
 const monthText = (m) => (/^\d{4}-\d{2}$/.test(String(m || '')) ? `${String(m).slice(5)}/${String(m).slice(0, 4)}` : esc(m || ''));
 /** Nhãn điều khoản: "7.1.5" hoặc "BRCGS · Kiểm soát vật lạ" */
-const clauseLab = (c) => (c ? `${c.std === 'BRC' ? 'BRCGS · ' : ''}${esc(c.key)}` : '');
+/** Nhãn điều khoản: ISO 9001 chỉ số (như trước), chuẩn khác có tên chuẩn đứng trước — "ISO 14001 · 6.1.2", "BRCGS · …" (như máy chủ) */
+const clausePrefix = (c) => (c && c.std !== 'ISO9001' ? `${STD_SHORT[c.std] || c.std} · ` : '');
+const clauseLab = (c) => (c ? `${esc(clausePrefix(c))}${esc(c.key)}` : '');
 /** Một nhãn có biến, lấy riêng phần Việt / Trung: fillLang('aud.sq.iso', 0, {K, N}) */
 function fillLang(key, i, vars) {
   return String((L[key] || [key, key])[i] || '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
@@ -313,11 +314,15 @@ export async function renderProgramForm(view, ctx) {
     title_vi: '', title_zh: '', objective_vi: fillLang('aud.objective_default', 0, {}), objective_zh: fillLang('aud.objective_default', 1, {}),
     scope_vi: names ? fillLang('aud.scope_default', 0, { D: names.vi }) : '', scope_zh: names ? fillLang('aud.scope_default', 1, { D: names.zh }) : ''
   };
-  let stds = pg ? programStds(pg) : AUDIT_STDS.slice();
+  // Chỉ chuẩn đã có điều khoản trên máy chủ (máy chủ chưa lên bản có ISO 14001/45001/50001 thì không hiện ba chuẩn đó)
+  const clsAll = await recs('CLAUSE');
+  const pStds = pg ? programStds(pg) : [];
+  const avail = AUDIT_STDS.filter((x) => pStds.includes(x) || clsAll.some((c) => c.std === x && c.active !== false && !c.archived_at));
+  let stds = pg ? pStds : (avail.length ? avail.slice() : AUDIT_STDS.filter((x) => x === 'ISO9001' || x === 'BRC'));
   view.innerHTML = `<form class="card form aud-prog-form" novalidate>
     ${editing ? kv('aud.year', esc(year)) : selectInput('year', 'aud.year', yearOpts.map((y) => [y, String(y)]), year, { required: true, empty: '' })}
     <div class="fld" data-field="stds"><label>${bi('aud.stds')} <span class="req">*</span></label>
-      <div class="chips" id="pf-stds">${AUDIT_STDS.map((s) => `<button type="button" class="chip${stds.includes(s) ? ' on' : ''}" data-s="${s}" aria-pressed="${stds.includes(s)}">${bi('aud.std.' + s)}</button>`).join('')}</div>
+      <div class="chips" id="pf-stds">${(avail.length ? avail : stds).map((s) => `<button type="button" class="chip${stds.includes(s) ? ' on' : ''}" data-s="${s}" aria-pressed="${stds.includes(s)}">${bi('aud.std.' + s)}</button>`).join('')}</div>
       <div class="hint">${bi('aud.stds_hint')}</div><div class="ferr"></div></div>
     ${bilingualInputs('title', v, { labelKey: 'aud.prog_title', required: false, maxlength: 200 })}
     <p class="muted small">${bi('aud.prog_title_hint', { Y: esc(year) })}</p>
@@ -544,7 +549,7 @@ export async function renderAuditForm(view, ctx) {
 /** Câu hỏi gợi ý cho một điều khoản: hai thứ tiếng, kèm mã biểu cần xem hồ sơ */
 function suggestLine(c, forms) {
   const codes = forms.slice(0, 8).map((it) => it.code);
-  const vars = (i) => ({ K: c.key, N: (i === 0 ? c.name_vi || c.name_zh : c.name_zh || c.name_vi) || '', C: codes.join(i === 0 ? ', ' : '、') });
+  const vars = (i) => ({ K: c.std === 'ISO9001' || c.std === 'BRC' ? c.key : `${STD_SHORT[c.std]} ${c.key}`, N: (i === 0 ? c.name_vi || c.name_zh : c.name_zh || c.name_vi) || '', C: codes.join(i === 0 ? ', ' : '、') });
   const key = c.std === 'BRC' ? 'aud.sq.brc' : 'aud.sq.iso';
   return {
     clause_id: c.clause_id,
@@ -570,7 +575,7 @@ async function checkDialog(a, clMap, c, prev) {
   return dialog({
     title: bi(c ? 'aud.check_edit' : 'aud.check_add'),
     wide: true,
-    body: `<label class="fld"><span>${bi('aud.clause')}</span><select class="inp sel" id="ck-cl"><option value="">${esc(biText('aud.clause_general'))}</option>${(a.clauses_json || []).map((id) => { const cl = clMap.get(id); return `<option value="${esc(id)}"${v.clause_id === id ? ' selected' : ''}>${cl ? (cl.std === 'BRC' ? 'BRCGS · ' : '') + esc(cl.key) + ' · ' + esc(nameText(cl)) : esc(id)}</option>`; }).join('')}</select></label>
+    body: `<label class="fld"><span>${bi('aud.clause')}</span><select class="inp sel" id="ck-cl"><option value="">${esc(biText('aud.clause_general'))}</option>${(a.clauses_json || []).map((id) => { const cl = clMap.get(id); return `<option value="${esc(id)}"${v.clause_id === id ? ' selected' : ''}>${cl ? clauseLab(cl) + ' · ' + esc(nameText(cl)) : esc(id)}</option>`; }).join('')}</select></label>
       <fieldset class="bi-pair"><legend>${bi('aud.question')} <span class="req">*</span></legend>
         <label class="fld"><span>${bi('i18n.lang_vi')}</span><textarea class="inp" rows="3" maxlength="1000" id="ck-vi">${esc(v.question_vi)}</textarea></label>
         <label class="fld"><span>${bi('i18n.lang_zh')}</span><textarea class="inp" rows="2" maxlength="1000" id="ck-zh">${esc(v.question_zh)}</textarea></label>
@@ -627,7 +632,7 @@ async function findingDialog(a, clMap, checks, findings, f, check0, prev) {
         <span class="hint">${bi('aud.fnd_check_hint')}</span></label>
       <div class="fld"><span>${bi('aud.ftype')} <span class="req">*</span></span><div class="chips" role="radiogroup" id="fd-type">${AUDIT_FINDING_TYPES.map((x) => `<button type="button" class="chip${v.ftype === x ? ' on' : ''}" data-ft="${x}" role="radio" aria-checked="${v.ftype === x}">${bi('aud.ftype.' + x)}</button>`).join('')}</div>
         <div class="hint">${bi('aud.ftype_hint')}</div></div>
-      <label class="fld"><span>${bi('aud.clause')}</span><select class="inp sel" id="fd-cl"><option value="">${esc(biText('aud.clause_general'))}</option>${(a.clauses_json || []).map((id) => { const cl = clMap.get(id); return `<option value="${esc(id)}"${v.clause_id === id ? ' selected' : ''}>${cl ? (cl.std === 'BRC' ? 'BRCGS · ' : '') + esc(cl.key) + ' · ' + esc(nameText(cl)) : esc(id)}</option>`; }).join('')}</select></label>
+      <label class="fld"><span>${bi('aud.clause')}</span><select class="inp sel" id="fd-cl"><option value="">${esc(biText('aud.clause_general'))}</option>${(a.clauses_json || []).map((id) => { const cl = clMap.get(id); return `<option value="${esc(id)}"${v.clause_id === id ? ' selected' : ''}>${cl ? clauseLab(cl) + ' · ' + esc(nameText(cl)) : esc(id)}</option>`; }).join('')}</select></label>
       <fieldset class="bi-pair"><legend>${bi('aud.finding_content')} <span class="req">*</span></legend>
         <label class="fld"><span>${bi('i18n.lang_vi')}</span><textarea class="inp" rows="3" maxlength="3000" id="fd-vi">${esc(v.content_vi)}</textarea></label>
         <label class="fld"><span>${bi('i18n.lang_zh')}</span><textarea class="inp" rows="2" maxlength="3000" id="fd-zh">${esc(v.content_zh)}</textarea></label>

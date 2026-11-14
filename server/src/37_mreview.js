@@ -111,8 +111,12 @@ function mrStats_(r, today) {
     versions_issued: vIss, req: reqs.length, req_done: reqs.filter(function (q) { return q.state === 'DONE'; }).length };
   var cls = readRows_('Clauses').filter(function (c) { return c.active !== false && !c.archived_at; });
   var cov = coverageCounts_(items, cls);
-  out.coverage = { iso_total: cls.filter(function (c) { return c.std === 'ISO9001'; }).length, iso_covered: cov.iso_covered, iso_missing: cov.missing,
-    brc_total: cls.filter(function (c) { return c.std === 'BRC'; }).length, brc_covered: cov.brc_covered };
+  var b9 = cov.by_std.ISO9001;
+  out.coverage = { iso_total: b9.total, iso_covered: b9.covered, iso_missing: b9.missing, brc_total: cov.by_std.BRC.total, brc_covered: cov.by_std.BRC.covered,
+    // ISO 14001 / 45001 / 50001 (14/11/2026): chuẩn có điều khoản mới ghi
+    stds: ISO_STDS_.filter(function (x) { return x !== 'ISO9001' && cov.by_std[x].total; }).map(function (x) {
+      return { std: x, total: cov.by_std[x].total, covered: cov.by_std[x].covered, missing: cov.by_std[x].missing };
+    }) };
   // c5) Hồ sơ đúng hạn (như báo cáo Tình trạng hồ sơ — theo tháng, khoảng dài hơn 12 tháng thì theo quý)
   out.records = mrRecords_(from, to, today);
   // c1, c4, c7) Khắc phục, khiếu nại, SCAR
@@ -254,13 +258,18 @@ function mrBlocks_(st) {
     row('mr.s.review_overdue', d.review_overdue, d.review_overdue ? 'red' : ''), row('mr.s.file_missing', d.file_missing, d.file_missing ? 'amber' : ''),
     row('mr.s.versions_issued', d.versions_issued), row('mr.s.docreq', d.req + ' (' + d.req_done + ')'),
     row('mr.s.iso_cov', cv.iso_covered + '/' + cv.iso_total), row('mr.s.iso_missing', cv.iso_missing, cv.iso_missing ? 'red' : 'green'),
-    row('mr.s.brc_cov', cv.brc_covered + '/' + cv.brc_total),
+    row('mr.s.brc_cov', cv.brc_covered + '/' + cv.brc_total)].concat((cv.stds || []).map(function (x) {
+      return row('mr.s.cov_' + x.std, x.covered + '/' + x.total + ' · ' + x.missing, x.missing ? 'red' : 'green');
+    })).concat([
     row('mr.s.rec_rate', r.ok + '/' + (r.ok + r.late) + ' · ' + pct(r.rate), r.late ? 'red' : r.ok ? 'green' : ''),
-    row('mr.s.rec_late_items', r.items_late, r.items_late ? 'red' : ''), row('mr.s.rec_events', r.events)];
+    row('mr.s.rec_late_items', r.items_late, r.items_late ? 'red' : ''), row('mr.s.rec_events', r.events)]);
   var a = st.audit;
   b.audit = [a.program ? row('mr.s.aud_prog', a.program.code + (a.program.rev ? ' · ' + a.program.rev : ''), a.program.state === 'APPROVED' ? 'green' : 'amber', 'aud.prog.state.' + a.program.state)
     : row('mr.s.aud_prog_none', '—', 'amber')];
-  if (a.program) b.audit.push(row('mr.s.aud_cov', (a.program.cov.ISO9001 || '—') + ' · ' + (a.program.cov.BRC || '—')));
+  // Phủ của chương trình theo từng chuẩn có trong bản chụp ("ISO 9001 41/41 · ISO 14001 26/26 · BRCGS 31/31"); bản chụp cũ chỉ có ISO 9001, BRCGS
+  if (a.program) {
+    b.audit.push(row('mr.s.aud_cov', CLAUSE_STDS_.filter(function (x) { return a.program.cov[x]; }).map(function (x) { return STD_SHORT_[x] + ' ' + a.program.cov[x]; }).join(' · ') || '—'));
+  }
   b.audit = b.audit.concat([row('mr.s.aud_n', a.done + '/' + a.n), row('mr.s.aud_closed', a.closed), row('mr.s.aud_late', a.late, a.late ? 'red' : ''),
     row('mr.s.aud_fnd', join([a.findings.MAJOR || 0, a.findings.MINOR || 0, a.findings.OBS || 0]), a.findings.MAJOR ? 'red' : ''),
     row('mr.s.aud_capa', a.capa_closed + '/' + a.capa_need, a.capa_need && a.capa_closed < a.capa_need ? 'amber' : '')]);

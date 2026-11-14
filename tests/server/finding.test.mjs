@@ -40,7 +40,7 @@ function auditInProgress(env, owner, tk) {
   const audCL = userClient(env, 'AUDCL', 2, '583931', { depts: 'CL', auditor: true });
   const audKV = userClient(env, 'AUDKV', 2, '583933', { depts: 'KV', auditor: true });
   const pid = uuid();
-  assert.equal(tk.write('iaudit.program.save', { program_id: pid, year: 2026 }).ok, true);
+  assert.equal(tk.write('iaudit.program.save', { program_id: pid, year: 2026, stds: ['ISO9001', 'BRC'] }).ok, true);
   const aid = uuid();
   let r = tk.write('iaudit.save', { audit_id: aid, program_id: pid, dept_code: 'CĐ', plan_month: '2026-11', title_vi: 'Bảo trì, sửa chữa thiết bị',
     clauses: clauseIds(env, 'ISO9001').concat(clauseIds(env, 'BRC')) });
@@ -333,7 +333,7 @@ test('cập nhật từ bản 4a (chưa có sheet AuditFindings, cột báo cáo
   strip(env2);
   env2.logs.length = 0;
   env2.g.migrateSchema();
-  const want = 'migrateSchema xong. Thêm: Capas(finding_id); Audits(' + AUD_COLS.join(',') + '); AuditFindings. schema_version=1.0.13';
+  const want = 'migrateSchema xong. Thêm: Capas(finding_id); Audits(' + AUD_COLS.join(',') + '); AuditFindings. schema_version=1.0.14';
   assert.ok(env2.logs.some((l) => l === want), env2.logs.join('\n'));
   env2.g.dbReset_();
   assert.ok(env2.g.readRows_('Settings').some((x) => x.setting_key === 'audit_report_form_code'));

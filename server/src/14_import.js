@@ -44,16 +44,24 @@ function normClauses_(list) {
     if (seen[id]) return;
     seen[id] = true;
     var nm = splitBiCell_(c.name), gr = splitBiCell_(c.group);
-    out.push({
+    var row = {
       clause_id: id, std: std, key: key, group_vi: c.group_vi !== undefined ? cellText_(c.group_vi) : gr.vi, group_zh: c.group_zh !== undefined ? cellText_(c.group_zh) : gr.zh,
       name_vi: c.name_vi !== undefined ? cellText_(c.name_vi) : nm.vi, name_zh: c.name_zh !== undefined ? cellText_(c.name_zh) : nm.zh,
       mandatory_record: c.mandatory_record === true, sort_order: Number(c.sort_order) || i + 1, active: true
-    });
+    };
+    // Sheet Phủ không có cột / dòng nhóm (file xuất từ app): giữ nhóm đang có, không xóa trắng
+    if (c.group === undefined && c.group_vi === undefined && c.group_zh === undefined) row.keep_group = true;
+    out.push(row);
   });
   return { rows: out, errors: errs };
 }
 
 var CLAUSE_FIELDS_ = ['group_vi', 'group_zh', 'name_vi', 'name_zh', 'mandatory_record', 'sort_order', 'active'];
+
+/** Cột so / ghi của một dòng điều khoản đọc từ tệp (keep_group: bỏ nhóm) */
+function clauseFields_(r) {
+  return r.keep_group ? CLAUSE_FIELDS_.filter(function (k) { return k !== 'group_vi' && k !== 'group_zh'; }) : CLAUSE_FIELDS_;
+}
 
 /** Điều khoản thêm/sửa/ngừng so với bảng Clauses (chỉ chuẩn có trong tệp mới bị ngừng dòng thiếu) */
 function clauseDiff_(rows) {
@@ -66,7 +74,7 @@ function clauseDiff_(rows) {
     seen[r.clause_id] = true;
     var o = cur[r.clause_id];
     if (!o) { add.push(r); return; }
-    if (CLAUSE_FIELDS_.some(function (k) { return cmpVal_(o[k]) !== cmpVal_(r[k]); })) upd.push(r);
+    if (clauseFields_(r).some(function (k) { return cmpVal_(o[k]) !== cmpVal_(r[k]); })) upd.push(r);
   });
   var off = Object.keys(cur).filter(function (id) { return !seen[id] && stds[cur[id].std] && cur[id].active; });
   return { add: add, update: upd, deactivate: off };
@@ -308,19 +316,19 @@ function importCommit_(ctx) {
         var cd = clauseDiff_(jsonVal_(b.clauses_json));
         var cur2 = {};
         readRows_('Clauses').forEach(function (r) { cur2[r.clause_id] = r; });
-        var meta = function (r) {
-          var m = {};
-          ['name', 'group'].forEach(function (f) {
+        var meta = function (r, o) {
+          var m = o && jsonVal_(o.i18n_meta) && typeof jsonVal_(o.i18n_meta) === 'object' ? clone_(jsonVal_(o.i18n_meta)) : {};
+          (r.keep_group ? ['name'] : ['name', 'group']).forEach(function (f) {
             if (r[f + '_vi'] && r[f + '_zh']) m[f] = { src: 'vi', state: 'HUMAN', at: nowIso };
             else if (r[f + '_vi'] || r[f + '_zh']) m[f] = { src: r[f + '_vi'] ? 'vi' : 'zh', state: 'PENDING', at: nowIso };
           });
           return m;
         };
-        cd.add.forEach(function (r) { var x = cNew_(ctx, clone_(r)); x.i18n_meta = meta(r); writes.push({ sheet: 'Clauses', mode: 'insert', row: x }); clausesDone++; });
+        cd.add.forEach(function (r) { var x = cNew_(ctx, clone_(r)); delete x.keep_group; x.i18n_meta = meta(r); writes.push({ sheet: 'Clauses', mode: 'insert', row: x }); clausesDone++; });
         cd.update.forEach(function (r) {
           var o = cur2[r.clause_id]; var x = clone_(o); delete x.__row;
-          CLAUSE_FIELDS_.forEach(function (k) { x[k] = r[k]; });
-          x.i18n_meta = meta(r); cUpdate_(ctx, x);
+          clauseFields_(r).forEach(function (k) { x[k] = r[k]; });
+          x.i18n_meta = meta(r, o); cUpdate_(ctx, x);
           writes.push({ sheet: 'Clauses', mode: 'update', row: x, rowNum: o.__row }); clausesDone++;
         });
         cd.deactivate.forEach(function (cid) {

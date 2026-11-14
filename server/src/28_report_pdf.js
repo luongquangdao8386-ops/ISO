@@ -190,7 +190,7 @@ function layoutCoverage_(snap) {
   var secs = [];
   var stTone = { MISSING: 'red', NONE: 'amber', NOT_ISSUED: 'navy', OK: 'green' };
   d.stds.forEach(function (s) {
-    var iso = s.std === 'ISO9001';
+    var iso = s.std !== 'BRC';
     var head = [labNl_('rpt.col.group'), labNl_(iso ? 'rpt.col.clause' : 'rpt.col.topic'), labNl_('rpt.col.content')]
       .concat(iso ? [labNl_('rpt.col.mandatory')] : [])
       .concat([labNl_('rpt.col.items'), labNl_('rpt.col.issued'), labNl_('rpt.col.app'), labNl_('rpt.col.status')])
@@ -207,7 +207,9 @@ function layoutCoverage_(snap) {
         .concat([String(r.n), String(r.issued), String(r.app), labNl_('cov.st.' + r.state)])
         .concat(d.codes ? [(r.codes || []).map(function (c) { return c.code + ' ' + STATUS_SYMBOL_[c.status]; }).join(', ')] : []);
     });
-    secs.push({ heading: lab_(iso ? 'rpt.sec.iso' : 'rpt.sec.brc', { N: s.rows.length }), table: rptTable_(head, types, rows, tones), note: lab_(iso ? 'cov.how_iso' : 'cov.how_brc') });
+    var sn = STD_SHORT_[s.std] || s.std;
+    secs.push({ heading: lab_(iso ? 'rpt.sec.iso' : 'rpt.sec.brc', { N: s.rows.length, S: sn }), table: rptTable_(head, types, rows, tones),
+      note: lab_(iso ? 'cov.how_iso' : 'cov.how_brc', { S: sn, C: STD_COL_[s.std] || '' }) });
   });
   return { sections: secs, notes: [lab_('rpt.note.scope_items', { N: d.items })] };
 }

@@ -10,7 +10,7 @@ import { isWide } from '../shell.js';
 import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue, ncrOn, ncrOverdue, auditOn, canSeeAudits, auditLate, mreviewOn, mrDecisions } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
-import { missingMandatory } from '../coverage.js';
+import { missingMandatory, ISO_STDS } from '../coverage.js';
 import { isoWeekKey } from '../periods.js';
 import { stIcon } from './catalog.js';
 
@@ -61,7 +61,10 @@ async function pendingHtml() {
 /** 4 ô số */
 async function statsHtml(list) {
   const s = catalogSummary(list);
-  const miss = missingMandatory(list, await recs('CLAUSE'));
+  // Tổng các chuẩn ISO (9001, 14001, 45001, 50001); bấm → thẻ của chuẩn đầu tiên còn thiếu
+  const cls = await recs('CLAUSE');
+  const miss = missingMandatory(list, cls);
+  const missStd = miss ? ISO_STDS.find((x) => missingMandatory(list, cls, x) > 0) : '';
   let overdue = 0;
   const recOn = canSeeRecords() && await recordsOn();
   if (recOn) for (const s of (await recordStatusMap(list)).values()) if (s.overdue) overdue++;
@@ -71,7 +74,7 @@ async function statsHtml(list) {
     ${tile(esc(String(s.pct).replace('.', ',')) + '%', 'home.stat_pct', '/catalog?f=issued', s.pct >= 80 ? 't-green-text' : '')}
     ${recOn ? tile(esc(String(overdue)), 'home.stat_overdue', '/records?f=late', overdue ? 't-red-text' : '', bi('home.stat_overdue_sub'))
       : tile('—', 'home.stat_overdue', '/records', 'soon', bi('rec.no_access_short'))}
-    ${tile(esc(String(miss)), 'home.stat_missing', !canSeeRecords() ? '/catalog' : miss ? '/coverage?f=MISSING' : '/coverage', miss ? 't-red-text' : '', bi('home.stat_missing_sub'))}
+    ${tile(esc(String(miss)), 'home.stat_missing', !canSeeRecords() ? '/catalog' : miss ? `/coverage?std=${missStd}&f=MISSING` : '/coverage', miss ? 't-red-text' : '', bi('home.stat_missing_sub'))}
   </section>`;
 }
 

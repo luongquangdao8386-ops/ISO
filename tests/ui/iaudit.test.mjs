@@ -78,7 +78,9 @@ test('iPhone: Lập chương trình năm → thêm đợt → Không áp dụng 
     await page.click('#aud-prog-new');
     await page.waitForSelector('form.aud-prog-form');
     assert.equal(await page.inputValue('#f-year'), '2026');
-    assert.equal(await page.locator('#pf-stds .chip.on').count(), 2, 'mặc định ISO 9001 + BRCGS');
+    // Mặc định mọi chuẩn đã có điều khoản: ISO 9001, 14001, 45001, 50001 (máy chủ nạp sẵn), BRCGS
+    assert.deepEqual(await page.locator('#pf-stds .chip.on').evaluateAll((els) => els.map((e) => e.dataset.s)), ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001', 'BRC']);
+    assert.ok(await noOverflow(page));
     assert.match(await page.inputValue('#f-scope_vi'), /Cơ điện/);
     await page.click('#pf-save');
     await page.waitForSelector('.aud-prog .item-head');
@@ -126,6 +128,15 @@ test('iPhone: Lập chương trình năm → thêm đợt → Không áp dụng 
     await page.waitForSelector('.modal #dlg-text');
     await modalPrimary(page);
     await page.waitForFunction(() => /BRCGS 6\/6/.test(document.querySelector('.aud-cov') && document.querySelector('.aud-cov').textContent));
+    // ISO 14001 / 45001 / 50001: Không áp dụng phần còn thiếu của từng chuẩn
+    for (const [std, n] of [['ISO14001', 26], ['ISO45001', 30], ['ISO50001', 27]]) {
+      await page.click(`.aud-cov [data-std="${std}"]`);
+      await page.waitForSelector(`.aud-cov [data-std="${std}"].on`);
+      await page.click('#aud-na-all');
+      await page.waitForSelector('.modal #dlg-text');
+      await modalPrimary(page);
+      await page.waitForFunction(([s, k]) => new RegExp(s.replace('ISO', 'ISO ') + ' ' + k + '/' + k).test(document.querySelector('.aud-cov') && document.querySelector('.aud-cov').textContent), [std, n]);
+    }
     // Bấm một điều khoản Không áp dụng → hộp thoại có lý do, bỏ được
     await page.click('.aud-cov-row.st-NA >> nth=0');
     await page.waitForSelector('.modal #cl-na');
@@ -213,11 +224,12 @@ test('iPhone: Lập chương trình năm → thêm đợt → Không áp dụng 
     await page.click('#rp-run');
     await page.waitForFunction(() => /CHƯƠNG TRÌNH ĐÁNH GIÁ NỘI BỘ/.test(document.querySelector('.rp-paper') && document.querySelector('.rp-paper').textContent));
     paper = await page.textContent('.rp-paper');
-    for (const s of ['BM-ISO-03-01', 'Lịch đánh giá', 'Phủ điều khoản ISO 9001', 'Phủ chủ đề BRCGS Packaging', 'Ngoài phạm vi áp dụng (Cơ điện)']) assert.ok(paper.includes(s), s);
+    for (const s of ['BM-ISO-03-01', 'Lịch đánh giá', 'Phủ điều khoản ISO 9001', 'Phủ điều khoản ISO 14001', 'Phủ điều khoản ISO 45001', 'Phủ điều khoản ISO 50001',
+      'Phủ chủ đề BRCGS Packaging', 'Ngoài phạm vi áp dụng (Cơ điện)']) assert.ok(paper.includes(s), s);
     assert.deepEqual(await noRawKeys(page), []);
     // 11. Trạng thái hệ thống
     await go(page, '#/admin/status');
-    await page.waitForFunction(() => /Đánh giá nội bộ/.test(document.body.textContent) && /DG-26 Đã duyệt lần 01 · 1 đợt · phủ ISO 9001 11\/11 · BRCGS 6\/6/.test(document.body.textContent), null, { timeout: 20000 });
+    await page.waitForFunction(() => /Đánh giá nội bộ/.test(document.body.textContent) && /DG-26 Đã duyệt lần 01 · 1 đợt · phủ ISO 9001 11\/11 · ISO 14001 26\/26 · ISO 45001 30\/30 · ISO 50001 27\/27 · BRCGS 6\/6/.test(document.body.textContent), null, { timeout: 20000 });
     assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
 });
@@ -233,7 +245,9 @@ test('web: Đánh giá viên của bộ phận được đánh giá bị chặn 
   const pid = uuid(), aid = uuid();
   assert.equal(tk.write('iaudit.program.save', { program_id: pid, year: 2026 }).ok, true);
   env.g.dbReset_();
+  // Mọi điều khoản của 5 chuẩn (11 + 26 + 30 + 27 + 6) trong một đợt
   const all = env.g.readRows_('Clauses').map((c) => c.clause_id);
+  assert.equal(all.length, 100);
   assert.equal(tk.write('iaudit.save', { audit_id: aid, program_id: pid, dept_code: 'CĐ', plan_month: '2026-11', title_vi: 'Quản lý thiết bị đo', clauses: all, audit_date: '2026-11-12' }).ok, true);
   const ver = (sheet, key, id) => { env.g.dbReset_(); return env.g.readRows_(sheet).find((x) => x[key] === id).record_version; };
   assert.equal(tk.write('iaudit.program.submit', { program_id: pid }, { expected_version: ver('AuditPrograms', 'program_id', pid) }).ok, true);
@@ -343,7 +357,7 @@ test('đúng các bước "Nên kiểm" của HUONG_DAN 4a: Trạng thái hệ t
     await login(page, 'TK', '583922');
     await go(page, '#/admin/status');
     await page.waitForFunction(() => /Chưa có chương trình năm 2026/.test(document.body.textContent), null, { timeout: 20000 });
-    assert.match(await page.textContent('.view'), /1\.0\.13/);
+    assert.match(await page.textContent('.view'), /1\.0\.14/);
     await go(page, '#/');
     await page.waitForSelector('.grid9 .tile[href="#/audits"]');
     await page.click('.grid9 .tile[href="#/audits"]');

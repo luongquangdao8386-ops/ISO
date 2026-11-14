@@ -5,9 +5,9 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d4.3';
+var SERVER_VERSION = '1.0.0-d4.4';
 var API_CONTRACT_VERSION = '1.0';
-var SCHEMA_VERSION = '1.0.13';
+var SCHEMA_VERSION = '1.0.14';
 var TZ = 'Asia/Ho_Chi_Minh';
 var TZ_OFFSET_MIN = 7 * 60; // Việt Nam không có giờ mùa hè
 var RELEASED_DOT = 1;
@@ -205,13 +205,16 @@ var NCR_MAX_FILES_ = 30;
  *  Chương trình: DRAFT nháp → IN_REVIEW chờ duyệt → APPROVED đã duyệt (Quản trị, PIN; lần 01, 02…) → sửa (PIN, lý do) về DRAFT · CANCELLED.
  *  Đợt: PLANNED trong chương trình → READY đã chốt kế hoạch (ngày, đoàn, checklist) → IN_PROGRESS đang đánh giá → REPORTED đã báo cáo →
  *  CLOSED đã đóng (4b: mọi phát hiện không phù hợp có phiếu khắc phục đã đóng) · CANCELLED. Kết quả câu hỏi: C phù hợp · NC không phù hợp · OBS cần cải tiến (quan sát) · NA không áp dụng. */
-var AUDIT_STDS_ = ['ISO9001', 'BRC'];
+var AUDIT_STDS_ = ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001', 'BRC'];
+/** Chương trình lập trước khi có ISO 14001/45001/50001 (14/11/2026) mà không ghi chuẩn: hiểu là ISO 9001 + BRCGS */
+var AUDIT_STDS_LEGACY_ = ['ISO9001', 'BRC'];
 var AUDIT_PROG_STATES_ = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'CANCELLED'];
 var AUDIT_STATES_ = ['PLANNED', 'READY', 'IN_PROGRESS', 'REPORTED', 'CLOSED', 'CANCELLED'];
 var AUDIT_RESULTS_ = ['C', 'NC', 'OBS', 'NA'];
 var AUDIT_MAX_TEAM_ = 6;
 var AUDIT_MAX_CHECKS_ = 80;
-var AUDIT_MAX_CLAUSES_ = 80;
+/** Điều khoản mỗi đợt: đủ cho một đợt phủ mọi điều khoản của 5 chuẩn (ISO 9001 41 + 14001 26 + 45001 30 + 50001 27 + BRCGS 31) */
+var AUDIT_MAX_CLAUSES_ = 200;
 var AUDIT_MAX_PER_PROGRAM_ = 40;
 var AUDIT_MAX_NA_ = 150;
 /** Phát hiện đánh giá (phiên 4b, AuditFindings — người dùng chốt 13/11/2026): MAJOR không phù hợp lớn · MINOR không phù hợp nhỏ (bắt buộc có
@@ -308,5 +311,12 @@ var WHERE_ = [
 var PERIOD_TYPES_ = ['DAY', 'WEEK', 'MONTH', 'QUARTER', 'HALF', 'YEAR', 'EVENT'];
 var PERIOD_DAYS_ = { DAY: 1, WEEK: 7, MONTH: 31, QUARTER: 92, HALF: 183, YEAR: 366 };
 
-/** Chuẩn điều khoản */
-var CLAUSE_STDS_ = ['ISO9001', 'BRC'];
+/** Chuẩn điều khoản. ISO: biểu thuộc điều khoản khi một mã ở cột của chuẩn đó (G 9001, H 14001, I 45001, J 50001) BẮT ĐẦU bằng điều
+ *  khoản; BRCGS: cột K chứa khóa chủ đề. ISO 14001, 45001, 50001 thêm 14/11/2026 (công ty có đủ chứng nhận) — danh sách điều khoản tự nạp
+ *  (39_stds.js), sửa được qua file Excel tổng (sheet Phủ ISO 14001 / 45001 / 50001). */
+var CLAUSE_STDS_ = ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001', 'BRC'];
+var ISO_STDS_ = ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001'];
+var STD_FIELD_ = { ISO9001: 'iso9001', ISO14001: 'iso14001', ISO45001: 'iso45001', ISO50001: 'iso50001', BRC: 'brc_topics' };
+var STD_SHORT_ = { ISO9001: 'ISO 9001', ISO14001: 'ISO 14001', ISO45001: 'ISO 45001', ISO50001: 'ISO 50001', BRC: 'BRCGS' };
+/** Cột của Danh mục tổng (file Excel) theo chuẩn */
+var STD_COL_ = { ISO9001: 'G', ISO14001: 'H', ISO45001: 'I', ISO50001: 'J', BRC: 'K' };

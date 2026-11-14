@@ -14,6 +14,7 @@ import { busy } from '../form.js';
 import { openFile } from '../files.js';
 import { reportLogo } from '../report-logo.js';
 import { reportExcelFile } from '../report-xlsx.js';
+import { STDS } from '../coverage.js';
 
 const KINDS = ['CATALOG', 'RECORDS', 'COVERAGE', 'VERSIONS', 'DIST', 'DOCREQ', 'CAPA', 'NCR', 'AUDIT', 'MREVIEW'];
 const KIND_ICON = { CATALOG: 'library', RECORDS: 'file', COVERAGE: 'checklist', VERSIONS: 'archive', DIST: 'print', DOCREQ: 'edit', CAPA: 'repairs', NCR: 'alert', AUDIT: 'inspections', MREVIEW: 'trend' };
@@ -22,7 +23,7 @@ const N_OPTS = { MONTH: [3, 6, 12], QUARTER: [2, 4, 8] };
 const N_DEF = { MONTH: 6, QUARTER: 4 };
 const LONG = 180000; // máy chủ dựng PDF bằng Google Docs: tới cả phút với danh mục lớn
 
-const INIT = { kind: 'CATALOG', dept: '', scope: 'ISSUED', grain: 'MONTH', end: '', n: 6, std: 'BOTH', codes: true, item: '', dstate: 'ALL', year: 0, rstate: 'ALL', req: '', capa: '', cstate: 'ALL', cform: '', csource: 'ALL', ncr: '', nform: 'NCR', nstate: 'ALL', aud: '', aform: 'PLAN', mr: '' };
+const INIT = { kind: 'CATALOG', dept: '', scope: 'ISSUED', grain: 'MONTH', end: '', n: 6, std: 'ALL', codes: true, item: '', dstate: 'ALL', year: 0, rstate: 'ALL', req: '', capa: '', cstate: 'ALL', cform: '', csource: 'ALL', ncr: '', nform: 'NCR', nstate: 'ALL', aud: '', aform: 'PLAN', mr: '' };
 const state = { ...INIT };
 /** Bản xem trước / báo cáo đang làm: {sig, runId, code, layout, logo} — đổi bộ lọc thì bỏ */
 let cur = null;
@@ -57,7 +58,8 @@ const keyLabel = (grain, k) => (grain === 'MONTH' ? `${k.slice(5, 7)}/${k.slice(
 function filtersOf(s) {
   if (s.kind === 'CATALOG') return { dept: s.dept, scope: s.scope };
   if (s.kind === 'RECORDS') return { dept: s.dept, grain: s.grain, end: s.end || periodKey(s.grain, today()), n: Number(s.n) || N_DEF[s.grain] };
-  if (s.kind === 'COVERAGE') return { dept: s.dept, std: s.std, codes: !!s.codes };
+  // Mọi chuẩn gửi 'BOTH' (máy chủ mới hiểu là mọi chuẩn; máy chủ trước bản ISO 14001/45001/50001 hiểu là ISO 9001 + BRCGS)
+  if (s.kind === 'COVERAGE') return { dept: s.dept, std: s.std === 'ALL' ? 'BOTH' : s.std, codes: !!s.codes };
   if (s.kind === 'DIST') return { dept: s.dept, state: s.dstate };
   if (s.kind === 'DOCREQ') return s.req ? { request_id: s.req } : { dept: s.dept, year: Number(s.year) || Number(today().slice(0, 4)), state: s.rstate };
   if (s.kind === 'MREVIEW') return { review_id: s.mr };
@@ -73,7 +75,8 @@ function applyQuery(q) {
   if (KINDS.includes(q.kind)) state.kind = q.kind;
   if (q.item) state.item = String(q.item);
   if (q.dept !== undefined) state.dept = String(q.dept);
-  if (q.std && ['BOTH', 'ISO9001', 'BRC'].includes(q.std)) state.std = q.std;
+  if (q.std && ['ALL'].concat(STDS).includes(q.std)) state.std = q.std;
+  if (q.std === 'BOTH') state.std = 'ALL';
   if (q.req) state.req = String(q.req);
   if (q.capa) state.capa = String(q.capa);
   if (q.form && !['NCR', 'DECISION', 'PLAN', 'CHECKLIST', 'REPORT'].includes(q.form)) state.cform = String(q.form);
@@ -226,6 +229,10 @@ export async function renderReports(view, ctx) {
   const deptMap = new Map(deps.map((d) => [d.dept_code, d]));
   const itemMap = new Map(all.map((x) => [x.item_id, x]));
   const deptOpts = deps.filter((d) => all.some((x) => x.dept_code === d.dept_code));
+  // Chuẩn có điều khoản (máy chủ chưa nạp ISO 14001/45001/50001 thì không có trong ô chọn)
+  const clsAll = await recs('CLAUSE');
+  const stdOpts = ['ALL'].concat(STDS.filter((x) => clsAll.some((c) => c.std === x && c.active !== false && !c.archived_at)));
+  if (!stdOpts.includes(state.std)) state.std = 'ALL';
   const sorted = all.slice().sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0) || String(a.code).localeCompare(String(b.code)));
   if (state.kind === 'VERSIONS' && !itemMap.has(state.item)) state.item = (sorted.find((x) => x.status === 'ISSUED') || sorted[0] || {}).item_id || '';
   // Phiếu đề nghị (2d): chọn một phiếu (in ký) hoặc sổ theo dõi năm
@@ -290,7 +297,7 @@ export async function renderReports(view, ctx) {
       out.push(sel('rf-n', 'rpt.f.n', N_OPTS[state.grain].map((n) => [n, biText('rp.n.' + state.grain, { N: n })]), state.n));
     }
     if (k === 'COVERAGE') {
-      out.push(sel('rf-std', 'rpt.f.std', ['BOTH', 'ISO9001', 'BRC'].map((s) => [s, biText('rpt.std.' + s)]), state.std));
+      out.push(sel('rf-std', 'rpt.f.std', stdOpts.map((s) => [s, biText('rpt.std.' + s)]), state.std));
       out.push(`<label class="fld chk"><input type="checkbox" id="rf-codes"${state.codes ? ' checked' : ''}><span>${bi('rpt.f.codes')}</span></label>`);
     }
     if (k === 'VERSIONS') {

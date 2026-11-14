@@ -136,6 +136,8 @@ function systemReset_(ctx) {
       throw validationError_([e0]);
     }
     res = withWriteLock_(function () { return resetWipe_(ctx, mode, bk.folder); });
+    // Xóa cả danh mục: nạp lại điều khoản ISO 14001 / 45001 / 50001 (ISO 9001, BRCGS có lại khi nhập file Excel tổng)
+    if (mode === 'ALL') { dbReset_(); seedStdClauses_(); }
   } catch (e) {
     if (!noted) {
       try { resetNote_({ status: 'FAILED', error: String(e && (e.apiCode || e.message) || e).slice(0, 200), at: isoVN_(now_()), mode: mode, by: by, ref: bk ? bk.folder : '' }); }

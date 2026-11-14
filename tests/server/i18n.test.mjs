@@ -129,7 +129,12 @@ test('họ khóa ghép động đủ thành viên', () => {
     'AuditPrograms', 'Audits', 'AuditChecks', 'AuditFindings', 'MgmtReviews', 'ReportRuns', 'ImportBatches', 'ImportRows', 'Documents', 'AuditLogs'];
   // Nhãn số liệu tự gom do máy chủ gửi (37_mreview.js mrBlocks_ row('mr.s.…'))
   const mr = fs.readFileSync(path.join(ROOT, 'server', 'src', '37_mreview.js'), 'utf8');
-  fam['mr.s.'] = [...mr.matchAll(/'mr\.s\.([a-z_]+)'/g)].map((m) => m[1]);
+  // 'mr.s.cov_' + chuẩn: số liệu phủ ISO 14001 / 45001 / 50001
+  fam['mr.s.'] = [...mr.matchAll(/'mr\.s\.([a-z_]+)'/g)].map((m) => m[1]).flatMap((k) => (k.endsWith('_') ? ['ISO14001', 'ISO45001', 'ISO50001'].map((x) => k + x) : [k]));
+  // Chuẩn (ISO 14001 / 45001 / 50001 thêm 14/11/2026)
+  const STD5 = ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001', 'BRC'];
+  ['aud.std.', 'rpt.t.aud_cov_', 'rpt.sec.aud_cov_', 'std.name.', 'rpt.t.cov_'].forEach((p) => { fam[p] = STD5; });
+  fam['rpt.std.'] = ['ALL'].concat(STD5);
   assert.ok(fam['mr.s.'].length > 40);
   // Dòng kiểm tra sức khỏe máy chủ (24_system.js add('khóa', …))
   const sys = fs.readFileSync(path.join(ROOT, 'server', 'src', '24_system.js'), 'utf8');

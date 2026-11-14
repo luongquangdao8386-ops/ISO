@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { xlsx } from '../xlsx-node.mjs';
 import { buildCatalogWorkbook, SHEET } from '../../js/catalog-xlsx.js';
-import { coverageRows, coverageSummary, missingMandatory } from '../../js/coverage.js';
+import { coverageRows, coverageSummary, missingMandatory, unmatchedCodes, STDS, STD_SHORT } from '../../js/coverage.js';
 import { weekAgenda, mondayOf, periodOf } from '../../js/periods.js';
 import { freshServer, ownerClient } from '../helpers.mjs';
 
@@ -106,8 +106,66 @@ test('Phủ ISO 9001: số biểu, đã ban hành, in từ app, trạng thái kh
   assert.equal(by['7.5.3'].state, 'OK');
   const s = coverageSummary(rows);
   assert.deepEqual([s.total, s.mandatory, s.MISSING], [9, 6, 2]);
-  assert.equal(missingMandatory(ITEMS, CLAUSES), 2, 'ô "Điều khoản ISO 9001 bắt buộc chưa có biểu" (Tổng hợp N7)');
-  assert.equal(wb.Sheets[SHEET.summary].N7.f, `COUNTIF('${SHEET.iso}'!$G$5:$G$60,"Thiếu*")`);
+  assert.equal(missingMandatory(ITEMS, CLAUSES), 2, 'ô "Điều khoản ISO bắt buộc chưa có biểu" (Tổng hợp N7) — chỉ có điều khoản ISO 9001');
+  assert.equal(missingMandatory(ITEMS, CLAUSES, 'ISO9001'), 2);
+  // N7 = tổng các trang Phủ ISO 9001 / 14001 / 45001 / 50001
+  assert.equal(wb.Sheets[SHEET.summary].N7.f, [SHEET.iso, SHEET.iso14001, SHEET.iso45001, SHEET.iso50001].map((n) => `COUNTIF('${n}'!$G$5:$G$60,"Thiếu*")`).join('+'));
+  // Mã ở cột G không khớp điều khoản nào (7.10 khớp 7.1 như Excel; 8.4 không có trong danh sách)
+  assert.deepEqual(unmatchedCodes(ITEMS, CLAUSES, 'ISO9001').map((x) => x.code), ['7.5.2', '8.4', '8.5.4', '8.7']);
+});
+
+test('Phủ ISO 14001 / 45001 / 50001: đếm theo cột H / I / J (khóa ẩn AB / AC / AD) khớp công thức của file Excel; N7 cộng mọi chuẩn ISO', () => {
+  const items = ITEMS.map((x, i) => ({ ...x,
+    iso14001: ['6.1.2; 9.1.1', '', '6.1.3', '8.1;8.2', '', '6.1.2.1', '9.1.2', '', ''][i],
+    iso45001: ['', '8.1.4', '', '6.1.2', '8.1.2\n9.1.1', '', '', '', '7.2'][i],
+    iso50001: ['', '', '6.3; 6.6', '', '', '9.1.1', '', '6.4', ''][i] }));
+  const cl2 = CLAUSES.concat([
+    cl('ISO14001', '6.1.2', { n: 1, m: true, g: '6 Hoạch định' }), cl('ISO14001', '6.1.3', { n: 2, m: true }), cl('ISO14001', '8.1', { n: 3, m: true }),
+    cl('ISO14001', '9.1.1', { n: 4, m: true }), cl('ISO14001', '9.1.2', { n: 5, m: true }), cl('ISO14001', '7.4', { n: 6, m: true }), cl('ISO14001', '10.3', { n: 7 }),
+    cl('ISO45001', '6.1.2', { n: 1, m: true }), cl('ISO45001', '8.1.2', { n: 2 }), cl('ISO45001', '8.1.4', { n: 3 }), cl('ISO45001', '9.1.1', { n: 4, m: true }),
+    cl('ISO50001', '6.3', { n: 1, m: true }), cl('ISO50001', '6.4', { n: 2, m: true }), cl('ISO50001', '6.5', { n: 3, m: true }), cl('ISO50001', '9.1.1', { n: 4, m: true })
+  ]);
+  const { wb: wb0 } = buildCatalogWorkbook(X, { items, groups: [], depts: [], clauses: cl2, grace: 3, epoch: 'e', exported_at: '2026-11-14' });
+  const wb = X.read(X.write(wb0, { type: 'array', bookType: 'xlsx' }), { type: 'array', cellFormula: true });
+  assert.deepEqual([...wb.SheetNames], [SHEET.summary, SHEET.catalog, SHEET.iso, SHEET.iso14001, SHEET.iso45001, SHEET.iso50001, SHEET.brc, SHEET.guide, '_meta']);
+  const cat = wb.Sheets[SHEET.catalog];
+  let total = 0;
+  for (const [std, sheet, keyCol, srcCol] of [['ISO14001', SHEET.iso14001, 'AB', 'H'], ['ISO45001', SHEET.iso45001, 'AC', 'I'], ['ISO50001', SHEET.iso50001, 'AD', 'J']]) {
+    // Cột khóa ẩn: ";"&SUBSTITUTE(cột," ","")&";"
+    const keyVals = [];
+    for (let r = 5; r <= 600; r++) {
+      assert.equal(cat[keyCol + r].f, `";"&SUBSTITUTE(${srcCol}${r}," ","")&";"`);
+      keyVals.push(';' + txt(cat[srcCol + r]).split(' ').join('') + ';');
+    }
+    const cols = { B: column(cat, 'B'), T: column(cat, 'T'), R: column(cat, 'R'), [keyCol]: keyVals };
+    const ws = wb.Sheets[sheet];
+    const rows = coverageRows(items, cl2, std);
+    assert.ok(rows.length >= 4);
+    rows.forEach((row, i) => {
+      const r = 5 + i;
+      assert.equal(txt(ws['A' + r]), row.key);
+      assert.match(ws['D' + r].f, new RegExp(`^COUNTIF\\(${RANGE(keyCol)},"\\*;"&\\$A${r}&"\\*"\\)$`));
+      const k = '*;' + row.key + '*';
+      const D = countifs(cols, keyCol, k), E = countifs(cols, keyCol, k, 'T', '●');
+      const F = countifs(cols, keyCol, k, 'R', 'M&E*') + countifs(cols, keyCol, k, 'R', 'Checksheet*');
+      const G = D === 0 ? (txt(ws['C' + r]).slice(0, 2) === 'Có' ? 'MISSING' : 'NONE') : (E === 0 ? 'NOT_ISSUED' : 'OK');
+      assert.deepEqual([row.n, row.issued, row.app, row.state], [D, E, F, G], std + ' ' + row.key);
+      assert.equal(txt(ws['H' + r]), row.items.map((x) => x.code).join(', '));
+    });
+    total += rows.filter((r) => r.state === 'MISSING').length;
+  }
+  const by = (std) => Object.fromEntries(coverageRows(items, cl2, std).map((r) => [r.key, r]));
+  // 6.1.2 gồm 6.1.2.1; cột H không lẫn với cột G / I (9.1.1 của 45001 sau xuống dòng không tính — như Excel)
+  assert.deepEqual(by('ISO14001')['6.1.2'].items.map((x) => x.code), ['BM-ISO-02-01', 'BM-SX-02-01']);
+  assert.deepEqual(by('ISO45001')['9.1.1'].items.map((x) => x.code), []);
+  assert.equal(by('ISO45001')['8.1.2'].n, 1);
+  assert.equal(by('ISO14001')['7.4'].state, 'MISSING');
+  assert.equal(by('ISO14001')['10.3'].state, 'NONE', 'không bắt buộc → Chưa có biểu');
+  assert.equal(by('ISO50001')['6.5'].state, 'MISSING');
+  assert.equal(missingMandatory(items, cl2), 2 + total, 'trang chủ = N7 = tổng các chuẩn ISO');
+  assert.deepEqual(unmatchedCodes(items, cl2, 'ISO45001').map((x) => [x.code, x.items]), [['7.2', ['BM-BRC-01-01']]], 'ô có xuống dòng tính theo mã đầu (như Excel)');
+  assert.deepEqual(unmatchedCodes(items, cl2, 'ISO50001').map((x) => x.code), ['6.6']);
+  assert.deepEqual(STDS.map((x) => STD_SHORT[x]), ['ISO 9001', 'ISO 14001', 'ISO 45001', 'ISO 50001', 'BRCGS']);
 });
 
 test('Phủ BRCGS: biểu thuộc chủ đề khi cột K chứa khóa (không phân biệt hoa thường), khớp công thức của file Excel', () => {
@@ -186,14 +244,25 @@ test('Trạng thái hệ thống: dòng Phủ điều khoản của máy chủ c
   let h = rowOf();
   const calc = () => {
     const items = env.rows('Items'), clauses = env.rows('Clauses');
-    const iso = coverageRows(items, clauses, 'ISO9001'), brc = coverageRows(items, clauses, 'BRC');
-    return `ISO 9001: ${iso.filter((r) => r.n).length}/${iso.length} điều khoản có biểu · bắt buộc chưa có biểu ${iso.filter((r) => r.state === 'MISSING').length} · BRCGS: ${brc.filter((r) => r.n).length}/${brc.length} chủ đề có biểu`;
+    return STDS.map((s) => [s, coverageRows(items, clauses, s)]).filter(([, rows]) => rows.length).map(([s, rows]) => `${STD_SHORT[s]}: ${rows.filter((r) => r.n).length}/${rows.length}`
+      + (s === 'BRC' ? ' chủ đề có biểu' : ` điều khoản có biểu · bắt buộc chưa có biểu ${rows.filter((r) => r.state === 'MISSING').length}`)).join(' · ');
   };
+  // Máy chủ mới tự nạp điều khoản ISO 14001 / 45001 / 50001 — dữ liệu mẫu chưa ghi cột H, I, J nên có điều khoản bắt buộc thiếu biểu
+  assert.equal(h.status, 'WARN');
+  assert.equal(h.value, calc());
+  assert.match(h.note, /ISO 14001 4\.3, 5\.2, 6\.1\.1/);
+  assert.match(h.note, / · ISO 45001 4\.3, /);
+  assert.doesNotMatch(h.note, /ISO 9001/);
+  // Bỏ ba chuẩn mới (ngừng dùng) → chỉ ISO 9001 + BRCGS như trước: ĐẠT
+  for (const c of env.rows('Clauses').filter((x) => x.std !== 'ISO9001' && x.std !== 'BRC')) {
+    env.g.systemWrite_([{ sheet: 'Clauses', mode: 'update', row: { ...c, active: false }, rowNum: c.__row }]);
+  }
+  h = rowOf();
   assert.equal(h.status, 'OK');
   assert.equal(h.value, calc());
   env.g.systemWrite_([{ sheet: 'Clauses', mode: 'insert', row: env.g.cNewSystem_({ clause_id: 'ISO9001|6.2', std: 'ISO9001', key: '6.2', group_vi: '', group_zh: '', name_vi: 'Mục tiêu', name_zh: '目标', mandatory_record: true, sort_order: 20, active: true }) }], { action: 'test.clause', entity_type: 'SYSTEM' });
   h = rowOf();
   assert.equal(h.status, 'WARN');
   assert.equal(h.value, calc());
-  assert.match(h.note, /6\.2/);
+  assert.equal(h.note, 'Phủ điều khoản → Thiếu biểu – bắt buộc: ISO 9001 6.2');
 });

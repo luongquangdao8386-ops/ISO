@@ -100,7 +100,7 @@ function reportPeriodOfKey_(grain, key) {
 /**
  * Bộ lọc chuẩn hóa theo loại báo cáo (chỉ khóa cho phép, giá trị mặc định); sai → VALIDATION_ERROR.
  *  CATALOG {dept, scope: ISSUED | ALL} · RECORDS {dept, grain: MONTH | QUARTER, end: 2026-11 | 2026-Q4, n}
- *  COVERAGE {dept, std: BOTH | ISO9001 | BRC, codes: true | false} · VERSIONS {item_id}
+ *  COVERAGE {dept, std: ALL | ISO9001 | ISO14001 | ISO45001 | ISO50001 | BRC, codes: true | false} · VERSIONS {item_id}
  */
 function reportFilters_(kind, f, today) {
   f = f || {};
@@ -163,8 +163,9 @@ function reportFilters_(kind, f, today) {
     if (!(n >= 1 && n <= REPORT_GRAINS_[grain].max) || Math.floor(n) !== n) { errs.push(fieldError_('filters.n', 'INVALID_VALUE')); n = REPORT_GRAINS_[grain].def; }
     out.n = n;
   } else if (kind === 'COVERAGE') {
-    var std = f.std || 'BOTH';
-    if (['BOTH', 'ISO9001', 'BRC'].indexOf(std) < 0) { errs.push(fieldError_('filters.std', 'INVALID_VALUE')); std = 'BOTH'; }
+    // ALL = mọi chuẩn (ISO 9001, 14001, 45001, 50001, BRCGS); BOTH của app cũ (trước 14/11/2026) hiểu là ALL
+    var std = !f.std || f.std === 'BOTH' ? 'ALL' : f.std;
+    if (std !== 'ALL' && CLAUSE_STDS_.indexOf(std) < 0) { errs.push(fieldError_('filters.std', 'INVALID_VALUE')); std = 'ALL'; }
     out.std = std;
     out.codes = f.codes !== false;
   } else if (kind === 'VERSIONS') {
@@ -409,7 +410,8 @@ function reportRecords_(ctx, f, today) {
 
 /** Bảng phủ một chuẩn — GIỐNG HỆT coverageRows() trong js/coverage.js (đếm như hai trang Phủ của file Excel tổng) */
 function coverageRowsSrv_(items, clauses, std) {
-  var isoKey = function (it) { return ';' + String(it.iso9001 || '').split(' ').join('') + ';'; };
+  var field = STD_FIELD_[std] || 'iso9001';
+  var isoKey = function (it) { return ';' + String(it[field] || '').split(' ').join('') + ';'; };
   return clauses.filter(function (c) { return c.std === std && c.active !== false && !c.archived_at; })
     .sort(function (a, b) { return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0) || String(a.key).localeCompare(String(b.key)); })
     .map(function (c) {
@@ -419,7 +421,7 @@ function coverageRowsSrv_(items, clauses, std) {
         return std === 'BRC' ? !!key && String(it.brc_topics || '').toLowerCase().indexOf(kl) >= 0 : !!key && isoKey(it).indexOf(';' + key) >= 0;
       });
       var issued = hit.filter(function (it) { return it.status === 'ISSUED'; }).length;
-      var mandatory = std === 'ISO9001' && !!c.mandatory_record;
+      var mandatory = std !== 'BRC' && !!c.mandatory_record;
       var state = !hit.length ? (mandatory ? 'MISSING' : 'NONE') : (issued ? 'OK' : 'NOT_ISSUED');
       return {
         key: key, group_vi: c.group_vi || '', group_zh: c.group_zh || '', name_vi: c.name_vi || '', name_zh: c.name_zh || '', mandatory: mandatory,
@@ -432,9 +434,12 @@ function coverageRowsSrv_(items, clauses, std) {
 function reportCoverage_(ctx, f) {
   var items = reportItems_(ctx, f.dept, true);
   var clauses = readRows_('Clauses');
-  var stds = f.std === 'BOTH' ? ['ISO9001', 'BRC'] : [f.std];
+  // Chuẩn chưa có điều khoản nào thì bỏ khi xem mọi chuẩn
+  var stds = f.std === 'ALL' || f.std === 'BOTH' ? CLAUSE_STDS_.filter(function (s) {
+    return clauses.some(function (c) { return c.std === s && c.active !== false && !c.archived_at; });
+  }) : [f.std];
   var tiles = [];
-  var n = 0;
+  var n = 0, missAll = 0;
   var out = stds.map(function (std) {
     var rows = coverageRowsSrv_(items, clauses, std).map(function (r) {
       var o = { key: r.key, group_vi: r.group_vi, group_zh: r.group_zh, name_vi: r.name_vi, name_zh: r.name_zh, mandatory: r.mandatory,
@@ -446,15 +451,16 @@ function reportCoverage_(ctx, f) {
     rows.forEach(function (r) { sum[r.state]++; if (r.mandatory) sum.mandatory++; });
     sum.covered = sum.total - sum.MISSING - sum.NONE;
     n += rows.length;
-    if (std === 'ISO9001') {
-      tiles.push({ k: 'rpt.t.iso_covered', v: sum.covered + '/' + sum.total });
-      tiles.push({ k: 'rpt.t.iso_missing', v: String(sum.MISSING), tone: sum.MISSING ? 'red' : 'green' });
-    } else {
-      tiles.push({ k: 'rpt.t.brc_covered', v: sum.covered + '/' + sum.total });
+    missAll += sum.MISSING;
+    // Một chuẩn: có biểu · bắt buộc thiếu biểu · có biểu chưa ban hành; mọi chuẩn: mỗi chuẩn một ô có biểu, thêm một ô bắt buộc thiếu biểu
+    tiles.push({ k: 'rpt.t.cov_' + std, v: sum.covered + '/' + sum.total, tone: sum.MISSING ? 'red' : '' });
+    if (stds.length === 1) {
+      if (std !== 'BRC') tiles.push({ k: 'rpt.t.iso_missing', v: String(sum.MISSING), tone: sum.MISSING ? 'red' : 'green' });
+      tiles.push({ k: 'rpt.t.not_issued', v: String(sum.NOT_ISSUED), tone: sum.NOT_ISSUED ? 'amber' : '' });
     }
-    tiles.push({ k: std === 'BRC' ? 'rpt.t.brc_not_issued' : 'rpt.t.iso_not_issued', v: String(sum.NOT_ISSUED), tone: sum.NOT_ISSUED ? 'amber' : '' });
     return { std: std, rows: rows, sum: sum };
   });
+  if (stds.length > 1) tiles.push({ k: 'rpt.t.iso_missing', v: String(missAll), tone: missAll ? 'red' : 'green' });
   return { data: { stds: out, codes: f.codes, items: items.length }, rows: n, tiles: tiles };
 }
 

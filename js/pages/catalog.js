@@ -5,10 +5,11 @@ import { bi, biText, esc, nameText } from '../core.js';
 import { ICON, setViewHtml, wireSearch, listChunk, wireMore, freshFilters } from '../ui.js';
 import { isWide } from '../shell.js';
 import { items, depts, recs, isSecretary, seesAll, myDepts, groupText, itemHay, foldVi, STATUS_SYMBOL, STATUSES, KINDS, WHERES, catalogSummary, reviewSoon, today, scopeNames, scopeBi } from '../data.js';
-import { isoMatch, brcMatch } from '../coverage.js';
+import { isoMatch, brcMatch, ISO_STDS, STD_SHORT } from '../coverage.js';
 
-// iso / brc: lọc theo điều khoản ISO 9001 / chủ đề BRCGS (mở từ màn Phủ điều khoản, đếm như file Excel)
-const INIT = { q: '', dept: '', group: '', kind: '', where: '', status: '', prio: '', f: '', iso: '', brc: '', open: false };
+// iso / brc: lọc theo điều khoản ISO 9001 / chủ đề BRCGS; std + cl: điều khoản ISO 14001 / 45001 / 50001 (mở từ màn Phủ điều khoản,
+// đếm như file Excel)
+const INIT = { q: '', dept: '', group: '', kind: '', where: '', status: '', prio: '', f: '', iso: '', brc: '', std: '', cl: '', open: false };
 const state = { ...INIT };
 
 /** Hình tình trạng ○ ◐ ● ✕ vẽ bằng CSS (chữ ◐ của phông iPhone quá nhỏ); ký hiệu chữ chỉ ở file Excel */
@@ -24,8 +25,9 @@ export function statusDot(st) {
 
 function applyQuery(query) {
   if (!query) return;
-  ['dept', 'group', 'kind', 'where', 'status', 'prio', 'f', 'iso', 'brc'].forEach((k) => { if (query[k] !== undefined) state[k] = String(query[k]); });
+  ['dept', 'group', 'kind', 'where', 'status', 'prio', 'f', 'iso', 'brc', 'std', 'cl'].forEach((k) => { if (query[k] !== undefined) state[k] = String(query[k]); });
   if (query.f === 'issued') { state.status = 'ISSUED'; state.f = ''; }
+  if (!ISO_STDS.includes(state.std)) { state.std = ''; state.cl = ''; }
 }
 
 function filterList(list, tplIds) {
@@ -43,6 +45,7 @@ function filterList(list, tplIds) {
     if (state.f === 'notpl' && (it.status === 'NA' || tplIds.has(it.item_id))) return false;
     if (state.iso && !isoMatch(it, state.iso)) return false;
     if (state.brc && !brcMatch(it, state.brc)) return false;
+    if (state.std && state.cl && !isoMatch(it, state.cl, state.std)) return false;
     if (words.length) { const hay = itemHay(it); if (!words.every((w) => hay.includes(w))) return false; }
     return true;
   });
@@ -73,14 +76,16 @@ export async function renderCatalog(view, ctx) {
     const sig = JSON.stringify({ ...state, open: 0 });
     const { shown, more } = listChunk('catalog', list, sig);
     const counts = {};
-    const base = all.filter((x) => (!state.dept || x.dept_code === state.dept) && (!state.iso || isoMatch(x, state.iso)) && (!state.brc || brcMatch(x, state.brc)));
+    const base = all.filter((x) => (!state.dept || x.dept_code === state.dept) && (!state.iso || isoMatch(x, state.iso)) && (!state.brc || brcMatch(x, state.brc))
+      && (!state.std || !state.cl || isoMatch(x, state.cl, state.std)));
     STATUSES.forEach((s) => { counts[s] = base.filter((x) => x.status === s).length; });
     const deptOpts = deps.filter((d) => all.some((x) => x.dept_code === d.dept_code));
     const grpOpts = groups.filter((g) => (!state.dept || g.dept_code === state.dept) && all.some((x) => x.group_key === g.group_key))
       .sort((a, b) => String(a.group_key).localeCompare(String(b.group_key)));
     const nFilt = ['dept', 'group', 'kind', 'where', 'prio', 'f'].filter((k) => state[k]).length;
     const scopeNote = (scope ? `<p class="muted small">${scopeBi('scope.short', scope)}</p>` : '') + (seesAll() ? '' : `<p class="muted small">${bi('cat.scope_note', { D: myDepts().join(', ') })}</p>`);
-    const clauseChip = state.iso || state.brc ? `<div class="chips cov-filter"><button type="button" class="chip on" id="cf-clause">${bi(state.iso ? 'cat.f_iso' : 'cat.f_brc', { K: esc(state.iso || state.brc) })} ${ICON.x}</button></div>` : '';
+    const clauseChip = state.iso || state.brc || (state.std && state.cl) ? `<div class="chips cov-filter"><button type="button" class="chip on" id="cf-clause">${state.std && state.cl && !state.iso && !state.brc
+      ? bi('cat.f_std', { S: esc(STD_SHORT[state.std]), K: esc(state.cl) }) : bi(state.iso ? 'cat.f_iso' : 'cat.f_brc', { K: esc(state.iso || state.brc) })} ${ICON.x}</button></div>` : '';
     const chips = `<div class="chips" role="group" aria-label="${esc(biText('cat.status'))}">
       <button type="button" class="chip${state.status ? '' : ' on'}" data-st="">${bi('cat.all')} <b>${base.length}</b></button>
       ${STATUSES.map((s) => `<button type="button" class="chip${state.status === s ? ' on' : ''}" data-st="${s}">${stIcon(s)} ${bi('status.' + s)} <b>${counts[s]}</b></button>`).join('')}</div>`;
@@ -118,7 +123,7 @@ export async function renderCatalog(view, ctx) {
     const sel = (id, k) => { const el = view.querySelector('#' + id); if (el) el.addEventListener('change', () => { state[k] = el.value; if (k === 'dept') state.group = ''; state.open = true; draw(); }); };
     sel('cf-dept', 'dept'); sel('cf-group', 'group'); sel('cf-kind', 'kind'); sel('cf-where', 'where'); sel('cf-prio', 'prio'); sel('cf-f', 'f');
     const cc = view.querySelector('#cf-clause');
-    if (cc) cc.addEventListener('click', () => { state.iso = ''; state.brc = ''; draw(); });
+    if (cc) cc.addEventListener('click', () => { state.iso = ''; state.brc = ''; state.std = ''; state.cl = ''; draw(); });
     const clr = view.querySelector('#cf-clear');
     if (clr) clr.addEventListener('click', () => { Object.assign(state, { dept: '', group: '', kind: '', where: '', prio: '', f: '', iso: '', brc: '', open: true }); draw(); });
     const det = view.querySelector('details.filters');

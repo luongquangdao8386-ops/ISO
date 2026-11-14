@@ -194,9 +194,24 @@ test('Phủ điều khoản: khớp js/coverage.js (cách đếm của file Exce
     assert.deepEqual(s.rows.map((x) => [x.key, x.n, x.issued, x.app, x.state, x.mandatory]), exp.map((x) => [x.key, x.n, x.issued, x.app, x.state, x.mandatory]), s.std);
     s.rows.forEach((x, i) => assert.deepEqual(x.codes.map((c) => c.code).sort(), exp[i].items.map((it) => it.code).sort()));
   }
+  // BOTH (app cũ) = mọi chuẩn có điều khoản: ISO 9001, 14001, 45001, 50001 (máy chủ nạp sẵn), BRCGS
+  assert.equal(r.data.report.filters.std, 'ALL');
+  assert.deepEqual(r.data.report.data.stds.map((x) => x.std), ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001', 'BRC']);
   const lay = r.data.layout;
-  assert.equal(lay.sections.length, 2);
+  assert.equal(lay.sections.length, 5);
   assert.ok(lay.sections[0].table.head.at(-1).startsWith('Mã biểu'));
+  assert.match(lay.sections[1].heading, /^ISO 14001 — 26 điều khoản/);
+  assert.match(lay.sections[1].note, /cột ISO 14001 \(cột H của Danh mục tổng\)/);
+  assert.equal(lay.sections[1].table.head.length, 9, 'chuẩn ISO có cột Bắt buộc lưu hồ sơ');
+  // Ô số: mỗi chuẩn một ô "có biểu", thêm một ô bắt buộc thiếu biểu (tổng các chuẩn ISO)
+  const tl = r.data.report.tiles.map((t) => t.k);
+  assert.deepEqual(tl, ['rpt.t.cov_ISO9001', 'rpt.t.cov_ISO14001', 'rpt.t.cov_ISO45001', 'rpt.t.cov_ISO50001', 'rpt.t.cov_BRC', 'rpt.t.iso_missing']);
+  const miss = ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001'].reduce((n, x) => n + coverageRows(items, clauses, x).filter((y) => y.state === 'MISSING').length, 0);
+  assert.equal(r.data.report.tiles.at(-1).v, String(miss));
+  // Một chuẩn ISO 45001: 3 ô số
+  const r45 = run(owner, 'COVERAGE', { std: 'ISO45001' });
+  assert.deepEqual(r45.data.report.tiles.map((t) => t.k), ['rpt.t.cov_ISO45001', 'rpt.t.iso_missing', 'rpt.t.not_issued']);
+  assert.deepEqual(run(owner, 'COVERAGE', { std: 'ISO27001' }).errors.map((e) => e.field + ':' + e.code), ['filters.std:INVALID_VALUE']);
   // Không kèm mã biểu; chỉ BRCGS
   const r2 = run(owner, 'COVERAGE', { std: 'BRC', codes: false });
   assert.equal(r2.data.report.data.stds.length, 1);

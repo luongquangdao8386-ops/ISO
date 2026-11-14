@@ -84,7 +84,7 @@ test('nhập file Excel tổng 221 dòng: 2 lượt xem trước, ghi 3 lượt 
   ];
   const bytes = workbookBytes({ items, groups, depts, clauses, grace: 3, epoch: '', exported_at: '2026-11-06' });
   const wb = X.read(bytes, { type: 'array', cellDates: true });
-  assert.deepEqual([...wb.SheetNames], [SHEET.summary, SHEET.catalog, SHEET.iso, SHEET.brc, SHEET.guide, '_meta']);
+  assert.deepEqual([...wb.SheetNames], [SHEET.summary, SHEET.catalog, SHEET.iso, SHEET.iso14001, SHEET.iso45001, SHEET.iso50001, SHEET.brc, SHEET.guide, '_meta']);
   const parsed = parseCatalogWorkbook(X, wb);
   assert.equal(parsed.rows.length, 221);
   assert.equal(parsed.rows[0].row_number, 5, 'dữ liệu từ dòng 5');
@@ -117,14 +117,30 @@ test('nhập file Excel tổng 221 dòng: 2 lượt xem trước, ghi 3 lượt 
   assert.equal(rows.find((r) => r.code === 'BM-CĐ-01-01').group_key, 'CĐ-01');
   assert.equal(env.rows('Groups').find((g) => g.group_key === 'CĐ-01').label, '01. NHÓM 01 · 01. 第01组');
   assert.equal(env.g.setting_('records_start_date'), '2026-11-06', 'ngày bắt đầu tính hồ sơ = ngày nhập danh mục đầu tiên');
-  assert.equal(env.rows('Clauses').length, 4);
-  // Xuất từ dữ liệu máy chủ rồi nhập lại: Không đổi
+  // Tệp chỉ có điều khoản ISO 9001 + BRCGS: điều khoản ISO 14001 / 45001 / 50001 máy chủ nạp sẵn giữ nguyên
+  const clRows = env.rows('Clauses');
+  assert.equal(clRows.filter((c) => c.std === 'ISO9001' || c.std === 'BRC').length, 4);
+  assert.deepEqual(['ISO14001', 'ISO45001', 'ISO50001'].map((x) => clRows.filter((c) => c.std === x && c.active).length), [26, 30, 27]);
+  // Xuất từ dữ liệu máy chủ rồi nhập lại: Không đổi (kể cả nhóm của điều khoản nạp sẵn — sheet Phủ không có cột nhóm)
   const rec = owner.call('sync.bootstrap', {}).data.records;
   const again = parseCatalogWorkbook(X, X.read(workbookBytes({ items: rec.ITEM, groups: rec.GROUP, depts: rec.DEPT, clauses: rec.CLAUSE, grace: 3, epoch: env.props.getProperty('DATASET_EPOCH'), exported_at: 'x' }), { type: 'array', cellDates: true }));
   assert.equal(again.rows.length, 221);
   const pv2 = preview(tk, again);
   assert.equal(pv2.batch.same_count, 221, JSON.stringify(pv2.rows.filter((r) => r.action !== 'SAME').slice(0, 3)));
   assert.equal(pv2.batch.clause_count, 0);
+  assert.equal(again.clauses.length, 4 + 26 + 30 + 27);
+  assert.equal(again.clauses.find((c) => c.std === 'ISO45001' && c.key === '8.1.4').name, 'Mua sắm (nhà thầu, thuê ngoài)\n采购（承包方、外包）');
+  // Sửa danh sách ở sheet Phủ ISO 50001 (bỏ 8.3, đổi 7.4 thành bắt buộc) → nhập lại: sửa 1, ngừng 1; nhóm giữ nguyên
+  const wb3 = X.read(workbookBytes({ items: rec.ITEM, groups: rec.GROUP, depts: rec.DEPT, clauses: rec.CLAUSE, grace: 3, epoch: env.props.getProperty('DATASET_EPOCH'), exported_at: 'x' }), { type: 'array', cellDates: true });
+  const p3 = parseCatalogWorkbook(X, wb3);
+  p3.clauses = p3.clauses.filter((c) => !(c.std === 'ISO50001' && c.key === '8.3')).map((c) => (c.std === 'ISO50001' && c.key === '7.4' ? { ...c, mandatory_record: true } : c));
+  const pv3 = preview(tk, p3);
+  assert.equal(pv3.batch.clause_count, 2);
+  commitAll(tk2, pv3.id);
+  env.g.dbReset_();
+  const c74 = env.rows('Clauses').find((c) => c.clause_id === 'ISO50001|7.4');
+  assert.deepEqual([c74.mandatory_record, c74.group_vi, c74.group_zh], [true, '7. Hỗ trợ', '7. 支持']);
+  assert.equal(env.rows('Clauses').find((c) => c.clause_id === 'ISO50001|8.3').active, false);
 });
 
 test('dòng lỗi (ký hiệu tình trạng, bộ phận, trùng mã, ngày), sửa một dòng → UPDATE; biểu bị sửa sau xem trước → ROW_CHANGED; tệp không đúng khuôn', () => {

@@ -44,9 +44,9 @@ function auditInProgress(env, team, results = {}) {
   const tk = makeClient(env);
   assert.equal(tk.login('TK', TK_PIN).ok, true);
   const pid = uuid(), aid = uuid();
-  assert.equal(tk.write('iaudit.program.save', { program_id: pid, year: 2026 }).ok, true);
+  assert.equal(tk.write('iaudit.program.save', { program_id: pid, year: 2026, stds: ['ISO9001', 'BRC'] }).ok, true);
   env.g.dbReset_();
-  const all = env.g.readRows_('Clauses').map((c) => c.clause_id);
+  const all = env.g.readRows_('Clauses').filter((c) => c.std === 'ISO9001' || c.std === 'BRC').map((c) => c.clause_id);
   let r = tk.write('iaudit.save', { audit_id: aid, program_id: pid, dept_code: 'CĐ', plan_month: '2026-11', title_vi: 'Bảo trì, sửa chữa thiết bị', clauses: all,
     audit_date: '2026-11-12', auditee_text: 'Trưởng bộ phận Cơ điện', team });
   assert.equal(r.ok, true, JSON.stringify(r));
@@ -257,7 +257,7 @@ test('iPhone: Ghi phát hiện từ câu (NC lớn) → Gửi báo cáo (nhắc 
     // 11. Trạng thái hệ thống
     await go(page, '#/admin/status');
     await page.waitForFunction(() => /đã báo cáo chờ đóng 0 · đã đóng 1 · phát hiện không phù hợp chưa có phiếu khắc phục 0/.test(document.body.textContent), null, { timeout: 20000 });
-    assert.match(await page.textContent('#view'), /1\.0\.13/);
+    assert.match(await page.textContent('#view'), /1\.0\.14/);
     assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
 });

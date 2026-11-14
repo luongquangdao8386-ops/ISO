@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.3 (Đợt 4, phiên 4c — Xem xét lãnh đạo, Xóa sạch dữ liệu)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.4 (thêm ISO 14001, ISO 45001, ISO 50001)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -107,7 +107,65 @@ VERIFIED, không thì không xóa gì)**, xóa, đổi thế hệ dữ liệu �
 ảnh nền, kết nối M&E / Checksheet, Gmail, nhật ký đăng nhập và quản trị, bộ đếm mã (không quay lại 001), các bản sao lưu. **Trên THẬT
 không bấm** trừ khi thật sự cần bắt đầu lại (màn báo đỏ "Đây là máy chủ THẬT").
 
-## CẬP NHẬT LÊN BẢN 4c (1.0.0-d4.3, Xem xét lãnh đạo, Xóa sạch dữ liệu) — làm một lần, trên máy tính
+Bản 4.4 (14/11/2026, anh báo công ty có đủ chứng nhận **ISO 14001, ISO 45001, ISO 50001**) thêm ba chuẩn này bên cạnh ISO 9001 và
+BRCGS: máy chủ **tự nạp danh sách điều khoản** (ISO 14001:2015 — 26 điều khoản, 16 bắt buộc lưu hồ sơ; ISO 45001:2018 — 30 / 18; ISO
+50001:2018 — 27 / 16; tên Việt · Trung, nhóm theo chương 4–10); **Phủ điều khoản** có 5 thẻ (9001 · 14001 · 45001 · 50001 · BRCGS), đếm
+theo cột **H / I / J** của Danh mục tổng như ISO 9001 đếm theo cột G, kèm danh sách **mã ghi ở cột đó mà không khớp điều khoản nào**;
+ô trang chủ **Điều khoản bắt buộc thiếu biểu** = tổng bốn chuẩn ISO; **Đánh giá nội bộ**: chương trình mới mặc định chọn cả 5 chuẩn (bỏ
+chuẩn nào thì bấm chip), mỗi đợt chọn điều khoản của mọi chuẩn (tối đa 200), nhãn "ISO 14001 · 6.1.2"; báo cáo **Phủ điều khoản** chọn
+Mọi chuẩn hoặc từng chuẩn; **Xem xét lãnh đạo** thêm dòng phủ của từng chuẩn; file **Excel tổng** thêm sheet **Phủ ISO 14001 / 45001 /
+50001** (cột khóa ẩn AB / AC / AD, ô Tổng hợp N7 cộng cả bốn chuẩn). Sửa danh sách điều khoản (thêm dòng, đổi tên, cột "Bắt buộc lưu hồ
+sơ"): Excel → Xuất danh mục → sửa sheet Phủ của chuẩn đó → nhập lại; nhập file **không có** sheet của một chuẩn thì điều khoản chuẩn đó
+**giữ nguyên**; nhập lại file xuất từ app **giữ nhóm** của điều khoản (trước đây nhóm ISO 9001 bị xóa trắng).
+
+## CẬP NHẬT LÊN BẢN 4.4 (1.0.0-d4.4, ISO 14001, ISO 45001, ISO 50001) — làm một lần, trên máy tính
+
+Bản 4.4 **không thêm sheet / cột**; `migrateSchema` **nạp điều khoản** ba chuẩn mới (chỉ chuẩn chưa có dòng nào — chạy lại không nạp
+trùng, không đụng ISO 9001 / BRCGS đã nhập). **Không** hỏi quyền Google mới, **không** cần `installTriggers`. App 4.4 vẫn chạy với máy chủ
+4c (chỉ hiện ISO 9001 + BRCGS như cũ tới khi máy chủ nạp điều khoản).
+
+**Anh phải làm:**
+1. <https://script.google.com> → dự án `ISO_MayChu_THAT` → tệp `Code.gs` → Ctrl+A → xóa → mở link
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán vào → **Lưu**.
+2. Chọn hàm **`migrateSchema`** → **Chạy**. Nhật ký: `migrateSchema xong. Thêm: điều khoản ISO 14001 (26); điều khoản ISO 45001 (30);
+   điều khoản ISO 50001 (27). schema_version=1.0.14` (nếu trigger nền đã kịp tự chạy trước thì báo `Thêm: không có. schema_version=1.0.14`
+   — cũng đúng).
+3. **Triển khai → Quản lý các bản triển khai** → bút chì → Phiên bản: **Phiên bản mới** → Mô tả `d4.4 iso 14001 45001 50001` →
+   **Triển khai**. Link `/exec` giữ nguyên.
+4. Mở app `/ISO/` (đang mở thì đóng hẳn rồi mở lại) → **Tài khoản → Thông tin** ghi `1.0.0-d4.4 · mã vỏ app 48c5c3adecd5` (màn báo lỗi
+   hoặc mã khác thì bấm **Tải lại bản mới**).
+
+**Nên kiểm (3 phút — phần máy giả lập không kiểm được):**
+1. **Tài khoản → Quản trị → Trạng thái hệ thống**: `schema_version` = **1.0.14**; dòng **Điều khoản / chủ đề** = `ISO 9001: 41 · ISO 14001:
+   26 · ISO 45001: 30 · ISO 50001: 27 · BRCGS: 31`; dòng **Phủ điều khoản** có đủ 5 chuẩn (ISO 14001 / 45001 / 50001 có nhiều điều khoản
+   bắt buộc chưa có biểu là bình thường — cột H / I / J của danh mục Cơ điện ghi ít).
+2. iPhone: **Trang chủ → ô Phủ điều khoản** → 5 thẻ trên một hàng → bấm **14001** → xem danh sách điều khoản; nếu có khung vàng
+   "N mã ở cột ISO 14001 (cột H) không khớp điều khoản nào" thì bấm mở, chụp gửi Claude (mã ghi kiểu "6.1" chung chung hoặc ghi sai).
+3. Máy tính: **Excel → Xuất danh mục** → mở bằng Microsoft Excel → có thêm 3 sheet **Phủ ISO 14001 / 45001 / 50001**, cột Số biểu có số
+   (không báo lỗi công thức). Không cần nhập lại.
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/server/stds.test.mjs` (2 test): máy chủ như bản 4c (dữ liệu mẫu ISO 9001 + BRCGS,
+schema 1.0.13) → Trạng thái hệ thống cảnh báo "Chạy migrateSchema để nạp điều khoản…" → `migrateSchema` → đúng dòng nhật ký ở bước 2 →
+26 / 30 / 27 điều khoản, app đang mở nhận 83 điều khoản qua đồng bộ → chạy lại "Thêm: không có"; quên `migrateSchema` → trigger nền tự nạp;
+chuẩn đã có dòng (kể cả đã ngừng) không nạp lại. `tests/server/coverage.test.mjs`: sheet Phủ ISO 14001 / 45001 / 50001 khớp công thức
+Excel (COUNTIF trên cột khóa ẩn), 6.1.2 gồm 6.1.2.1, cột H không lẫn G / I, N7 = tổng bốn chuẩn = ô trang chủ, mã không khớp điều khoản;
+ngoài repo đã mở file xuất bằng **LibreOffice** cho tính lại công thức: 100 dòng phủ của 5 sheet khớp app, N7 khớp. `iaudit.test.mjs`:
+chương trình mới mặc định 5 chuẩn, phủ hết mới gửi duyệt, duyệt, Trạng thái hệ thống `phủ ISO 9001 11/11 · ISO 14001 26/26 · …`, báo cáo
+chương trình có 5 mục phủ + ô số từng chuẩn, kế hoạch đợt ghi "ISO 14001 8.2", chương trình cũ không ghi chuẩn = ISO 9001 + BRCGS.
+`import.test.mjs`: tệp chỉ có ISO 9001 + BRCGS không đụng 3 chuẩn mới; xuất → nhập lại Không đổi (kể cả nhóm); sửa sheet Phủ ISO 50001
+(bỏ 8.3, 7.4 bắt buộc) → nhập lại sửa 1 · ngừng 1, nhóm giữ nguyên. `report.test.mjs`: báo cáo Phủ mọi chuẩn = 5 mục, ô số từng chuẩn,
+cột H trong ghi chú; app cũ gửi BOTH vẫn ra mọi chuẩn. `mreview.test.mjs`: dòng phủ ISO 14001 / 45001 / 50001. `reset.test.mjs`: Xóa cả
+danh mục thì nạp lại ngay 3 chuẩn. Giao diện: `tests/ui/coverage.test.mjs` iPhone 390×844 — ô trang chủ 49 (= 1 + 14 + 18 + 16), 5 thẻ
+vừa một hàng, thẻ 14001: 26 điều khoản, khung "1 mã ở cột ISO 14001 (cột H) không khớp…", 6.1.2 → Mở trong Danh mục → lọc "ISO 14001:
+6.1.2" đúng 1 biểu; app 4.4 với máy chủ 4c (chỉ 2 thẻ, lập chương trình chỉ 2 chuẩn, báo cáo gửi BOTH); `tests/ui/iaudit.test.mjs` iPhone
+lập chương trình 5 chuẩn → Không áp dụng phần còn thiếu từng chuẩn → duyệt → in chương trình có Phủ ISO 14001 / 45001 / 50001 → Trạng thái
+hệ thống; máy tính: một đợt chọn đủ 100 điều khoản của 5 chuẩn. Cả bộ: 114 test máy chủ + 52 test giao diện đạt.
+
+Không kiểm được ở đâu cả trước khi dùng thật: Microsoft Excel mở file (đã kiểm bằng LibreOffice), iPhone thật (đã kiểm khung 390×844).
+Danh sách điều khoản và cột "Bắt buộc lưu hồ sơ" của ba chuẩn do Claude lập theo tiêu chuẩn (điều khoản yêu cầu duy trì / lưu giữ thông
+tin dạng văn bản) — anh / Thư ký ISO xem lại, muốn sửa thì làm qua file Excel tổng như trên.
+
+## CẬP NHẬT LÊN BẢN 4c (1.0.0-d4.3, Xem xét lãnh đạo, Xóa sạch dữ liệu) — đã xong (anh xác nhận 14/11/2026)
 
 Bản 4c **thêm 1 sheet** (`MgmtReviews`) và **1 cài đặt** (`mreview_form_code` = BM-ISO-05-01) → chạy `migrateSchema`. **Không** hỏi quyền
 Google mới, **không** cần `installTriggers`. App 4c vẫn chạy với máy chủ 4b (chưa có ô Xem xét lãnh đạo, chưa có Xóa sạch).

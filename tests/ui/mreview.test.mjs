@@ -171,7 +171,7 @@ test('iPhone: Lập cuộc xem xét → số liệu tự gom → Ghi Đã họp 
     // 8. Trạng thái hệ thống
     await go(page, '#/admin/status');
     await bodyHas(page, /Gần nhất XL-26-01 họp 12\/11\/2026 · đang chuẩn bị 0 · quyết định đang làm 1/);
-    assert.match(await page.textContent('.view'), /1\.0\.13/);
+    assert.match(await page.textContent('.view'), /1\.0\.14/);
     assert.match(await page.textContent('.view'), /Chưa xóa sạch lần nào/);
     assert.deepEqual(app.consoleErrors.filter((e) => !/favicon|net::ERR/.test(e)), []);
   } finally {

@@ -71,7 +71,7 @@ function ensureIauditSchema_() {
 
 function auditStdsOf_(pg) {
   var s = deptList_(pg && pg.stds);
-  return s.length ? s.filter(function (x) { return AUDIT_STDS_.indexOf(x) >= 0; }) : AUDIT_STDS_.slice();
+  return s.length ? AUDIT_STDS_.filter(function (x) { return s.indexOf(x) >= 0; }) : AUDIT_STDS_LEGACY_.slice();
 }
 
 /** Mã chương trình: DG-26 */
@@ -946,8 +946,9 @@ var AUDIT_FORMS_ = ['PLAN', 'CHECKLIST', 'REPORT'];
 var AUDIT_FORM_SETTING_ = { PROGRAM: 'audit_program_form_code', PLAN: 'audit_plan_form_code', CHECKLIST: 'audit_checklist_form_code', REPORT: 'audit_report_form_code' };
 var AUDIT_FORM_SLUG_ = { PROGRAM: 'chuong-trinh-danh-gia-noi-bo', PLAN: 'ke-hoach-danh-gia', CHECKLIST: 'checklist-danh-gia', REPORT: 'bao-cao-danh-gia' };
 
+/** Nhãn điều khoản: ISO 9001 chỉ số điều khoản (như trước), chuẩn khác có tên chuẩn đứng trước — "ISO 14001 · 6.1.2", "BRCGS · …" */
 function auditClauseLabel_(cl) {
-  return cl ? (cl.std === 'BRC' ? 'BRCGS · ' : '') + cl.key : '';
+  return cl ? (cl.std === 'ISO9001' ? '' : (STD_SHORT_[cl.std] || cl.std) + ' · ') + cl.key : '';
 }
 
 function reportAuditRow_(a, dir, clMap, depts, today) {
@@ -1085,7 +1086,7 @@ function layoutAudit_(snap) {
       };
     }
     var teamRows = r.team.map(function (t) { return [labNl_(t.r === 'L' ? 'aud.role.L' : 'aud.role.M'), t.n, t.d || '']; });
-    var clRows = r.clauses.map(function (c) { return [c.std === 'BRC' ? 'BRCGS' : 'ISO 9001', c.key, biNl_(c.name_vi, c.name_zh)]; });
+    var clRows = r.clauses.map(function (c) { return [STD_SHORT_[c.std] || c.std, c.key, biNl_(c.name_vi, c.name_zh)]; });
     var secs = [
       { heading: lab_('rpt.sec.aud_info'), kv: head },
       { heading: lab_('rpt.sec.aud_team'), table: rptTable_([labNl_('aud.role'), labNl_('aud.member_name'), labNl_('aud.member_dept')], ['text', 'text', 'code'], teamRows, null) },
@@ -1110,7 +1111,7 @@ function layoutAudit_(snap) {
   var aRows = d.audits.map(function (r2) {
     aTones.push(['', '', '', '', '', '', r2.late ? 'red' : '', r2.late ? 'red' : (AUDIT_TONE_[r2.state] || '')]);
     return [r2.code || '—', auditMonthText_(r2.plan_month), r2.dept_code, biNl_(r2.title_vi, r2.title_zh),
-      r2.clauses.map(function (c) { return (c.std === 'BRC' ? 'BRCGS: ' : '') + c.key; }).join('; '), auditTeamText_(r2.team), dmy_(r2.audit_date),
+      r2.clauses.map(function (c) { return (c.std === 'ISO9001' ? '' : (STD_SHORT_[c.std] || c.std) + ': ') + c.key; }).join('; '), auditTeamText_(r2.team), dmy_(r2.audit_date),
       labNl_('aud.state.' + r2.state) + (r2.late ? '\n' + lab_('aud.late') : '') + (r2.state === 'CANCELLED' && r2.cancel_reason ? '\n' + r2.cancel_reason : '')];
   });
   var secs2 = [
@@ -1161,7 +1162,7 @@ function iauditHealth_() {
   var cov = auditCoverageOf_(pg, audits);
   var part = auditStdsOf_(pg).map(function (s) {
     var list = cov.filter(function (c) { return c.std === s; });
-    return (s === 'BRC' ? 'BRCGS ' : 'ISO 9001 ') + list.filter(function (c) { return c.state !== 'MISSING'; }).length + '/' + list.length;
+    return (STD_SHORT_[s] || s) + ' ' + list.filter(function (c) { return c.state !== 'MISSING'; }).length + '/' + list.length;
   }).join(' · ');
   var cnt = function (st) { return audits.filter(function (a) { return a.state === st; }).length; };
   var late = audits.filter(function (a) { return auditLate_(a, today); }).length;

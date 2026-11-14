@@ -1,13 +1,17 @@
 // File Excel tổng (mục 6 đặc tả): xuất danh mục đúng khuôn để xuất → sửa → nhập lại được (báo "Không đổi"), đọc tệp người dùng chọn.
-// 5 sheet: Tổng hợp - 汇总 (D4 = số ngày cho phép trễ) · Danh mục tổng - 总清单 (tiêu đề dòng 4, dữ liệu từ dòng 5, công thức dòng 5–600,
-// cố định ô D5) · Phủ ISO 9001 - 条款覆盖 · Phủ BRCGS - BRCGS覆盖 · Hướng dẫn - 说明; thêm sheet _meta (template_key, version, dataset_epoch).
+// Sheet: Tổng hợp - 汇总 (D4 = số ngày cho phép trễ) · Danh mục tổng - 总清单 (tiêu đề dòng 4, dữ liệu từ dòng 5, công thức dòng 5–600,
+// cố định ô D5) · Phủ ISO 9001 - 条款覆盖 · Phủ ISO 14001 / 45001 / 50001 (thêm 14/11/2026, cột khóa ẩn AB / AC / AD) · Phủ BRCGS - BRCGS覆盖 ·
+// Hướng dẫn - 说明; thêm sheet _meta (template_key, version, dataset_epoch). Tệp không có sheet Phủ của một chuẩn → điều khoản chuẩn đó giữ nguyên.
 // Hàm thuần (nhận đối tượng XLSX), dùng được cả trong test Node.
-import { isoMatch, brcMatch } from './coverage.js';
+import { isoMatch, brcMatch, STD_COL, STD_SHORT } from './coverage.js';
 
 export const SHEET = {
   summary: 'Tổng hợp - 汇总',
   catalog: 'Danh mục tổng - 总清单',
   iso: 'Phủ ISO 9001 - 条款覆盖',
+  iso14001: 'Phủ ISO 14001 - 条款覆盖',
+  iso45001: 'Phủ ISO 45001 - 条款覆盖',
+  iso50001: 'Phủ ISO 50001 - 条款覆盖',
   brc: 'Phủ BRCGS - BRCGS覆盖',
   guide: 'Hướng dẫn - 说明'
 };
@@ -15,6 +19,14 @@ export const TEMPLATE_KEY = 'iso_catalog';
 export const TEMPLATE_VERSION = '1';
 const HEAD_ROW = 4, FIRST = 5, LAST = 600;
 const CAT = `'${SHEET.catalog}'`;
+/** Các chuẩn ISO: sheet Phủ, cột khóa ẩn của Danh mục tổng (";"&SUBSTITUTE(cột," ","")&";"), phiên bản tiêu chuẩn ghi ở chú thích */
+export const ISO_SHEETS = [
+  { std: 'ISO9001', sheet: SHEET.iso, key: 'AA', ed: 'ISO 9001:2015', zh: '质量' },
+  { std: 'ISO14001', sheet: SHEET.iso14001, key: 'AB', ed: 'ISO 14001:2015', zh: '环境' },
+  { std: 'ISO45001', sheet: SHEET.iso45001, key: 'AC', ed: 'ISO 45001:2018', zh: '职业健康安全' },
+  { std: 'ISO50001', sheet: SHEET.iso50001, key: 'AD', ed: 'ISO 50001:2018', zh: '能源' }
+];
+const KEY_COLS = ISO_SHEETS.map((x) => x.key);
 
 /** Cột A–AA của Danh mục tổng như file DM-ISO-01: [chữ cột, tiêu đề (hai dòng), độ rộng, kiểu ô dữ liệu] */
 export const COLS = [
@@ -44,7 +56,10 @@ export const COLS = [
   ['X', 'Ngày hồ sơ gần nhất\n最近记录日期', 11.5, 'input_date'],
   ['Y', 'Tình trạng hồ sơ\n记录状态', 15, 'cell'],
   ['Z', 'Ghi chú / liên quan\n备注/关联', 30, 'input_left'],
-  ['AA', 'khóa ISO 9001 (ẩn)', 6, 'cell']
+  ['AA', 'khóa ISO 9001 (ẩn)', 6, 'cell'],
+  ['AB', 'khóa ISO 14001 (ẩn)', 6, 'cell'],
+  ['AC', 'khóa ISO 45001 (ẩn)', 6, 'cell'],
+  ['AD', 'khóa ISO 50001 (ẩn)', 6, 'cell']
 ];
 
 export const WHERE_TEXT = {
@@ -111,7 +126,7 @@ export function buildCatalogWorkbook(X, data) {
   put(sum, 'D4', N(data.grace ?? 3));
   put(sum, 'E4', S('ngày · 天'));
   const heads6 = [['B', 'Tổng số biểu\n表单总数'], ['D', 'Đã ban hành\n已发布'], ['F', '% ban hành\n发布率'], ['H', 'In từ app\n(M&E + Checksheet)\n由App打印'],
-    ['J', 'Ưu tiên 1 chưa ban hành\n优先级1未发布'], ['L', 'Hồ sơ quá hạn\n逾期记录'], ['N', 'Điều khoản ISO 9001 bắt buộc chưa có biểu\nISO 9001强制条款缺表单'], ['P', 'Chủ đề BRCGS chưa có biểu\nBRCGS主题缺表单']];
+    ['J', 'Ưu tiên 1 chưa ban hành\n优先级1未发布'], ['L', 'Hồ sơ quá hạn\n逾期记录'], ['N', 'Điều khoản ISO bắt buộc chưa có biểu\n(9001 · 14001 · 45001 · 50001)\nISO强制条款缺表单'], ['P', 'Chủ đề BRCGS chưa có biểu\nBRCGS主题缺表单']];
   heads6.forEach(([c, t]) => put(sum, c + '6', S(t)));
   put(sum, 'B7', F(`COUNTA(${rng('B')})`, 'n'));
   put(sum, 'D7', F(`COUNTIF(${rng('T')},"●")`, 'n'));
@@ -119,7 +134,7 @@ export function buildCatalogWorkbook(X, data) {
   put(sum, 'H7', F(`COUNTIF(${rng('R')},"M&E*")+COUNTIF(${rng('R')},"Checksheet*")`, 'n'));
   put(sum, 'J7', F(`COUNTIFS(${rng('Q')},1,${rng('T')},"<>●",${rng('T')},"<>✕")`, 'n'));
   put(sum, 'L7', F(`COUNTIF(${rng('Y')},"Quá hạn*")`, 'n'));
-  put(sum, 'N7', F(`COUNTIF('${SHEET.iso}'!$G$5:$G$60,"Thiếu*")`, 'n'));
+  put(sum, 'N7', F(ISO_SHEETS.map((x) => `COUNTIF('${x.sheet}'!$G$5:$G$60,"Thiếu*")`).join('+'), 'n'));
   put(sum, 'P7', F(`COUNTIF('${SHEET.brc}'!$G$5:$G$60,"Chưa*")`, 'n'));
   put(sum, 'B8', S('Theo bộ phận · 按部门'));
   const heads9 = ['Bộ phận\n部门', 'Số biểu\n表单数', 'M&E\n机电App', 'Checksheet\n点检表', 'Một phần app\n部分App', 'Đề xuất Checksheet\n建议点检表', 'Làm tay → App ISO\n手工→ISO App',
@@ -203,17 +218,17 @@ export function buildCatalogWorkbook(X, data) {
     }
     // Công thức như file gốc (dòng 5–600 đều có để thêm dòng mới vẫn được tính)
     put(ws, 'Y' + r, F(`IF(B${r}="","",IF(T${r}="✕","Không áp dụng · 不适用",IF(W${r}="","Khi phát sinh · 发生时记录",IF(X${r}="","Chưa có hồ sơ · 暂无记录",IF(TODAY()-X${r}<=W${r}+${grace},"Đúng hạn · 按期","Quá hạn · 逾期")))))`));
-    put(ws, 'AA' + r, F(`";"&SUBSTITUTE(G${r}," ","")&";"`));
+    ISO_SHEETS.forEach((x) => put(ws, x.key + r, F(`";"&SUBSTITUTE(${STD_COL[x.std]}${r}," ","")&";"`)));
   }
-  ws['!ref'] = `A1:AA${LAST}`;
-  ws['!cols'] = COLS.map(([c, , w]) => (c === 'AA' ? { wch: w, hidden: true } : { wch: w }));
+  ws['!ref'] = `A1:AD${LAST}`;
+  ws['!cols'] = COLS.map(([c, , w]) => (KEY_COLS.includes(c) ? { wch: w, hidden: true } : { wch: w }));
   merges(ws, ['A1:Z1', 'A2:H2', 'I2:Z2']);
   X.utils.book_append_sheet(wb, ws, SHEET.catalog);
   const catH = { 1: 42, 2: 39.75, 3: 6, 4: 51.75 };
   for (let r = FIRST; r <= lastRow; r++) catH[r] = 66;
   polish[2] = {
     freeze: 'D5',
-    styles: [['A1:A1', 'title_c'], ['A2:A2', 'note'], ['I2:I2', 'note'], ['A4:AA4', 'head', true],
+    styles: [['A1:A1', 'title_c'], ['A2:A2', 'note'], ['I2:I2', 'note'], ['A4:AD4', 'head', true],
       ...COLS.map(([c, , , kind]) => [`${c}${FIRST}:${c}${Math.max(lastRow, FIRST + 49)}`, kind, true])],
     rowHeights: catH,
     validations: [
@@ -230,42 +245,47 @@ export function buildCatalogWorkbook(X, data) {
     ]
   };
 
-  /* ---- Phủ ISO 9001 ---- */
+  /* ---- Phủ ISO 9001 / 14001 / 45001 / 50001 ---- */
   const cls = (data.clauses || []).filter((c) => c.active !== false).sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
-  const iso = cls.filter((c) => c.std === 'ISO9001');
   const brc = cls.filter((c) => c.std === 'BRC');
   const statusIso = (r) => `IF(D${r}=0,IF(LEFT(C${r},2)="Có","Thiếu biểu – bắt buộc · 缺表单（强制）","Chưa có biểu · 无表单"),IF(E${r}=0,"Có biểu, chưa ban hành · 有表单未发布","Đã có · 已覆盖"))`;
-  const wi = {};
-  put(wi, 'A1', S('PHỦ ĐIỀU KHOẢN ISO 9001 · ISO 9001条款覆盖'));
-  put(wi, 'A2', S('Đếm số biểu trong Danh mục tổng có ghi điều khoản ở cột ISO 9001 (kể cả điều khoản con, ví dụ 7.1.5 gồm 7.1.5.2). "Bắt buộc lưu hồ sơ" = ISO 9001:2015 yêu cầu duy trì hoặc lưu giữ thông tin dạng văn bản. Cột "Biểu liên quan" là danh sách lúc xuất file; số đếm tự cập nhật.\n'
-    + '统计总清单中ISO 9001列注明该条款（含子条款）的表单数。“强制保存记录”＝ISO 9001:2015要求保持或保留成文信息。“相关表单”为导出时清单，计数自动更新。'));
-  ['Điều khoản\n条款', 'Nội dung\n内容', 'Bắt buộc lưu hồ sơ\n强制保存记录', 'Số biểu\n表单数', '● Đã ban hành\n已发布', 'In từ app\n由App打印', 'Trạng thái\n状态', 'Biểu liên quan (lúc xuất file)\n相关表单（导出时）']
-    .forEach((t, i) => put(wi, X.utils.encode_col(i) + '4', S(t)));
-  iso.forEach((c, i) => {
-    const r = 5 + i;
-    const k = `"*;"&$A${r}&"*"`;
-    put(wi, 'A' + r, S(c.key));
-    put(wi, 'B' + r, S(bi2(c.name_vi, c.name_zh)));
-    put(wi, 'C' + r, S(c.mandatory_record ? 'Có · 是' : '–'));
-    put(wi, 'D' + r, F(`COUNTIF(${rng('AA')},${k})`, 'n'));
-    put(wi, 'E' + r, F(`COUNTIFS(${rng('AA')},${k},${rng('T')},"●")`, 'n'));
-    put(wi, 'F' + r, F(`COUNTIFS(${rng('AA')},${k},${rng('R')},"M&E*")+COUNTIFS(${rng('AA')},${k},${rng('R')},"Checksheet*")`, 'n'));
-    put(wi, 'G' + r, F(statusIso(r)));
-    put(wi, 'H' + r, S(items.filter((it) => isoMatch(it, c.key)).map((it) => it.code).join(', ')));
-  });
-  const isoLast = 4 + Math.max(1, iso.length);
-  wi['!ref'] = `A1:H${isoLast}`;
-  wi['!cols'] = [9, 34, 11, 8, 10, 9, 22, 70].map((w) => ({ wch: w }));
-  merges(wi, ['A1:H1', 'A2:H2']);
-  X.utils.book_append_sheet(wb, wi, SHEET.iso);
   const covCf = (last) => [{ sqref: `G5:G${last}`, rules: [{ op: 'expr', formula: 'LEFT(G5,5)="Thiếu"', style: 'bad' }, { op: 'expr', formula: 'LEFT(G5,5)="Chưa "', style: 'warn' },
     { op: 'expr', formula: 'LEFT(G5,6)="Có biể"', style: 'pale' }, { op: 'expr', formula: 'LEFT(G5,5)="Đã có"', style: 'good' }] }];
-  polish[3] = {
-    freeze: 'C5',
-    styles: [['A1:A1', 'title'], ['A2:A2', 'note'], ['A4:H4', 'head', true], [`A5:G${isoLast}`, 'cell', true], [`B5:B${isoLast}`, 'cell_left', true], [`H5:H${isoLast}`, 'cell_left', true]],
-    rowHeights: { 1: 24, 2: 39.75, 4: 39.75 },
-    conditional: covCf(isoLast)
-  };
+  let sheetNo = 3;
+  ISO_SHEETS.forEach((x) => {
+    const iso = cls.filter((c) => c.std === x.std);
+    const name = STD_SHORT[x.std];
+    const col = STD_COL[x.std];
+    const wi = {};
+    put(wi, 'A1', S(`PHỦ ĐIỀU KHOẢN ${name} · ${name}条款覆盖`));
+    put(wi, 'A2', S(`Đếm số biểu trong Danh mục tổng có ghi điều khoản ở cột ${name} (cột ${col}, kể cả điều khoản con, ví dụ 7.1.5 gồm 7.1.5.2). "Bắt buộc lưu hồ sơ" = ${x.ed} yêu cầu duy trì hoặc lưu giữ thông tin dạng văn bản. Cột "Biểu liên quan" là danh sách lúc xuất file; số đếm tự cập nhật.\n`
+      + `统计总清单中${name}列（${col}列）注明该条款（含子条款）的表单数。“强制保存记录”＝${x.ed}要求保持或保留成文信息。“相关表单”为导出时清单，计数自动更新。`));
+    ['Điều khoản\n条款', 'Nội dung\n内容', 'Bắt buộc lưu hồ sơ\n强制保存记录', 'Số biểu\n表单数', '● Đã ban hành\n已发布', 'In từ app\n由App打印', 'Trạng thái\n状态', 'Biểu liên quan (lúc xuất file)\n相关表单（导出时）']
+      .forEach((t, i) => put(wi, X.utils.encode_col(i) + '4', S(t)));
+    iso.forEach((c, i) => {
+      const r = 5 + i;
+      const k = `"*;"&$A${r}&"*"`;
+      put(wi, 'A' + r, S(c.key));
+      put(wi, 'B' + r, S(bi2(c.name_vi, c.name_zh)));
+      put(wi, 'C' + r, S(c.mandatory_record ? 'Có · 是' : '–'));
+      put(wi, 'D' + r, F(`COUNTIF(${rng(x.key)},${k})`, 'n'));
+      put(wi, 'E' + r, F(`COUNTIFS(${rng(x.key)},${k},${rng('T')},"●")`, 'n'));
+      put(wi, 'F' + r, F(`COUNTIFS(${rng(x.key)},${k},${rng('R')},"M&E*")+COUNTIFS(${rng(x.key)},${k},${rng('R')},"Checksheet*")`, 'n'));
+      put(wi, 'G' + r, F(statusIso(r)));
+      put(wi, 'H' + r, S(items.filter((it) => isoMatch(it, c.key, x.std)).map((it) => it.code).join(', ')));
+    });
+    const isoLast = 4 + Math.max(1, iso.length);
+    wi['!ref'] = `A1:H${isoLast}`;
+    wi['!cols'] = [9, 34, 11, 8, 10, 9, 22, 70].map((w) => ({ wch: w }));
+    merges(wi, ['A1:H1', 'A2:H2']);
+    X.utils.book_append_sheet(wb, wi, x.sheet);
+    polish[sheetNo++] = {
+      freeze: 'C5',
+      styles: [['A1:A1', 'title'], ['A2:A2', 'note'], ['A4:H4', 'head', true], [`A5:G${isoLast}`, 'cell', true], [`B5:B${isoLast}`, 'cell_left', true], [`H5:H${isoLast}`, 'cell_left', true]],
+      rowHeights: { 1: 24, 2: 39.75, 4: 39.75 },
+      conditional: covCf(isoLast)
+    };
+  });
 
   /* ---- Phủ BRCGS ---- */
   const wbr = {};
@@ -291,7 +311,7 @@ export function buildCatalogWorkbook(X, data) {
   wbr['!cols'] = [24, 26, 2, 8, 10, 9, 22, 18, 60].map((w, i) => (i === 2 ? { wch: w, hidden: true } : { wch: w }));
   merges(wbr, ['A1:I1', 'A2:I2']);
   X.utils.book_append_sheet(wb, wbr, SHEET.brc);
-  polish[4] = {
+  polish[sheetNo++] = {
     freeze: 'C5',
     styles: [['A1:A1', 'title'], ['A2:A2', 'note'], ['A4:I4', 'head', true], [`A5:I${brcLast}`, 'cell_left', true], [`C5:H${brcLast}`, 'cell', true]],
     rowHeights: { 1: 24, 2: 39.75, 4: 39.75 },
@@ -303,9 +323,9 @@ export function buildCatalogWorkbook(X, data) {
   put(gd, 'A1', S('HƯỚNG DẪN SỬ DỤNG DANH MỤC TỔNG · 总清单使用说明'));
   put(gd, 'A3', S('Mục\n项目')); put(gd, 'B3', S('Nội dung\n内容'));
   const guide = [
-    ['Mục đích\n目的', 'Một danh mục cho toàn nhà máy: biết biểu nào đã có, biểu nào in từ app M&E / Checksheet nên không cần soạn lại, biểu nào còn thiếu theo điều khoản ISO 9001 và BRCGS Packaging; theo dõi hồ sơ có được ghi đúng hạn không. Tệp này xuất từ app ISO; sửa xong nhập lại vào app (Excel → Nhập lô).\n全厂统一清单：掌握已建立的表单、可由机电App/点检表打印而无需另行编制的表单、按ISO 9001及BRCGS包装材料条款仍欠缺的表单；跟踪记录是否按期填写。本文件由ISO系统导出，修改后可重新导入。'],
+    ['Mục đích\n目的', 'Một danh mục cho toàn nhà máy: biết biểu nào đã có, biểu nào in từ app M&E / Checksheet nên không cần soạn lại, biểu nào còn thiếu theo điều khoản ISO 9001, ISO 14001, ISO 45001, ISO 50001 và BRCGS Packaging; theo dõi hồ sơ có được ghi đúng hạn không. Tệp này xuất từ app ISO; sửa xong nhập lại vào app (Excel → Nhập lô).\n全厂统一清单：掌握已建立的表单、可由机电App/点检表打印而无需另行编制的表单、按ISO 9001、ISO 14001、ISO 45001、ISO 50001及BRCGS包装材料条款仍欠缺的表单；跟踪记录是否按期填写。本文件由ISO系统导出，修改后可重新导入。'],
     ['Cấu trúc mã\n编号规则', 'BM-<bộ phận>-xx-yy: xx = nhóm, yy = số thứ tự. Mã bộ phận: ' + deptList.map((d) => `${d.dept_code} = ${dept1(d)}`).join(' · ') + '.\nBM-<部门>-xx-yy：xx＝类别，yy＝序号。'],
-    ['Ô cần nhập\n填写栏', 'Nền vàng ở trang Danh mục tổng: Tình trạng biểu, Lần ban hành, Ngày ban hành, Chu kỳ hồ sơ (ngày), Ngày hồ sơ gần nhất, Ghi chú. Trang Tổng hợp: ô D4 (số ngày cho phép trễ, mặc định 3). Các cột khác là nội dung danh mục; trang Tổng hợp và hai trang Phủ tự tính.\n总清单黄色栏：表单状态、版次、发布日期、记录周期（天）、最近记录日期、备注。汇总页：D4（宽限天数，默认3）。其余为清单内容；汇总页及两张覆盖页自动计算。'],
+    ['Ô cần nhập\n填写栏', 'Nền vàng ở trang Danh mục tổng: Tình trạng biểu, Lần ban hành, Ngày ban hành, Chu kỳ hồ sơ (ngày), Ngày hồ sơ gần nhất, Ghi chú. Trang Tổng hợp: ô D4 (số ngày cho phép trễ, mặc định 3). Các cột khác là nội dung danh mục; trang Tổng hợp và các trang Phủ tự tính. Danh sách điều khoản ở các trang Phủ sửa được (thêm dòng, sửa tên, cột Bắt buộc) rồi nhập lại.\n总清单黄色栏：表单状态、版次、发布日期、记录周期（天）、最近记录日期、备注。汇总页：D4（宽限天数，默认3）。其余为清单内容；汇总页及各覆盖页自动计算。覆盖页的条款清单可修改（增行、改名称、强制栏）后重新导入。'],
     ['Tình trạng biểu\n表单状态', '○ chưa có · ◐ đang soạn · ● đã ban hành · ✕ không áp dụng.\n○ 未建立 · ◐ 编制中 · ● 已发布 · ✕ 不适用。'],
     ['Tình trạng hồ sơ\n记录状态', 'Tự tính: Đúng hạn / Quá hạn (so Ngày hồ sơ gần nhất với hôm nay, theo Chu kỳ + số ngày cho phép trễ); Chưa có hồ sơ; Khi phát sinh (biểu không có chu kỳ); Không áp dụng. Chu kỳ hồ sơ (ngày): 1 ngày · 7 tuần · 31 tháng · 92 quý · 183 nửa năm · 366 năm.\n自动计算：按期/逾期；暂无记录；发生时记录；不适用。周期（天）：1日·7周·31月·92季·183半年·366年。'],
     ['Nơi làm\n完成方式', 'M&E / Checksheet: in từ app, không soạn biểu giấy. Một phần: app làm được một phần, xem cột "In ở đâu / còn thiếu". Đề xuất Checksheet: biểu kiểm tra định kỳ nên làm bằng app Checksheet. Làm tay → App ISO: nộp hồ sơ bằng ảnh / tệp trong app ISO.\n机电App/点检表：由App打印。部分：App可完成部分。建议点检表：定期检查类表单建议用点检表App。手工→ISO App：在ISO App中以照片/文件提交记录。'],
@@ -324,7 +344,7 @@ export function buildCatalogWorkbook(X, data) {
   X.utils.book_append_sheet(wb, gd, SHEET.guide);
   const gH = { 1: 21.6, 3: 24.6 };
   for (let r = 4; r <= gLast; r++) gH[r] = 60;
-  polish[5] = { styles: [['A1:A1', 'title'], ['A3:B3', 'head', true], [`A4:A${gLast}`, 'label', true], [`B4:B${gLast}`, 'cell_left', true], ['F4:F4', 'side_head'], ['F5:F10', 'cell_left', true]], rowHeights: gH };
+  polish[sheetNo++] = { styles: [['A1:A1', 'title'], ['A3:B3', 'head', true], [`A4:A${gLast}`, 'label', true], [`B4:B${gLast}`, 'cell_left', true], ['F4:F4', 'side_head'], ['F5:F10', 'cell_left', true]], rowHeights: gH };
 
   const meta = X.utils.aoa_to_sheet([['template_key', TEMPLATE_KEY], ['version', TEMPLATE_VERSION], ['dataset_epoch', data.epoch || ''], ['exported_at', data.exported_at || '']]);
   X.utils.book_append_sheet(wb, meta, '_meta');
@@ -386,8 +406,9 @@ function colBy(X, ws, hr, re, skip = []) {
 /** "Có · 是" (file DM-ISO-01, Excel đếm theo LEFT(C,2)="Có"), "Có", "x", "✓"… → true; "–", trống → false */
 const yes = (v) => /^(có|co\b|yes|y$|x$|✓|✔|true$|1$|是|须|必须)/i.test(String(v || '').trim());
 
-/** Điều khoản ISO 9001 từ sheet Phủ ISO 9001: cột Điều khoản, Tên, Nhóm, Bắt buộc lưu hồ sơ; dòng không có số điều khoản = tên nhóm */
-function readIso(X, ws) {
+/** Điều khoản ISO từ sheet Phủ ISO 9001 / 14001 / 45001 / 50001: cột Điều khoản, Tên, Nhóm, Bắt buộc lưu hồ sơ; dòng không có số điều
+ *  khoản = tên nhóm. Sheet không có cột nhóm, dòng nhóm (file xuất từ app) → group không ghi: máy chủ giữ nhóm đang có. */
+function readIso(X, ws, std = 'ISO9001') {
   if (!ws || !ws['!ref']) return [];
   const hr = headerRow(X, ws, /điều khoản|条款/);
   if (hr < 0) return [];
@@ -398,13 +419,16 @@ function readIso(X, ws) {
   const cMand = colBy(X, ws, hr, /bắt buộc|须|必须|必需/, [cKey, cName, cGroup]);
   const out = [];
   let grp = '';
+  let grpSeen = cGroup >= 0;
   for (let r = hr + 1; r <= range.e.r; r++) {
     const v = (c) => (c < 0 ? '' : cellValue(ws[X.utils.encode_cell({ r, c })]).trim());
     const key = v(cKey);
     if (cGroup >= 0 && v(cGroup)) grp = v(cGroup);
     if (!key) continue;
-    if (!/^\d+(\.\d+)*$/.test(key)) { grp = key; continue; }
-    out.push({ std: 'ISO9001', key, name: v(cName), group: grp, mandatory_record: yes(v(cMand)), sort_order: out.length + 1 });
+    if (!/^\d+(\.\d+)*$/.test(key)) { grp = key; grpSeen = true; continue; }
+    const row = { std, key, name: v(cName), mandatory_record: yes(v(cMand)), sort_order: out.length + 1 };
+    if (grpSeen) row.group = grp;
+    out.push(row);
   }
   return out;
 }
@@ -458,7 +482,10 @@ export function parseCatalogWorkbook(X, wb) {
     });
     rows.push({ row_number: r + 1, cells });
   }
-  const clauses = readIso(X, findSheet(wb, SHEET.iso, /phủ iso|条款覆盖/)).concat(readBrc(X, findSheet(wb, SHEET.brc, /phủ brc|brcgs覆盖/)));
+  // ISO 9001: tên sheet cũ có thể chỉ "Phủ ISO …" / "…条款覆盖" — không nhầm với sheet 14001 / 45001 / 50001
+  const isoRe = { ISO9001: /phủ iso 9001|^(?!.*(14001|45001|50001)).*(phủ iso|条款覆盖)/, ISO14001: /phủ iso 14001|14001.*覆盖/,
+    ISO45001: /phủ iso 45001|45001.*覆盖/, ISO50001: /phủ iso 50001|50001.*覆盖/ };
+  const clauses = ISO_SHEETS.flatMap((x) => readIso(X, findSheet(wb, x.sheet, isoRe[x.std]), x.std)).concat(readBrc(X, findSheet(wb, SHEET.brc, /phủ brc|brcgs覆盖/)));
   const sum = findSheet(wb, SHEET.summary, /tổng hợp|汇总/);
   const d4raw = sum && sum.D4 ? sum.D4.v : null;
   const d4 = d4raw !== null && d4raw !== undefined && d4raw !== '' && isFinite(Number(d4raw)) ? Number(d4raw) : null;

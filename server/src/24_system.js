@@ -210,11 +210,17 @@ function healthRows_() {
     (scope.length ? ' — đổi ở Tài khoản → Quản trị → Bộ phận → Phạm vi áp dụng' : ''));
   add('items', items.length > 0, items.length, items.length ? '' : 'Excel → Nhập file Excel tổng');
   var cls = readRows_('Clauses').filter(function (c) { return c.active; });
-  var iso = cls.filter(function (c) { return c.std === 'ISO9001'; }).length, brc = cls.length - iso;
-  add('clauses', iso > 0 && brc > 0, 'ISO 9001: ' + iso + ' · BRCGS: ' + brc, iso && brc ? '' : 'Nhập file Excel tổng (sheet Phủ ISO 9001, Phủ BRCGS)');
   var cov = coverageCounts_(items, cls);
-  add('coverage', !cov.missing, 'ISO 9001: ' + cov.iso_covered + '/' + iso + ' điều khoản có biểu · bắt buộc chưa có biểu ' + cov.missing + ' · BRCGS: ' + cov.brc_covered + '/' + brc + ' chủ đề có biểu',
-    cov.missing ? 'Phủ điều khoản → Thiếu biểu – bắt buộc: ' + cov.missing_keys.join(', ') : '');
+  var bs = cov.by_std;
+  var noCl = CLAUSE_STDS_.filter(function (x) { return !bs[x].total; });
+  add('clauses', !noCl.length, CLAUSE_STDS_.map(function (x) { return STD_SHORT_[x] + ': ' + bs[x].total; }).join(' · '),
+    noCl.length ? (noCl.some(function (x) { return x === 'ISO9001' || x === 'BRC'; }) ? 'Nhập file Excel tổng (sheet Phủ ISO 9001, Phủ BRCGS)' : 'Chạy migrateSchema để nạp điều khoản ' +
+      noCl.map(function (x) { return STD_SHORT_[x]; }).join(', ')) : '');
+  add('coverage', !cov.missing, CLAUSE_STDS_.filter(function (x) { return bs[x].total; }).map(function (x) {
+    return STD_SHORT_[x] + ': ' + bs[x].covered + '/' + bs[x].total + (x === 'BRC' ? ' chủ đề có biểu' : ' điều khoản có biểu · bắt buộc chưa có biểu ' + bs[x].missing);
+  }).join(' · '), cov.missing ? 'Phủ điều khoản → Thiếu biểu – bắt buộc: ' + ISO_STDS_.filter(function (x) { return bs[x].missing; }).map(function (x) {
+    return STD_SHORT_[x] + ' ' + bs[x].missing_keys.join(', ');
+  }).join(' · ') : '');
   var th = tplHealth_(items);
   add('templates', th.ok, th.value, th.note);
   var heads = readRows_('Depts').filter(function (d) { return d.active && inScopeDept_(d.dept_code); });
@@ -322,25 +328,41 @@ function healthRows_() {
 
 /** Chạy từ trình soạn: in kết quả kiểm tra */
 /**
- * Phủ điều khoản (như js/coverage.js và hai trang Phủ của file Excel tổng): ISO 9001 — mã ở cột G (iso9001) bắt đầu bằng điều khoản;
- * BRCGS — cột K (brc_topics) chứa khóa chủ đề, không phân biệt hoa thường. Trả {iso_covered, missing, missing_keys, brc_covered}.
+ * Phủ điều khoản (như js/coverage.js và các trang Phủ của file Excel tổng): ISO — mã ở cột của chuẩn (G 9001, H 14001, I 45001,
+ * J 50001) bắt đầu bằng điều khoản; BRCGS — cột K (brc_topics) chứa khóa chủ đề, không phân biệt hoa thường.
+ * Trả {by_std: {STD: {total, covered, missing, missing_keys}}, iso_covered, brc_covered (ISO 9001, BRCGS), missing, missing_keys (mọi chuẩn ISO;
+ * chuẩn khác ISO 9001 ghi kèm tên chuẩn)}.
  */
 function coverageCounts_(items, clauses) {
-  var keys = items.map(function (it) { return ';' + String(it.iso9001 || '').split(' ').join('') + ';'; });
+  var keys = {};
+  ISO_STDS_.forEach(function (std) {
+    var f = STD_FIELD_[std];
+    keys[std] = items.map(function (it) { return ';' + String(it[f] || '').split(' ').join('') + ';'; });
+  });
   var topics = items.map(function (it) { return String(it.brc_topics || '').toLowerCase(); });
-  var out = { iso_covered: 0, missing: 0, missing_keys: [], brc_covered: 0 };
+  var by = {};
+  CLAUSE_STDS_.forEach(function (std) { by[std] = { total: 0, covered: 0, missing: 0, missing_keys: [] }; });
+  var out = { by_std: by, iso_covered: 0, missing: 0, missing_keys: [], brc_covered: 0 };
   clauses.forEach(function (c) {
-    if (c.active === false) return;
+    if (c.active === false || c.archived_at || !by[c.std]) return;
     var k = String(c.key);
-    if (c.std === 'ISO9001') {
-      var hit = keys.some(function (x) { return x.indexOf(';' + k) >= 0; });
-      if (hit) out.iso_covered++;
-      else if (c.mandatory_record) { out.missing++; out.missing_keys.push(k); }
-    } else if (c.std === 'BRC') {
+    var b = by[c.std];
+    b.total++;
+    var hit;
+    if (c.std === 'BRC') {
       var kl = k.toLowerCase();
-      if (topics.some(function (x) { return x.indexOf(kl) >= 0; })) out.brc_covered++;
+      hit = topics.some(function (x) { return x.indexOf(kl) >= 0; });
+    } else {
+      hit = keys[c.std].some(function (x) { return x.indexOf(';' + k) >= 0; });
+    }
+    if (hit) b.covered++;
+    else if (c.std !== 'BRC' && c.mandatory_record) {
+      b.missing++; b.missing_keys.push(k);
+      out.missing++; out.missing_keys.push((c.std === 'ISO9001' ? '' : STD_SHORT_[c.std] + ' ') + k);
     }
   });
+  out.iso_covered = by.ISO9001.covered;
+  out.brc_covered = by.BRC.covered;
   return out;
 }
 

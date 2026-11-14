@@ -487,16 +487,18 @@ export function ncrNeedsRecheck(n) { return (n && n.decision_json || []).some((l
 
 /** Máy chủ đã lên bản 4a (có iaudit.save trong danh sách quyền) — chưa có thì màn Đánh giá nội bộ báo cần cập nhật máy chủ */
 export async function auditOn() { return can('iaudit.save'); }
-export const AUDIT_STDS = ['ISO9001', 'BRC'];
+export const AUDIT_STDS = ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001', 'BRC'];
+/** Chương trình lập trước khi có ISO 14001/45001/50001 mà không ghi chuẩn: ISO 9001 + BRCGS (như máy chủ AUDIT_STDS_LEGACY_) */
+const AUDIT_STDS_LEGACY = ['ISO9001', 'BRC'];
 export const AUDIT_RESULTS = ['C', 'NC', 'OBS', 'NA'];
 /** Đánh giá viên (cờ cộng thêm ở Quản trị → Người dùng) */
 export function isAuditor() { return !!(session.user && session.user.auditor); }
 /** Xem đánh giá nội bộ: cấp 2+, Thư ký ISO, Đánh giá viên */
 export function canSeeAudits() { return isSecretary() || roleLevel() >= 2 || isAuditor(); }
-/** Chuẩn của chương trình (ISO9001, BRC) */
+/** Chuẩn của chương trình (ISO9001, ISO14001, ISO45001, ISO50001, BRC) */
 export function programStds(pg) {
   const s = String((pg && pg.stds) || '').split(',').map((x) => x.trim()).filter((x) => AUDIT_STDS.includes(x));
-  return s.length ? AUDIT_STDS.filter((x) => s.includes(x)) : AUDIT_STDS.slice();
+  return s.length ? AUDIT_STDS.filter((x) => s.includes(x)) : AUDIT_STDS_LEGACY.slice();
 }
 export function auditTeam(a) { return Array.isArray(a && a.team_json) ? a.team_json : []; }
 export function auditLead(a) { return auditTeam(a).find((t) => t && t.r === 'L') || null; }

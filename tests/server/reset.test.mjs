@@ -59,7 +59,7 @@ function seeded() {
   r = owner.write('capa.save', { capa_id: uuid(), source: 'EQUIPMENT', dept_code: 'CĐ', found_date: '2026-12-01', due_date: '2026-12-31', problem_vi: 'Máy nén khí dừng' });
   assert.equal(r.data.record.code, 'KP-2612-001');
   assert.equal(owner.write('ncr.save', { ncr_id: uuid(), stage: 'PROCESS', dept_code: 'SX', found_date: '2026-12-02', product_text: 'Hộp giấy', problem_vi: 'Lem màu' }).ok, true);
-  assert.equal(tk.write('iaudit.program.save', { program_id: uuid(), year: 2026 }).ok, true);
+  assert.equal(tk.write('iaudit.program.save', { program_id: uuid(), year: 2026, stds: ['ISO9001', 'BRC'] }).ok, true);
   assert.equal(tk.write('mreview.save', { review_id: uuid(), period_from: '2026-01-01', period_to: '2026-11-30' }).ok, true);
   // Báo cáo đã lưu (bản chụp + PDF)
   r = owner.write('report.save', { report_run_id: uuid(), kind: 'CATALOG', filters: {}, format: 'PDF' });
@@ -201,7 +201,12 @@ test('xóa cả danh mục: biểu, nhóm, điều khoản, tệp mẫu; ngày b
   const r = owner.write('system.reset', { mode: 'ALL', confirm: 'XÓA TOÀN BỘ' });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.ok(r.data.counts.Items > 0);
-  for (const s of ['Items', 'Groups', 'Clauses', 'TplFiles', 'Documents', 'Versions', 'Records']) assert.equal(rows(env, s).length, 0, s);
+  for (const s of ['Items', 'Groups', 'TplFiles', 'Documents', 'Versions', 'Records']) assert.equal(rows(env, s).length, 0, s);
+  // Điều khoản: ISO 9001, BRCGS xóa (có lại khi nhập file Excel tổng); ISO 14001 / 45001 / 50001 máy chủ nạp lại ngay, thế hệ dữ liệu mới
+  const cl = rows(env, 'Clauses');
+  assert.deepEqual(['ISO9001', 'BRC', 'ISO14001', 'ISO45001', 'ISO50001'].map((x) => cl.filter((c) => c.std === x).length), [0, 0, 26, 30, 27]);
+  assert.ok(cl.every((c) => c.dataset_epoch === env.props.getProperty('DATASET_EPOCH')));
+  assert.ok(r.data.counts.Clauses > 0);
   assert.equal(driveFile(env, tplFile).isTrashed(), true);
   assert.equal(env.g.setting_('records_start_date'), '');
   assert.ok(rows(env, 'Users').length >= 3, 'người dùng giữ nguyên');

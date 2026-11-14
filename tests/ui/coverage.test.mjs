@@ -20,8 +20,14 @@ function seeded() {
   // Thêm một điều khoản bắt buộc chưa có biểu (dữ liệu mẫu đều đã có biểu) để có dòng "Thiếu biểu – bắt buộc"
   env.g.systemWrite_([{ sheet: 'Clauses', mode: 'insert', row: env.g.cNewSystem_({ clause_id: 'ISO9001|6.2', std: 'ISO9001', key: '6.2', group_vi: 'Hoạch định', group_zh: '策划',
     name_vi: 'Mục tiêu chất lượng (mẫu)', name_zh: '质量目标（样例）', mandatory_record: true, sort_order: 12, active: true }) }], { action: 'test.clause', entity_type: 'SYSTEM' });
+  // ISO 14001 (máy chủ nạp sẵn 26 điều khoản): hai biểu ghi cột H — một mã khớp 6.1.2, một mã "6.1" không khớp điều khoản nào
+  env.g.dbReset_();
+  const set = (code, f) => { const it = env.rows('Items').find((x) => x.code === code); env.g.systemWrite_([{ sheet: 'Items', mode: 'update', row: { ...it, ...f }, rowNum: it.__row }]); env.g.dbReset_(); };
+  set('BM-SX-01-01', { iso14001: '6.1.2; 9.1.1' });
+  set('BM-SX-02-01', { iso14001: '6.1' });
   return env;
 }
+const ISO4 = ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001'];
 async function login(page, code = OWNER_CODE, pin = OWNER_PIN) {
   await page.waitForSelector('#emp', { timeout: 15000 });
   await page.fill('#emp', code);
@@ -73,12 +79,15 @@ test('iPhone: trang chủ đủ (Chờ bạn xử lý, 4 ô số, lịch tuần)
     // Chờ bạn xử lý: biểu quá hạn hồ sơ (owner nộp thay mọi bộ phận)
     const pend = await page.textContent('.pend-card');
     assert.match(pend, /\d+ biểu quá hạn hồ sơ/);
-    // 4 ô số: điều khoản bắt buộc thiếu biểu = số dòng MISSING
+    // 4 ô số: điều khoản bắt buộc thiếu biểu = số dòng MISSING của ISO 9001 + 14001 + 45001 + 50001
     const iso = expected(env, 'ISO9001');
     const sumIso = coverageSummary(iso);
     assert.equal(sumIso.MISSING, 1);
+    const missAll = ISO4.reduce((n, x) => n + coverageSummary(expected(env, x)).MISSING, 0);
+    assert.equal(missAll, 1 + 14 + 18 + 16, 'ISO 14001: 16 bắt buộc, 6.1.2 và 9.1.1 đã có biểu');
     const tile = page.locator('.stats .stat').nth(3);
-    assert.equal((await tile.locator('.stat-val').textContent()).trim(), String(sumIso.MISSING));
+    assert.equal((await tile.locator('.stat-val').textContent()).trim(), String(missAll));
+    assert.match(await tile.textContent(), /ISO 9001 · 14001 · 45001 · 50001/);
     assert.equal(await page.locator('.grid9 .tile[href="#/coverage"].soon').count(), 0, 'ô Phủ điều khoản không còn "Sắp có"');
     assert.ok(await noOverflow(page));
     assert.deepEqual(await noRawKeys(page), []);
@@ -102,6 +111,35 @@ test('iPhone: trang chủ đủ (Chờ bạn xử lý, 4 ô số, lịch tuần)
     assert.ok(await noOverflow(page));
     assert.deepEqual(await noRawKeys(page), []);
     await page.screenshot({ path: path.join(SHOTS, 'coverage-iphone.png'), fullPage: true });
+
+    // 5 thẻ chuẩn trên một hàng (iPhone: 9001 · 14001 · 45001 · 50001 · BRCGS, kèm số điều khoản)
+    assert.deepEqual((await page.locator('.cov-tabs .tab').allInnerTexts()).map((x) => x.replace(/\s+/g, ' ').trim()), ['9001 12', '14001 26', '45001 30', '50001 27', 'BRCGS 6']);
+    const tabsBox = await page.locator('.cov-tabs').boundingBox();
+    const lastTab = await page.locator('.cov-tabs .tab').last().boundingBox();
+    assert.ok(lastTab.x + lastTab.width <= tabsBox.x + tabsBox.width + 1, 'thẻ BRCGS không bị khuất');
+    // Thẻ ISO 14001: 26 điều khoản, 6.1.2 có 1 biểu; mã "6.1" (cột H) báo không khớp điều khoản nào
+    await page.click('.cov [data-std="ISO14001"]');
+    const e14 = expected(env, 'ISO14001');
+    await page.waitForFunction((n) => document.querySelectorAll('.cov .cov-row').length === n, e14.length);
+    assert.match(await page.textContent('.cov-std-h'), /ISO 14001 — Hệ thống quản lý môi trường/);
+    assert.match(await page.textContent('.cov-odd summary'), /1 mã ở cột ISO 14001 \(cột H\) không khớp điều khoản nào/);
+    await page.click('.cov-odd summary');
+    assert.match(await page.textContent('.cov-odd'), /6\.1 — BM-SX-02-01/);
+    assert.ok(await noOverflow(page));
+    assert.deepEqual(await noRawKeys(page), []);
+    await page.screenshot({ path: path.join(SHOTS, 'coverage-14001-iphone.png'), fullPage: true });
+    await page.locator('.cov .cov-row').nth(e14.findIndex((r) => r.key === '6.1.2')).click();
+    await page.waitForSelector('.modal .cov-items');
+    assert.equal(await page.locator('.modal .cov-items li').count(), 1);
+    await page.click('.modal .btn.primary');
+    await page.waitForSelector('.cat .cov-filter');
+    await page.waitForFunction(() => document.querySelectorAll('.cat-row').length === 1);
+    assert.match(await page.textContent('.cov-filter'), /ISO 14001: 6\.1\.2/);
+    assert.deepEqual(await page.locator('.cat-row .code').allTextContents(), ['BM-SX-01-01']);
+    await page.click('#cf-clause');
+    await page.waitForFunction(() => document.querySelectorAll('.cat-row').length === 25);
+    await go(page, '#/coverage');
+    await page.waitForSelector('.cov .cov-row');
 
     // Thẻ BRCGS → bấm "Truy xuất"? (chủ đề có biểu) → hộp thoại danh sách biểu → Mở trong Danh mục
     await page.click('.cov [data-std="BRC"]');
@@ -172,5 +210,39 @@ test('web: bảng Phủ ISO 9001 theo nhóm, cột Bắt buộc; quyền: Tra c�
     await go(page, '#/coverage');
     await page.waitForSelector('.empty-state');
     assert.ok((await page.textContent('.view')).includes('cấp 2+'));
+  } finally { await app.close(); }
+});
+
+test('app bản ISO 14001/45001/50001 với máy chủ 4c (chưa dán Code.gs mới, chưa có điều khoản ba chuẩn): chỉ thẻ ISO 9001 + BRCGS, lập chương trình chỉ hai chuẩn, báo cáo Phủ gửi BOTH', async () => {
+  const env = seeded();
+  env.g.dbReset_();
+  env.g.withWriteLock_(() => env.g.resetRewrite_('Clauses', env.g.readRows_('Clauses').filter((c) => c.std === 'ISO9001' || c.std === 'BRC')));
+  env.g.dbReset_();
+  const sent = [];
+  const post = env.post;
+  env.post = (p) => {
+    // Máy chủ 4c chỉ hiểu std BOTH | ISO9001 | BRC
+    if (p.action === 'report.run' && p.payload && p.payload.kind === 'COVERAGE') sent.push(p.payload.filters.std);
+    return post(p);
+  };
+  const app = await openApp({ env, now: NOW, ...IPHONE });
+  try {
+    const { page } = app;
+    await login(page);
+    await go(page, '#/coverage');
+    await page.waitForSelector('.cov-tabs');
+    assert.deepEqual(await page.locator('.cov-tabs .tab').evaluateAll((els) => els.map((e) => e.dataset.std)), ['ISO9001', 'BRC']);
+    await go(page, '#/audits/program/new?y=2026');
+    await page.waitForSelector('#pf-stds');
+    assert.deepEqual(await page.locator('#pf-stds .chip').evaluateAll((els) => els.map((e) => e.dataset.s)), ['ISO9001', 'BRC']);
+    await go(page, '#/reports');
+    await page.waitForSelector('.rp-item[data-kind="COVERAGE"]');
+    await page.click('.rp-item[data-kind="COVERAGE"]');
+    await page.waitForSelector('#rf-std');
+    assert.deepEqual(await page.locator('#rf-std option').evaluateAll((els) => els.map((e) => e.value)), ['ALL', 'ISO9001', 'BRC']);
+    await page.click('#rp-run');
+    await page.waitForSelector('.rp-paper');
+    assert.deepEqual(sent, ['BOTH']);
+    assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
 });
