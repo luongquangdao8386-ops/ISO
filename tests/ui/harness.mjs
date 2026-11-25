@@ -86,3 +86,22 @@ export async function openApp({ env = freshServer(), viewport = { width: 390, he
 
 export const SHOTS = path.join(ROOT, 'screenshots');
 fs.mkdirSync(SHOTS, { recursive: true });
+
+/** Bấm mục menu trái (25/11/2026: menu theo nhóm — mở nhóm nếu đang đóng) */
+export async function sideClick(page, key) {
+  await page.evaluate((k) => {
+    const a = document.querySelector(`.side .side-item[data-nav="${k}"]`);
+    const g = a && a.closest('.side-grp');
+    if (g && !g.classList.contains('open')) g.querySelector('.side-grp-h').click();
+  }, key);
+  await page.click(`.side .side-item[data-nav="${key}"]`);
+}
+/** Bấm ô chức năng: có ở Trang chủ thì bấm luôn, không thì qua ô "Tất cả chức năng" */
+export async function tileClick(page, href) {
+  const sel = `.grid9 .tile[href="#${href}"]`;
+  if (!(await page.locator(sel).count())) {
+    await page.click('.grid9 .tile[href="#/menu"]');
+    await page.waitForSelector('.menu-all');
+  }
+  await page.click(sel);
+}

@@ -1,5 +1,5 @@
 // Khung app sau đăng nhập (không logo công ty): header, nav 5 nút iPhone, menu trái web
-import { bi, biText, esc, fmtDate, fmtDateTime, session, badge, L } from './core.js';
+import { bi, biText, esc, fmtDate, fmtDateTime, session, badge, L, ls } from './core.js';
 import { ICON, h, $, $$ } from './ui.js';
 import { isIosSafariTab } from './auth.js';
 
@@ -36,7 +36,35 @@ export const SIDE = [
   { key: 'account', label: 'nav.account', icon: 'user', path: '/account', lvl: 1 }
 ];
 
+/** Nhóm chức năng (25/11/2026, người dùng thấy menu dài): menu trái mở / đóng theo nhóm, trang "Tất cả chức năng" xếp theo nhóm.
+ *  Trang chủ, Tài khoản đứng ngoài nhóm. SIDE_SHORT: tên ngắn ở menu trái (tên đầy đủ vẫn là tiêu đề màn). */
+export const SIDE_GROUPS = [
+  { key: 'docs', label: 'side.grp.docs', items: ['catalog', 'templates', 'versions', 'requests', 'dist', 'labels'] },
+  { key: 'rec', label: 'side.grp.rec', items: ['ready', 'records', 'coverage', 'capa', 'ncr', 'audits', 'mreview'] },
+  { key: 'tools', label: 'side.grp.tools', items: ['reports', 'excel', 'links'] }
+];
+const SIDE_SHORT = { requests: 'side.short.requests', dist: 'side.short.dist', ncr: 'tile.ncr', links: 'tile.links' };
+export const groupOf = (key) => (SIDE_GROUPS.find((g) => g.items.includes(key)) || {}).key || '';
+/** Nhóm người dùng tự mở (nhớ trên máy); nhóm của màn đang mở luôn mở */
+function openGroups() { try { return new Set(JSON.parse(ls.get('side_open') || '[]')); } catch (e) { return new Set(); } }
+
 export const isWide = () => window.matchMedia('(min-width: 900px)').matches;
+
+/** Menu trái: Trang chủ · 3 nhóm (bấm tên nhóm để mở / đóng) · Tài khoản */
+function sideHtml(lvl, sec) {
+  const shown = SIDE.filter((it) => lvl >= it.lvl || (['excel', 'versions', 'records', 'coverage', 'ready', 'requests', 'dist', 'labels', 'capa', 'ncr', 'audits', 'mreview'].includes(it.key) && sec) || (it.key === 'audits' && session.user && session.user.auditor));
+  const item = (it) => `<a class="side-item${it.soon ? ' soon' : ''}" href="#${it.path}" data-nav="${it.key}">${ICON[it.icon]}<span class="side-label">${bi(SIDE_SHORT[it.key] || it.label)}${it.soon ? `<span class="tag soon">${bi('soon.tag')}</span>` : ''}</span></a>`;
+  const byKey = new Map(shown.map((it) => [it.key, it]));
+  const open = openGroups();
+  const groups = SIDE_GROUPS.map((g) => {
+    const list = g.items.map((k) => byKey.get(k)).filter(Boolean);
+    if (!list.length) return '';
+    const on = open.has(g.key);
+    return `<div class="side-grp${on ? ' open' : ''}" data-grp="${g.key}"><button type="button" class="side-grp-h" aria-expanded="${on}"><span class="side-grp-label">${bi(g.label)}</span><span class="side-grp-badge" hidden></span>${ICON.chevron}</button>
+      <div class="side-grp-items">${list.map(item).join('')}</div></div>`;
+  }).join('');
+  return `${byKey.has('home') ? item(byKey.get('home')) : ''}${groups}<hr>${byKey.has('account') ? item(byKey.get('account')) : ''}`;
+}
 
 /**
  * Dựng khung. opts: {env, onScan}. Trả API {view, setScreen, setActive, setSync, setBadge, setSessionWarn}
@@ -47,9 +75,7 @@ export function mountShell(root, { env, onScan }) {
   const el = h(`<div class="app">
     <aside class="side" aria-label="${esc(biText('menu.title'))}">
       <div class="side-title">${bi('menu.title')}</div>
-      <nav class="side-nav">
-        ${SIDE.filter((it) => lvl >= it.lvl || (['excel', 'versions', 'records', 'coverage', 'ready', 'requests', 'dist', 'labels', 'capa', 'ncr', 'audits', 'mreview'].includes(it.key) && sec) || (it.key === 'audits' && session.user && session.user.auditor)).map((it, i) => `${i && it.key === 'account' ? '<hr>' : ''}<a class="side-item${it.soon ? ' soon' : ''}" href="#${it.path}" data-nav="${it.key}">${ICON[it.icon]}<span class="side-label">${bi(it.label)}${it.soon ? `<span class="tag soon">${bi('soon.tag')}</span>` : ''}</span></a>`).join('')}
-      </nav>
+      <nav class="side-nav">${sideHtml(lvl, sec)}</nav>
       <button type="button" class="scan-btn side-scan" id="side-scan">${ICON.scan}<span>${bi('nav.scan_qr')}</span></button>
     </aside>
     <div class="frame">
@@ -85,6 +111,23 @@ export function mountShell(root, { env, onScan }) {
       if (location.hash === '#' + nb.dataset.path) { view.scrollTop = 0; window.scrollTo(0, 0); }
       import('./router.js').then((r) => r.navigate(nb.dataset.path));
     }
+  });
+  // Nhóm menu trái: bấm tên nhóm mở / đóng, nhớ trên máy
+  $$('.side-grp-h', el).forEach((b) => b.addEventListener('click', () => {
+    const g = b.closest('.side-grp');
+    const on = !g.classList.contains('open');
+    g.classList.toggle('open', on);
+    b.setAttribute('aria-expanded', String(on));
+    const set = openGroups();
+    if (on) set.add(g.dataset.grp); else set.delete(g.dataset.grp);
+    ls.set('side_open', JSON.stringify([...set]));
+  }));
+  /** Số đỏ trên tên nhóm = tổng số đỏ của các mục trong nhóm (thấy cả khi nhóm đang đóng) */
+  const groupBadges = () => $$('.side-grp', el).forEach((g) => {
+    const n = $$('.side-item .nav-badge', g).reduce((a, x) => a + (parseInt(x.textContent, 10) || 0), 0);
+    const b = $('.side-grp-badge', g);
+    b.hidden = !n;
+    b.textContent = n > 99 ? '99+' : String(n || '');
   });
   $('#bnav-scan', el).addEventListener('click', () => onScan && onScan());
   $('#side-scan', el).addEventListener('click', () => onScan && onScan());
@@ -125,9 +168,14 @@ export function mountShell(root, { env, onScan }) {
         b.textContent = n > 99 ? '99+' : String(n);
         b.title = biText('pend.count', { N: n });
       });
+      groupBadges();
     },
     setActive(key) {
       $$('[data-nav]', el).forEach((x) => x.classList.toggle('active', x.dataset.nav === key));
+      // Nhóm của màn đang mở tự mở (không ghi nhớ)
+      const g = groupOf(key);
+      const box = g ? $(`.side-grp[data-grp="${g}"]`, el) : null;
+      if (box && !box.classList.contains('open')) { box.classList.add('open'); $('.side-grp-h', box).setAttribute('aria-expanded', 'true'); }
     },
     /** Trạng thái đồng bộ ở góc phải header (web) */
     setSync({ offline, maintenance = false, lastSync, queued = 0, problems = 0 }) {

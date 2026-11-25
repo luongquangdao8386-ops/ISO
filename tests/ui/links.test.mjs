@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, OWNER_CODE, OWNER_PIN } from '../helpers.mjs';
 import { ME_URL, CS_URL, ME_KEY, CS_KEY, fakeApps, daysBetween } from '../feed-mock.mjs';
 
@@ -73,7 +73,7 @@ test('web: Kết nối → thử sai mã (app kia từ chối) → thử đúng 
     assert.equal(await cellStates(page, 'BM-CĐ-04-03'), null, 'chưa nối: biểu M&E không có trong bảng kỳ');
     assert.ok((await page.textContent('.rg-app')).includes('chưa nối'));
     // Menu trái → Kết nối
-    await page.click('.side .side-item[data-nav="links"]');
+    await sideClick(page, 'links');
     await page.waitForSelector('#lk-ME');
     assert.ok((await page.textContent('#lk-ME')).includes('Chưa nối'));
     assert.ok((await page.textContent('#lk-CS')).includes('Chưa nối'));

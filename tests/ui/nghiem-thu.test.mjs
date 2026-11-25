@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import zlib from 'node:zlib';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, OWNER_CODE, OWNER_PIN } from '../helpers.mjs';
 
 const NOW = '2026-11-11T08:10:00+07:00';
@@ -53,7 +53,7 @@ test('nghiệm thu mục 4, 5, 8 đúng các bước đã gửi: Nhân viên SX 
   try {
     const { page } = app;
     await login(page, 'THU-SX', '583920');
-    await page.click('.side-item[data-nav="catalog"]');
+    await sideClick(page, 'catalog');
     await page.waitForSelector('.cat-tbl');
     await page.locator('tr[data-href]', { has: page.locator('td.code', { hasText: /^BM-SX-02-01$/ }) }).click();
     await page.waitForSelector('a[href^="#/version/new/"]');
@@ -71,7 +71,7 @@ test('nghiệm thu mục 4, 5, 8 đúng các bước đã gửi: Nhân viên SX 
     assert.equal(await page.locator('#v-approve').count(), 0, 'Nhân viên không thấy nút Duyệt');
     // Mục 8 — Nhân viên SX: Phủ điều khoản ghi phạm vi SX, không có Excel
     assert.equal(await page.locator('.side-item[data-nav="excel"]').count(), 0);
-    await page.click('.side-item[data-nav="coverage"]');
+    await sideClick(page, 'coverage');
     await page.waitForSelector('.cov');
     assert.ok((await page.textContent('.cov')).includes('Chỉ đếm biểu của bộ phận SX'));
   } finally { await app.close(); }

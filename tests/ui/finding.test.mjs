@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, makeClient, uuid } from '../helpers.mjs';
 import { xlsx } from '../xlsx-node.mjs';
 
@@ -277,7 +277,7 @@ test('web: thành viên đoàn ghi phát hiện, không có nút Gửi báo cáo
   try {
     const { page } = app;
     await login(page, 'AUDKV', '583933');
-    await page.click('.side-item[data-nav="audits"]');
+    await sideClick(page, 'audits');
     await page.waitForSelector('.aud-row');
     await page.click('.aud-row');
     await page.waitForSelector('#aud-fnd-add');

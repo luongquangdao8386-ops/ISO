@@ -1825,3 +1825,24 @@ html.bg-home .home-hero, html.bg-home .cs-hero { background-image: var(--bg-home
 .rd-tag { margin-left: auto; }
 .rd-act { flex: none; }
 .rd-how-note { margin-top: 12px; }
+
+/* =====================================================================
+ * Menu gọn (25/11/2026): menu trái theo nhóm mở / đóng; Trang chủ 9 ô + Tất cả chức năng
+ * ===================================================================== */
+.side-grp { display: flex; flex-direction: column; gap: 2px; }
+.side-grp-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; margin-top: 6px; padding: 4px 10px; border: 0; border-radius: 8px; background: none;
+  color: var(--graphite); font: inherit; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; text-align: left; cursor: pointer; }
+.side-grp-h:hover { background: #F2F5F8; }
+.side-grp-h .side-grp-label { flex: 1 1 auto; }
+.side-grp-h svg { width: 16px; height: 16px; transition: transform 0.15s; }
+.side-grp.open .side-grp-h svg { transform: rotate(90deg); }
+.side-grp-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font-size: 0.6875rem; line-height: 18px; text-align: center; text-transform: none; }
+.side-grp.open .side-grp-badge { display: none; }
+.side-grp-items { display: none; flex-direction: column; gap: 2px; }
+.side-grp.open .side-grp-items { display: flex; }
+.tile-all { background: #F6F8FA; }
+.menu-grp-h { margin: 14px 2px 0; font-size: 0.875rem; color: var(--graphite); text-transform: uppercase; letter-spacing: 0.02em; }
+.menu-grp-h:first-child { margin-top: 4px; }
+@media (min-width: 900px) {
+  .menu-all .grid9 { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+}

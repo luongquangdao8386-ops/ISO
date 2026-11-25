@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, uuid, fakePngB64, OWNER_CODE, OWNER_PIN } from '../helpers.mjs';
 import { xlsx } from '../xlsx-node.mjs';
 import { activeSheet, readSheets } from '../../js/tplx.js';
@@ -133,7 +133,7 @@ test('web: menu Kiểm tra ISO; có tệp mẫu cho biểu còn thiếu → Đ�
   try {
     const { page } = app;
     await login(page);
-    await page.click('.side .side-item[data-nav="ready"]');
+    await sideClick(page, 'ready');
     await page.waitForSelector('.rd-sum');
     assert.equal((await page.textContent('.rd-big .rd-n')).trim(), '4');
     assert.match(await page.innerText('.rd-sum'), /Đủ biểu/);

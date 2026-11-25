@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick, tileClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, makeClient, uuid, OWNER_CODE, OWNER_PIN } from '../helpers.mjs';
 
 const NOW = '2026-11-12T09:00:00+07:00';
@@ -89,7 +89,7 @@ test('iPhone: Lập cuộc xem xét → số liệu tự gom → Ghi Đã họp 
     const { page } = app;
     await login(page, 'TK', TK_PIN);
     // 1. Trang chủ → ô Xem xét lãnh đạo → chưa có → Lập
-    await page.click('.grid9 .tile[href="#/mreview"]');
+    await tileClick(page, '/mreview');
     await page.waitForSelector('#mr-new');
     assert.match(await page.textContent('.view'), /Chưa có cuộc xem xét lãnh đạo nào/);
     await page.click('#mr-new');
@@ -219,7 +219,7 @@ test('web: người phụ trách quyết định (cấp 2) báo Đã xong từ C
     await page.click('#ac-logout');
     await login(page, 'CD3', '583932');
     assert.equal(await page.locator('.side .side-item[data-nav="mreview"]').count(), 1);
-    await page.click('.side .side-item[data-nav="mreview"]');
+    await sideClick(page, 'mreview');
     await page.waitForSelector('.mr-row');
     assert.equal(await page.locator('#mr-new').count(), 0);
     await page.click('.mr-row');

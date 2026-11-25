@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser } from '../helpers.mjs';
 import { xlsx } from '../xlsx-node.mjs';
 import { readSheets, activeSheet } from '../../js/tplx.js';
@@ -147,7 +147,7 @@ test('web: menu Kho tệp mẫu, Danh mục lọc "Chưa có tệp mẫu", Bộ 
     const { page } = app;
     await login(page, 'TK', '583922');
     assert.equal(await page.locator('.side .side-item[data-nav="templates"]').count(), 1);
-    await page.click('.side .side-item[data-nav="templates"]');
+    await sideClick(page, 'templates');
     await page.waitForSelector('.tpl');
     // Tải lên một bộ, rồi tải nhầm bản thứ hai cùng bộ
     await go(page, '/templates/upload');

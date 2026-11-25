@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, OWNER_CODE, OWNER_PIN, fakePngB64 } from '../helpers.mjs';
 import { xlsx } from '../xlsx-node.mjs';
 
@@ -219,7 +219,7 @@ test('đúng các bước HUONG_DAN "CẬP NHẬT LÊN BẢN 2c" + "Thử Báo c
     const st = await page.textContent('body');
     assert.ok(st.includes('Đã lưu 0 báo cáo') && st.includes(env.g.SCHEMA_VERSION) && st.includes('Chưa có logo công ty trên báo cáo'));
     // Thử 1–2: Danh mục tài liệu, Đang hiệu lực → trống; Tất cả tình trạng → có bảng
-    await page.click('.side .side-item[data-nav="reports"]');
+    await sideClick(page, 'reports');
     await page.waitForSelector('#rp-run');
     await page.click('#rp-run');
     await page.waitForSelector('#rp-prev .paper');

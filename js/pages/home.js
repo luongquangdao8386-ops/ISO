@@ -141,7 +141,40 @@ function wireWeek(view) {
 }
 
 /** Lưới ô module (3 cột như M&E); ô của đợt sau mờ "Sắp có" */
+/** Ô ở Trang chủ (25/11/2026, người dùng thấy nhiều ô): 8 ô hay dùng + "Tất cả chức năng"; Nháp chờ gửi chỉ khi có nháp */
+const HOME_KEYS = ['ready', 'catalog', 'templates', 'records', 'coverage', 'capa', 'audits', 'reports'];
+
+function tileHtml(x) {
+  return `<a class="tile${x.soon ? ' soon' : ''}${x.key === 'all' ? ' tile-all' : ''}" href="#${x.href}">${ICON[x.icon]}<span class="tile-label">${bi('tile.' + x.key)}</span>${x.soon ? `<span class="tile-count tag soon">${bi('soon.tag')}</span>` : (x.tail ? `<span class="tile-count">${x.tail}</span>` : '')}</a>`;
+}
+const gridOf = (tiles) => `<section class="grid9" aria-label="${esc(biText('menu.title'))}">${tiles.map(tileHtml).join('')}</section>`;
+
+/** Lưới ô của Trang chủ */
 async function gridHtml(list) {
+  const { tiles, q } = await allTiles(list);
+  const main = HOME_KEYS.map((k) => tiles.find((x) => x.key === k)).filter(Boolean);
+  const all = { key: 'all', icon: 'more', href: '/menu', tail: bi('home.all_n', { N: tiles.length }) };
+  return gridOf(main.concat([all], q ? tiles.filter((x) => x.key === 'drafts') : []));
+}
+
+/** Trang "Tất cả chức năng" (/menu): mọi ô, xếp theo nhóm như menu trái */
+export async function renderMenu(view, ctx) {
+  ctx.shell.setScreen({ title: 'tile.all', back: '/' });
+  const { SIDE_GROUPS } = await import('../shell.js');
+  const { tiles } = await allTiles(await items());
+  const used = new Set();
+  const parts = SIDE_GROUPS.map((g) => {
+    const list = g.items.map((k) => tiles.find((x) => x.key === k)).filter(Boolean);
+    if (g.key === 'tools') list.push(...tiles.filter((x) => x.key === 'drafts'));
+    list.forEach((x) => used.add(x.key));
+    return list.length ? `<h2 class="menu-grp-h">${bi(g.label)}</h2>${gridOf(list)}` : '';
+  });
+  const rest = tiles.filter((x) => !used.has(x.key));
+  view.innerHTML = `<div class="menu-all">${parts.join('')}${rest.length ? gridOf(rest) : ''}</div>`;
+}
+
+/** Mọi ô chức năng người dùng được dùng: {tiles: [{key, icon, href, tail, soon}], q: số nháp chờ gửi} */
+async function allTiles(list) {
   const lvl = roleLevel();
   const sec = isSecretary();
   const uid = session.user && session.user.user_id;
@@ -194,6 +227,7 @@ async function gridHtml(list) {
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
     { key: 'templates', icon: 'folder', href: '/templates', tail: tplN ? bi('tpl.files_n', { N: tplN }) : '' },
+    { key: 'versions', icon: 'edit', href: '/versions', show: lvl >= 2 || sec },
     { key: 'ready', icon: 'check', href: '/ready', show: canSeeRecords(), tail: readyTail },
     { key: 'records', icon: 'file', href: '/records', lvl: 2, show: canSeeRecords() },
     { key: 'coverage', icon: 'checklist', href: '/coverage', show: canSeeRecords() },
@@ -209,7 +243,7 @@ async function gridHtml(list) {
     { key: 'links', icon: 'link', href: '/links', lvl: 4 },
     { key: 'drafts', icon: 'sync', href: '/account/drafts', tail: q ? bi('sync.queued_count', { N: q }) : bi('home.none_drafts') }
   ].filter((x) => (x.show !== undefined ? x.show : !x.lvl || lvl >= x.lvl));
-  return `<section class="grid9" aria-label="${esc(biText('menu.title'))}">${tiles.map((x) => `<a class="tile${x.soon ? ' soon' : ''}" href="#${x.href}">${ICON[x.icon]}<span class="tile-label">${bi('tile.' + x.key)}</span>${x.soon ? `<span class="tile-count tag soon">${bi('soon.tag')}</span>` : (x.tail ? `<span class="tile-count">${x.tail}</span>` : '')}</a>`).join('')}</section>`;
+  return { tiles, q };
 }
 
 /** Biểu theo bộ phận (web): số biểu, ● đã ban hành, % */

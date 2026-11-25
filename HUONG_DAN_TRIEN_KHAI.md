@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.6 (tải riêng từng biểu; 4.5 màn Kiểm tra ISO; 4.4 thêm ISO 14001, 45001, 50001)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.7 (menu gọn; 4.6 tải riêng từng biểu; 4.5 Kiểm tra ISO; 4.4 thêm ISO 14001, 45001, 50001)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -131,6 +131,29 @@ In**, **chi tiết biểu → Tải tệp mẫu**, **Kho tệp mẫu → Tải**
 vd BM-CĐ-04-03 kèm 04-03-TH, 04-03-ML; 03-03 kèm 03-03a…i), tên tệp theo mã biểu (`BM-CD-02-04.xlsx`), mở ra Ctrl+P là in. Định dạng, vùng
 in, khổ giấy, ảnh, ghi chú của biểu giữ nguyên; ô công thức / danh sách chọn / liên kết trỏ sang tab đã bỏ (vd về Mục lục) giữ **giá trị đang
 hiện**, không báo lỗi. **Kho tệp mẫu → Tải cả tệp** vẫn tải cả bộ. Chỉ đổi app.
+
+Bản 4.7 (25/11/2026, anh: "phần tab các danh mục này có rút gọn được không, tôi thấy nhiều dài dòng quá") — menu gọn: **Trang chủ** chỉ
+còn 9 ô (Kiểm tra ISO · Danh mục · Kho tệp mẫu / Hồ sơ · Phủ điều khoản · Khắc phục / Đánh giá nội bộ · Báo cáo · **Tất cả chức năng**);
+ô **Tất cả chức năng** mở trang có đủ các ô xếp theo 3 nhóm **Tài liệu** (Danh mục, Kho tệp mẫu, Phiên bản, Đề nghị tài liệu, Phân phối & thu
+hồi, In tem QR) · **Hồ sơ & đánh giá** (Kiểm tra ISO, Hồ sơ, Phủ điều khoản, Khắc phục, SP không phù hợp, Đánh giá nội bộ, Xem xét lãnh đạo)
+· **Công cụ** (Báo cáo, Excel, Kết nối, Nháp chờ gửi); ô **Nháp chờ gửi** chỉ hiện ở Trang chủ khi có nháp chưa gửi. **Menu trái (máy tính)**:
+Trang chủ · 3 tên nhóm · Tài khoản — bấm tên nhóm để mở / đóng (app nhớ trên máy), mở màn nào thì nhóm của màn đó tự mở, nhóm đang đóng mà
+có việc chờ thì hiện số đỏ trên tên nhóm; tên ngắn: Đề nghị, Phân phối, SP không phù hợp, Kết nối. Các mục hướng dẫn cũ ghi "Trang chủ → ô
+…" mà ô đó không còn ở Trang chủ: bấm ô **Tất cả chức năng** rồi bấm ô đó. Chỉ đổi app.
+
+## CẬP NHẬT LÊN BẢN 4.7 (1.0.0-d4.7, menu gọn) — chỉ app
+
+**Anh phải làm:** đóng hẳn app rồi mở lại `/ISO/` → **Tài khoản → Thông tin** ghi `1.0.0-d4.7 · mã vỏ app fe6488b2cb43` (không cần dán
+Code.gs; máy chủ chưa lên 4.4 thì làm các bước mục 4.4, Mô tả bản triển khai `d4.7 menu gon`).
+
+**Nên kiểm (1 phút):** iPhone thật — Trang chủ 9 ô, bấm **Tất cả chức năng** → 3 nhóm; máy tính — menu trái gọn, bấm tên nhóm mở / đóng.
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/menu.test.mjs` (2 test): iPhone — Trang chủ đúng 9 ô theo thứ tự trên, không có nháp
+thì không có ô Nháp chờ gửi, ô Tất cả chức năng "17 mục" → 3 nhóm, đủ 17 ô, bấm SP không phù hợp mở đúng màn; máy tính — mới vào chỉ thấy
+Trang chủ, 3 tên nhóm, Tài khoản; mở nhóm Tài liệu (6 mục, "Phân phối · 分发收回"), sang Khắc phục thì nhóm Hồ sơ & đánh giá tự mở; đóng /
+mở nhóm rồi tải lại trang vẫn nhớ; Tất cả chức năng trên máy tính nhiều cột; Tra cứu cấp 1 chỉ thấy nhóm Tài liệu (Danh mục, Kho tệp mẫu),
+Công cụ, Trang chủ 4 ô. Các test cũ bấm menu / ô đi qua nhóm và Tất cả chức năng; số đỏ trên tên nhóm Tài liệu khi có phiếu đề nghị chờ.
+Cả bộ: 117 test máy chủ + 56 test giao diện đạt.
 
 ## CẬP NHẬT LÊN BẢN 4.6 (1.0.0-d4.6, tải riêng từng biểu) — chỉ app
 

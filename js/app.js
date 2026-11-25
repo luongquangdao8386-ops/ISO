@@ -167,6 +167,7 @@ export async function openResolved(r, { replace = false } = {}) {
 function registerRoutes() {
   const lazy = (mod, fn) => async (view, ctx) => { const m = await import(mod); return m[fn](view, ctx); };
   route('/', lazy('./pages/home.js', 'renderHome'), { nav: 'home' });
+  route('/menu', lazy('./pages/home.js', 'renderMenu'), { nav: 'home' });
   route('/catalog', lazy('./pages/catalog.js', 'renderCatalog'), { nav: 'catalog' });
   route('/item/new', lazy('./pages/item.js', 'renderItemForm'), { nav: 'catalog' });
   route('/item/:id/edit', lazy('./pages/item.js', 'renderItemForm'), { nav: 'catalog' });
@@ -278,7 +279,7 @@ window.addEventListener('resize', () => {
 
 // Màn xem (trang chủ, danh mục, chi tiết biểu, hồ sơ, tài khoản) vẽ lại sau khi tự gửi nháp xong.
 // Không vẽ lại màn nhập (sửa biểu, Excel), khi đang mở hộp thoại hoặc đang gõ.
-const VIEW_PAGE = /^\/(catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|templates|ready|capa|capa\/(?!new)[^/]+|ncr|ncr\/(?!new)[^/]+|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
+const VIEW_PAGE = /^\/(menu|catalog|coverage|item\/[^/]+|versions|records|record\/(?!new)[^/]+|requests|request\/(?!new)[^/]+|dist|templates|ready|capa|capa\/(?!new)[^/]+|ncr|ncr\/(?!new)[^/]+|account(\/drafts)?)?$/; // không có /links (đang nhập link, mã)
 export function refreshAfterSend(r) {
   if (!app.shell) return;
   const path = currentPath();

@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick, tileClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser } from '../helpers.mjs';
 import { xlsx } from '../xlsx-node.mjs';
 
@@ -74,7 +74,7 @@ test('iPhone: Lập phiếu → Quyết định xử lý (làm lại + hủy, PI
     const { page } = app;
     await login(page, 'TK', '583922');
     // 1. Trang chủ → ô Sản phẩm không phù hợp → Lập phiếu
-    await page.click('.grid9 .tile[href="#/ncr"]');
+    await tileClick(page, '/ncr');
     await page.waitForSelector('#ncr-new');
     assert.match(await page.textContent('#view'), /Chưa có phiếu nào/);
     await page.click('#ncr-new');
@@ -224,7 +224,7 @@ test('web: nhân viên CĐ lập phiếu (không có nút quyết định) → t
   try {
     const { page } = app;
     await login(page, 'CD2', '583920');
-    await page.click('.side-item[data-nav="ncr"]');
+    await sideClick(page, 'ncr');
     await page.waitForSelector('#ncr-new');
     await page.click('#ncr-new');
     await page.waitForSelector('form.ncr-form');

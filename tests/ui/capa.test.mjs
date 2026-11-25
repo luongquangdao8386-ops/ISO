@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser } from '../helpers.mjs';
 
 const NOW = '2026-11-12T09:00:00+07:00';
@@ -234,7 +234,7 @@ test('web: Nhân viên CĐ lập phiếu từ chi tiết biểu, giao hành đ�
   try {
     const { page } = app;
     await login(page, 'CD2', '583920');
-    await page.click('.side .side-item[data-nav="capa"]');
+    await sideClick(page, 'capa');
     await page.waitForSelector('.capa-row');
     await page.click('.capa-row');
     await page.click('#capa-complete:not([disabled])');

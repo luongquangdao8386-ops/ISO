@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, tileClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, makeClient, uuid, OWNER_CODE, OWNER_PIN } from '../helpers.mjs';
 
 const NOW = '2026-11-12T09:00:00+07:00';
@@ -86,8 +86,8 @@ test('iPhone, đúng các bước "Thử phiên 2d" (danh mục toàn ○ ◐, T
   try {
     const { page } = app;
     await login(page, 'TK', '583922');
-    // Bước 1: Trang chủ → ô Đề nghị tài liệu → Đề nghị mới → Sửa đổi / ban hành → chọn biểu → lý do, nội dung → Gửi phiếu
-    await page.locator('.tile[href="#/requests"]').click();
+    // Bước 1: Trang chủ → Tất cả chức năng → ô Đề nghị tài liệu → Đề nghị mới → Sửa đổi / ban hành → chọn biểu → lý do, nội dung → Gửi phiếu
+    await tileClick(page, '/requests');
     await page.waitForSelector('a[href="#/request/new"]');
     await page.locator('a[href="#/request/new"]').first().click();
     await page.waitForSelector('form.dr-form');
@@ -260,6 +260,7 @@ test('web: Nhân viên SX đề nghị sửa từ chi tiết biểu → trưởn
     await login(page, 'SX3', '583924');
     assert.ok((await page.textContent('.pend-card')).includes('1 phiếu đề nghị tài liệu chờ bạn xem xét'));
     assert.equal(await page.textContent('.side-item[data-nav="requests"] .nav-badge'), '1');
+    assert.equal(await page.textContent('.side-grp[data-grp="docs"] .side-grp-badge'), '1', 'số đỏ trên tên nhóm Tài liệu');
     await page.locator('.pend-row[href^="#/request/"]').click();
     await page.click('#dr-approve');
     await page.locator('.modal .btn.primary').click();

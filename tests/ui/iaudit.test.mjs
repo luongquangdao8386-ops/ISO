@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, makeClient, uuid } from '../helpers.mjs';
 import { xlsx } from '../xlsx-node.mjs';
 
@@ -257,7 +257,7 @@ test('web: Đánh giá viên của bộ phận được đánh giá bị chặn 
   try {
     const { page } = app;
     await login(page, 'TK', '583922');
-    await page.click('.side-item[data-nav="audits"]');
+    await sideClick(page, 'audits');
     await page.waitForSelector('.aud-row');
     await page.click('.aud-row');
     await page.waitForSelector('#aud-edit');
@@ -284,7 +284,7 @@ test('web: Đánh giá viên của bộ phận được đánh giá bị chặn 
       const p2 = app2.page;
       await login(p2, 'AUDCL', '583931');
       assert.match(await p2.textContent('.pend-card'), /1 đợt đánh giá nội bộ trong 7 ngày tới/);
-      await p2.click('.side-item[data-nav="audits"]');
+      await sideClick(p2, 'audits');
       await p2.waitForSelector('.aud-row');
       assert.equal(await p2.locator('#aud-add').count(), 0, 'không phải Thư ký: không thêm đợt');
       await p2.click('.aud-row');
@@ -323,7 +323,7 @@ test('web: Đánh giá viên của bộ phận được đánh giá bị chặn 
     try {
       const p3 = app3.page;
       await login(p3, 'SX2', '583921');
-      await p3.click('.side-item[data-nav="audits"]');
+      await sideClick(p3, 'audits');
       await p3.waitForSelector('.aud-prog .item-head');
       assert.equal(await p3.locator('.aud-row').count(), 0);
       assert.equal(await p3.locator('#aud-submit, #aud-approve, #aud-reopen, #aud-prog-cancel').count(), 0);

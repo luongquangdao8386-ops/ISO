@@ -51,7 +51,9 @@ test('iPhone: đăng nhập PIN, trang chủ (biểu tượng, 4 ô số, ô S�
     assert.ok((await page.textContent('.stats')).includes('25'));
     assert.equal(await page.locator('.grid9 .tile.soon').count(), 0, 'hết ô "Sắp có" (Đánh giá nội bộ có từ 4a)');
     assert.equal(await page.locator('.grid9 .tile[href="#/audits"]:not(.soon)').count(), 1);
-    assert.equal(await page.locator('.grid9 .tile[href="#/links"]:not(.soon)').count(), 1);
+    // Trang chủ gọn (25/11/2026): 8 ô hay dùng + Tất cả chức năng (Kết nối nằm trong Tất cả chức năng); Nháp chờ gửi chỉ khi có nháp
+    assert.deepEqual(await page.locator('.grid9 .tile').evaluateAll((els) => els.map((e) => e.getAttribute('href'))),
+      ['#/ready', '#/catalog', '#/templates', '#/records', '#/coverage', '#/capa', '#/audits', '#/reports', '#/menu']);
     assert.ok((await page.textContent('.pend-card')).includes('chưa có tệp'));
     assert.ok(await noOverflow(page));
     assert.deepEqual(await noRawKeys(page), []);

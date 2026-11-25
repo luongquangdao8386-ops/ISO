@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, OWNER_CODE, OWNER_PIN } from '../helpers.mjs';
 import { coverageRows, coverageSummary } from '../../js/coverage.js';
 
@@ -170,7 +170,7 @@ test('web: bảng Phủ ISO 9001 theo nhóm, cột Bắt buộc; quyền: Tra c�
     const { page } = app;
     await login(page);
     assert.equal(await page.locator('.side .side-item[data-nav="coverage"].soon').count(), 0);
-    await page.click('.side .side-item[data-nav="coverage"]');
+    await sideClick(page, 'coverage');
     await page.waitForSelector('.cov-tbl');
     const iso = expected(env, 'ISO9001');
     assert.equal(await page.locator('.cov-tbl tbody tr[data-k]').count(), iso.length);

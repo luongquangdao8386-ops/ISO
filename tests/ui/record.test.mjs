@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { openApp, SHOTS } from './harness.mjs';
+import { openApp, SHOTS, sideClick } from './harness.mjs';
 import { freshServer, ownerClient, addUser, makeClient, uuid, fakeJpegB64 } from '../helpers.mjs';
 
 const NOW = '2026-11-11T08:10:00+07:00';
@@ -165,7 +165,7 @@ test('web: bảng kỳ theo bộ phận (✓ ! –, biểu tuần/khi phát sinh
     // Trang chủ: ô Hồ sơ quá hạn có số (biểu SX hằng ngày khác chưa nộp)
     const od = await page.textContent('.stats .stat:nth-child(3) .stat-val');
     assert.ok(Number(od) >= 1, od);
-    await page.click('.side-item[data-nav="records"]');
+    await sideClick(page, 'records');
     await page.waitForSelector('.rg .rg-row');
     // Chỉ biểu của SX + Ban ISO; dòng BM-SX-02-01: 31/10 quá hạn, 01–07/11 ✓, 08–11/11 chưa tới hạn
     const st = await cellStates(page, 'BM-SX-02-01');
