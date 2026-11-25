@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.4 (thêm ISO 14001, ISO 45001, ISO 50001)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.5 (màn Kiểm tra ISO; bản 4.4 thêm ISO 14001, ISO 45001, ISO 50001)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -117,6 +117,35 @@ Mọi chuẩn hoặc từng chuẩn; **Xem xét lãnh đạo** thêm dòng phủ
 50001** (cột khóa ẩn AB / AC / AD, ô Tổng hợp N7 cộng cả bốn chuẩn). Sửa danh sách điều khoản (thêm dòng, đổi tên, cột "Bắt buộc lưu hồ
 sơ"): Excel → Xuất danh mục → sửa sheet Phủ của chuẩn đó → nhập lại; nhập file **không có** sheet của một chuẩn thì điều khoản chuẩn đó
 **giữ nguyên**; nhập lại file xuất từ app **giữ nhóm** của điều khoản (trước đây nhóm ISO 9001 bị xóa trắng).
+
+Bản 4.5 (25/11/2026, anh yêu cầu "một danh mục mẫu khi cần kiểm tra ISO: nhìn vào biết thiếu biểu nào, biểu nào đã có") thêm màn
+**Kiểm tra ISO** (ô ở Trang chủ, menu trái, Tài khoản → Công việc; cấp 2+ và Thư ký ISO): trên cùng **Đã có X/Y biểu** + thanh tiến độ +
+**Thiếu N biểu — cần bổ sung**; nút lọc **Tất cả · ✗ Thiếu · ✓ Đã có**; danh sách theo nhóm, mỗi biểu một dòng có dấu ✓ Đã có / ✗ Thiếu và
+cách có. **Đã có** = biểu có tệp mẫu trong Kho tệp mẫu (nút **In** tải tệp mở sẵn đúng biểu) hoặc biểu in từ app M&E / Checksheet; biểu
+"Một phần M&E / Checksheet", "Đề xuất Checksheet" chưa có tệp mẫu tính là thiếu; biểu ✕ Không áp dụng không tính. Nút **Tải danh sách
+Excel** (góc trên) ra bảng Mã · Tên · Nhóm · Có / Thiếu · Cách có · Tình trạng, có logo công ty ở đầu như báo cáo. Chỉ đổi app, máy chủ
+không đổi.
+
+## CẬP NHẬT LÊN BẢN 4.5 (1.0.0-d4.5, màn Kiểm tra ISO) — chỉ app
+
+**Anh phải làm:**
+- **Máy chủ đã lên 4.4** (Trạng thái hệ thống `schema_version` = 1.0.14): **không** cần dán Code.gs. Đóng hẳn app rồi mở lại `/ISO/` →
+  **Tài khoản → Thông tin** ghi `1.0.0-d4.5 · mã vỏ app fc84190ec850` (máy chủ vẫn ghi 1.0.0-d4.4 — đúng).
+- **Máy chủ chưa lên 4.4**: làm đủ 4 bước của mục "CẬP NHẬT LÊN BẢN 4.4" ngay dưới (Code.gs trên `main` nay là bản d4.5, nhật ký
+  `migrateSchema` như ghi ở đó; Mô tả bản triển khai `d4.5 kiem tra iso`); bước 4 Thông tin ghi `1.0.0-d4.5 · mã vỏ app fc84190ec850`.
+
+**Nên kiểm (1 phút):** iPhone → Trang chủ → ô **Kiểm tra ISO** (đuôi "X/106 đã có") → số Đã có / Thiếu khớp với Kho tệp mẫu ("X/106 biểu
+có tệp mẫu" cộng các biểu in từ app M&E / Checksheet) → bấm **Thiếu** xem các biểu cần bổ sung → bấm **In** ở một biểu đã có → tệp mở
+đúng biểu. Máy tính: **Tải danh sách Excel** → mở bằng Microsoft Excel, có logo ở đầu (nếu đã tải logo ở Quản trị → Logo trên báo cáo).
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/ready.test.mjs` (2 test, dữ liệu như thật: phạm vi Cơ điện, Kho có bộ BM-CĐ-04):
+iPhone — ô Trang chủ "3/4 đã có" (đỏ) → màn Kiểm tra ISO: 3/4, Thiếu 1 (BM-CĐ-08-01 "Một phần M&E" chưa có tệp mẫu), Không áp dụng 1,
+"Tệp mẫu 1 · In từ app M&E 1 · In từ app Checksheet 1", theo nhóm; lọc Thiếu (1) / Đã có (3); **In** BM-CĐ-04-03 → tệp mở sẵn sheet
+BM-CĐ-04-03; **Tải danh sách Excel** → `Kiem_tra_ISO_2026-11-25.xlsx` có tiêu đề, cột Có / Thiếu, logo; không ô gõ, không tràn ngang.
+Máy tính — menu Kiểm tra ISO; thêm tệp mẫu cho biểu còn thiếu → 4/4 "Đủ biểu", lọc Thiếu báo "Không thiếu biểu nào"; Excel tải luôn
+(`…_da_co.xlsx`); Tra cứu cấp 1 không có ô / menu, mở thẳng báo không có quyền. `tests/server/ready.test.mjs`: cách tính Đã có / Thiếu
+(tệp mẫu kể cả chỉ có sheet phụ, in từ app, Một phần / Đề xuất là thiếu, ✕ không tính, thứ tự, đếm, lọc). Cả bộ: 115 test máy chủ +
+54 test giao diện đạt. Không kiểm được: iPhone thật, Microsoft Excel (đã kiểm nội dung tệp bằng thư viện đọc xlsx).
 
 ## CẬP NHẬT LÊN BẢN 4.4 (1.0.0-d4.4, ISO 14001, ISO 45001, ISO 50001) — làm một lần, trên máy tính
 

@@ -135,6 +135,9 @@ test('họ khóa ghép động đủ thành viên', () => {
   const STD5 = ['ISO9001', 'ISO14001', 'ISO45001', 'ISO50001', 'BRC'];
   ['aud.std.', 'rpt.t.aud_cov_', 'rpt.sec.aud_cov_', 'std.name.', 'rpt.t.cov_'].forEach((p) => { fam[p] = STD5; });
   fam['rpt.std.'] = ['ALL'].concat(STD5);
+  // Kiểm tra ISO (25/11/2026)
+  fam['rd.how.'] = ['TPL', 'ME', 'CS'];
+  fam['rd.also_app.'] = ['ME', 'CS'];
   assert.ok(fam['mr.s.'].length > 40);
   // Dòng kiểm tra sức khỏe máy chủ (24_system.js add('khóa', …))
   const sys = fs.readFileSync(path.join(ROOT, 'server', 'src', '24_system.js'), 'utf8');

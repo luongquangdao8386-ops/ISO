@@ -1800,3 +1800,28 @@ html.bg-home .home-hero, html.bg-home .cs-hero { background-image: var(--bg-home
 .xs-confirm #rs-text { text-transform: uppercase; letter-spacing: 0.05em; }
 #rs-mode.chips { flex-wrap: wrap; overflow: visible; }
 #rs-mode .chip { white-space: normal; text-align: left; }
+
+/* =====================================================================
+ * Kiểm tra ISO (25/11/2026): biểu đã có / còn thiếu
+ * ===================================================================== */
+.rd-sum { display: flex; flex-direction: column; gap: 6px; }
+.rd-big { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 4px; color: var(--navy); }
+.rd-big .rd-n { font-size: 2.25rem; font-weight: 800; line-height: 1; }
+.rd-big .rd-of { font-size: 1.25rem; font-weight: 700; }
+.rd-big .rd-lab { font-size: 0.875rem; color: var(--graphite); }
+.rd-bar { height: 10px; border-radius: 6px; background: #F3D6D2; overflow: hidden; }
+.rd-bar i { display: block; height: 100%; background: #2E8B57; border-radius: 6px; }
+.rd-line { font-size: 1rem; }
+.rd .chips { margin: 4px 0 6px; flex-wrap: wrap; overflow: visible; }
+.rd-chip-miss:not(.on) { border-color: #F3C6C0; color: var(--red); }
+.rd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rd-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.rd-row.s-MISSING { border-color: #F3C6C0; background: #FFF8F7; }
+.rd-main { flex: 1 1 auto; min-width: 0; }
+.rd-main .cat-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rd-main a.code { font-weight: 700; color: var(--navy); text-decoration: none; }
+.rd-name { display: block; color: var(--text); text-decoration: none; margin-top: 2px; }
+.rd-how { margin-top: 2px; overflow-wrap: anywhere; }
+.rd-tag { margin-left: auto; }
+.rd-act { flex: none; }
+.rd-how-note { margin-top: 12px; }

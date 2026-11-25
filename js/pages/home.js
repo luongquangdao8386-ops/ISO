@@ -12,6 +12,7 @@ import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { missingMandatory, ISO_STDS } from '../coverage.js';
 import { isoWeekKey } from '../periods.js';
+import { readyRows, readySummary } from '../readyx.js';
 import { stIcon } from './catalog.js';
 
 /**
@@ -147,6 +148,13 @@ async function gridHtml(list) {
   const q = (await queueItems().catch(() => [])).filter((o) => o.user_id === uid && o.dataset_epoch === session.epoch).length;
   const dcOn = await docControlOn();
   const tplN = (await tplActive()).length;
+  // Kiểm tra ISO: "98/106 đã có" (đỏ khi còn thiếu)
+  let readyTail = '';
+  if (canSeeRecords()) {
+    const { byItem } = await (await import('./tpl.js')).tplMap();
+    const rs = readySummary(readyRows(list, byItem).rows);
+    if (rs.total) readyTail = `<span class="${rs.missing ? 't-red-text' : 't-green-text'}">${bi('rd.tile', { H: rs.have, T: rs.total })}</span>`;
+  }
   const cOn = await capaOn();
   let capaTail = '';
   if (cOn) {
@@ -186,6 +194,7 @@ async function gridHtml(list) {
   const tiles = [
     { key: 'catalog', icon: 'library', href: '/catalog', tail: bi('home.items_n', { N: list.length }) },
     { key: 'templates', icon: 'folder', href: '/templates', tail: tplN ? bi('tpl.files_n', { N: tplN }) : '' },
+    { key: 'ready', icon: 'check', href: '/ready', show: canSeeRecords(), tail: readyTail },
     { key: 'records', icon: 'file', href: '/records', lvl: 2, show: canSeeRecords() },
     { key: 'coverage', icon: 'checklist', href: '/coverage', show: canSeeRecords() },
     { key: 'excel', icon: 'excel', href: '/excel', show: lvl >= 3 || sec },
