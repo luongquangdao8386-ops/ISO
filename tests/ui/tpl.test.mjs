@@ -123,16 +123,17 @@ test('iPhone: đúng các bước "Thử bản 2e" — Phạm vi Cơ điện, t�
     assert.match(card, /BM-CĐ-04-03\s+A3 ngang/);
     assert.match(card, /BM-CĐ-04-03-TH/);
     assert.match(card, /sheet phụ/);
-    assert.match(card, /In sheet hiện tại/);
+    assert.match(card, /tệp Excel chỉ có biểu đó/);
     // Bước 7: Tải tệp mẫu → iPhone: tải xong đổi thành "Mở / Lưu" → chạm lần nữa → tệp (mở sẵn sheet BM-CĐ-04-03)
     const btn = page.locator('#item-tpl .tpl-row').first().locator('button.tpl-get');
     await btn.click();
     await page.waitForFunction(() => /Mở \/ Lưu/.test(document.querySelector('#item-tpl .tpl-row button.tpl-get').innerText));
     const [dl] = await Promise.all([page.waitForEvent('download'), btn.click()]);
     const file = fs.readFileSync(await dl.path());
-    assert.equal(dl.suggestedFilename(), 'BM-CD-04_Sua-chua-su-co.xlsx');
+    // Tải một biểu (25/11/2026): tệp chỉ còn sheet của biểu BM-CĐ-04-03 + sheet phụ, không còn Mục lục, 04-01
+    assert.equal(dl.suggestedFilename(), 'BM-CD-04-03.xlsx');
     assert.equal(activeSheet(X, new Uint8Array(file)), 'BM-CĐ-04-03');
-    assert.deepEqual(readSheets(X, new Uint8Array(file)).map((s) => s.n), readSheets(X, new Uint8Array(SET04())).map((s) => s.n));
+    assert.deepEqual(readSheets(X, new Uint8Array(file)).map((s) => s.n), ['BM-CĐ-04-03', 'BM-CĐ-04-03-TH', 'BM-CĐ-04-03-ML']);
     await page.screenshot({ path: path.join(SHOTS, 'tpl-item-iphone.png') });
     assert.deepEqual(await noRawKeys(page), []);
     assert.deepEqual(app.consoleErrors, []);
@@ -174,7 +175,14 @@ test('web: menu Kho tệp mẫu, Danh mục lọc "Chưa có tệp mẫu", Bộ 
     // Máy tính: Tải (một sheet) → tải xuống luôn, mở sẵn sheet đó
     await page.locator('.tpl-set details.tpl-det summary').click();
     const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('.tpl-set .tpl-sheet button[data-sheet="BM-CĐ-04-01"]').click()]);
-    assert.equal(activeSheet(X, new Uint8Array(fs.readFileSync(await dl.path()))), 'BM-CĐ-04-01');
+    const one = new Uint8Array(fs.readFileSync(await dl.path()));
+    assert.equal(dl.suggestedFilename(), 'BM-CD-04-01.xlsx');
+    assert.deepEqual(readSheets(X, one).map((s) => s.n), ['BM-CĐ-04-01']);
+    assert.equal(activeSheet(X, one), 'BM-CĐ-04-01');
+    // Tải cả tệp: vẫn cả bộ
+    const [dl2] = await Promise.all([page.waitForEvent('download'), page.locator('.tpl-set .tpl-acts button.tpl-get').click()]);
+    assert.equal(dl2.suggestedFilename(), 'BM-CD-04_Sua-chua.xlsx');
+    assert.equal(readSheets(X, new Uint8Array(fs.readFileSync(await dl2.path()))).length, 5);
     await page.screenshot({ path: path.join(SHOTS, 'tpl-web.png') });
     // Danh mục: lọc "Chưa có tệp mẫu" (biểu cơ điện chưa có sheet nào trong kho)
     await go(page, '/catalog');

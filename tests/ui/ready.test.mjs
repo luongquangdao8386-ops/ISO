@@ -10,7 +10,7 @@ import path from 'node:path';
 import { openApp, SHOTS } from './harness.mjs';
 import { freshServer, ownerClient, addUser, uuid, fakePngB64, OWNER_CODE, OWNER_PIN } from '../helpers.mjs';
 import { xlsx } from '../xlsx-node.mjs';
-import { activeSheet } from '../../js/tplx.js';
+import { activeSheet, readSheets } from '../../js/tplx.js';
 
 const NOW = '2026-11-25T09:00:00+07:00';
 const IPHONE = { viewport: { width: 390, height: 844 }, mobile: true };
@@ -104,8 +104,11 @@ test('iPhone: ô Trang chủ → Kiểm tra ISO: 3/4 đã có, thiếu BM-CĐ-08
     await btn.click();
     await page.waitForFunction(() => /Mở \/ Lưu/.test(document.querySelector('.rd-row[data-code="BM-CĐ-04-03"] button.tpl-get').innerText));
     const [dl] = await Promise.all([page.waitForEvent('download'), btn.click()]);
-    assert.equal(dl.suggestedFilename(), 'BM-CD-04_Sua-chua.xlsx');
-    assert.equal(activeSheet(X, new Uint8Array(fs.readFileSync(await dl.path()))), 'BM-CĐ-04-03');
+    // Tệp chỉ có biểu BM-CĐ-04-03 + sheet phụ (không kèm Mục lục, 04-01)
+    assert.equal(dl.suggestedFilename(), 'BM-CD-04-03.xlsx');
+    const one = new Uint8Array(fs.readFileSync(await dl.path()));
+    assert.equal(activeSheet(X, one), 'BM-CĐ-04-03');
+    assert.deepEqual(readSheets(X, one).map((s) => s.n), ['BM-CĐ-04-03', 'BM-CĐ-04-03-TH', 'BM-CĐ-04-03-ML']);
     // Tải danh sách Excel → hộp thoại → Mở / lưu tệp: logo, tiêu đề, cột Có / Thiếu
     await page.click('#rd-xlsx');
     await page.waitForSelector('.modal #rd-open', { timeout: 20000 });

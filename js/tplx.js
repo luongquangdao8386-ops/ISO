@@ -67,7 +67,8 @@ export function setOf(sheets, fileName, deptCodes) {
 
 /* ---------------- Gói zip của tệp xlsx ---------------- */
 
-const unesc = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const unesc = (s) => String(s).replace(/&#x([0-9a-fA-F]+);/g, (m, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(Number(d)))
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const attr = (tag, name) => { const m = new RegExp(`\\s${name}="([^"]*)"`).exec(tag); return m ? unesc(m[1]) : null; };
 
 function openZip(X, bytes) {
@@ -91,7 +92,7 @@ function bookSheets(z) {
   const out = [];
   for (const m of wb.matchAll(/<sheet\b[^>]*\/?>/g)) {
     const rid = attr(m[0], 'r:id') || attr(m[0], 'r:Id');
-    out.push({ name: attr(m[0], 'name') || '', state: attr(m[0], 'state') || 'visible', path: rid ? target[rid] || '' : '' });
+    out.push({ name: attr(m[0], 'name') || '', state: attr(m[0], 'state') || 'visible', path: rid ? target[rid] || '' : '', rid: rid || '', tag: m[0] });
   }
   return out;
 }
@@ -160,6 +161,188 @@ export function openAtSheet(X, bytes, name) {
     if (x !== before) z.put(s.path, x);
   });
   return z.CFB.write(z.zip, { fileType: 'zip', type: 'array', compression: true });
+}
+
+/* ---------------- Tách biểu: chỉ giữ sheet của một biểu (25/11/2026) ---------------- */
+
+const reEsc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** Đường dẫn trong gói từ Target của .rels (tương đối với thư mục của phần chứa rels) */
+function resolvePart(base, target) {
+  if (target.startsWith('/')) return target.slice(1);
+  const parts = base.split('/').slice(0, -1);
+  for (const seg of target.split('/')) {
+    if (seg === '..') parts.pop();
+    else if (seg && seg !== '.') parts.push(seg);
+  }
+  return parts.join('/');
+}
+const relsOf = (part) => { const i = part.lastIndexOf('/'); return (i < 0 ? '' : part.slice(0, i + 1)) + '_rels/' + part.slice(i + 1) + '.rels'; };
+
+/** Phần (part) mà một phần trỏ tới qua .rels của nó (bỏ liên kết ngoài): [path] */
+function relTargets(z, part) {
+  const x = z.get(relsOf(part));
+  if (!x) return [];
+  const out = [];
+  for (const m of x.matchAll(/<Relationship\b[^>]*>/g)) {
+    if (attr(m[0], 'TargetMode') === 'External') continue;
+    const t = attr(m[0], 'Target');
+    if (t) out.push(resolvePart(part, t));
+  }
+  return out;
+}
+/** Mọi phần đi tới được từ các phần gốc (theo .rels, đệ quy) */
+function reach(z, roots) {
+  const seen = new Set();
+  const stack = roots.slice();
+  while (stack.length) {
+    const p = stack.pop();
+    if (!p || seen.has(p)) continue;
+    seen.add(p);
+    relTargets(z, p).forEach((t) => stack.push(t));
+  }
+  return seen;
+}
+
+/** Công thức có tham chiếu tới sheet bị bỏ ('Tên sheet'!, TênSheet!) hoặc tên vùng bị bỏ */
+function refTester(names, droppedNames) {
+  const res = [];
+  names.forEach((n) => {
+    const q = reEsc(n.replace(/'/g, "''"));
+    res.push(new RegExp(`'${q}'!`));
+    // Tham chiếu nhiều sheet 'A:B'!A1 có một đầu là sheet bị bỏ
+    res.push(new RegExp(`'${q}:[^']*'!`), new RegExp(`'[^']*:${q}'!`));
+    if (/^[A-Za-z_À-ỹ][\w.À-ỹ]*$/.test(n)) res.push(new RegExp(`(^|[^\\w.'\\u00C0-\\u1EF9])${reEsc(n)}!`));
+  });
+  droppedNames.forEach((n) => res.push(new RegExp(`(^|[^\\w.])${reEsc(n)}($|[^\\w.(])`)));
+  return (text) => res.some((re) => re.test(unesc(text)));
+}
+
+/** Sheet giữ lại: công thức / xác thực dữ liệu / liên kết trỏ sang sheet bị bỏ → giữ giá trị đang hiện, bỏ phần trỏ sang.
+ *  linkRid: Map(rId → Target) của liên kết dạng "#'Sheet'!A1" ghi qua .rels (một số chương trình ghi như vậy thay vì location) */
+function cutRefs(x, broken, linkRid = new Map()) {
+  // Công thức dùng chung (t="shared"): ô gốc trỏ sang sheet bị bỏ thì bỏ cả nhóm si đó
+  const badSi = new Set();
+  for (const m of x.matchAll(/<f\b([^>]*)>([\s\S]*?)<\/f>/g)) {
+    if (attr(m[0], 't') === 'shared' && attr(m[0], 'ref') !== null && broken(m[2])) badSi.add(attr(m[0], 'si'));
+  }
+  x = x.replace(/<c\b([^>]*?)(\/>|>([\s\S]*?)<\/c>)/g, (all, a, end, inner) => {
+    if (inner === undefined || !/<f\b/.test(inner)) return all;
+    const fm = /<f\b[^>]*?(?:\/>|>([\s\S]*?)<\/f>)/.exec(inner);
+    const ftag = fm[0];
+    const bad = broken(fm[1] || '') || (attr(ftag, 't') === 'shared' && badSi.has(attr(ftag, 'si')));
+    if (!bad) return all;
+    let rest = inner.replace(ftag, '');
+    let at = a;
+    if (attr(a, 't') === 'str') {
+      const v = /<v>([\s\S]*?)<\/v>/.exec(rest);
+      at = a.replace(/\st="str"/, ' t="inlineStr"');
+      rest = `<is><t xml:space="preserve">${v ? v[1] : ''}</t></is>`;
+    }
+    return rest ? `<c${at}>${rest}</c>` : `<c${at}/>`;
+  });
+  // Xác thực dữ liệu (danh sách lấy từ sheet khác)
+  x = x.replace(/<dataValidation\b[^>]*?(?:\/>|>[\s\S]*?<\/dataValidation>)/g, (dv) => (broken(dv.replace(/<[^>]+>/g, ' ')) ? '' : dv));
+  x = x.replace(/<dataValidations\b[^>]*>([\s\S]*?)<\/dataValidations>/g, (all, body) => {
+    const n = (body.match(/<dataValidation\b/g) || []).length;
+    return n ? all.replace(/(<dataValidations\b[^>]*?\scount=")\d+"/, `$1${n}"`) : '';
+  });
+  x = x.replace(/<x14:dataValidation\b[^>]*>[\s\S]*?<\/x14:dataValidation>/g, (dv) => (broken(dv.replace(/<[^>]+>/g, ' ')) ? '' : dv));
+  x = x.replace(/<x14:dataValidations\b[^>]*>([\s\S]*?)<\/x14:dataValidations>/g, (all, body) => {
+    const n = (body.match(/<x14:dataValidation\b/g) || []).length;
+    return n ? all.replace(/(<x14:dataValidations\b[^>]*?\scount=")\d+"/, `$1${n}"`) : '';
+  });
+  x = x.replace(/<ext\b[^>]*>\s*<\/ext>/g, '').replace(/<extLst>\s*<\/extLst>/g, '');
+  // Liên kết trong tệp (vd về Mục lục)
+  x = x.replace(/<hyperlink\b[^>]*\/>/g, (h) => {
+    const loc = attr(h, 'location');
+    const rid = attr(h, 'r:id');
+    const tgt = rid && linkRid.has(rid) ? linkRid.get(rid).replace(/^#/, '') : '';
+    const dec = (v) => { try { return decodeURIComponent(v); } catch (e) { return v; } };
+    return [loc, tgt].some((v) => v && (broken(xmlEsc(v)) || broken(xmlEsc(dec(v))))) ? '' : h;
+  });
+  x = x.replace(/<hyperlinks>\s*<\/hyperlinks>/g, '');
+  return x;
+}
+
+/**
+ * Tệp chỉ còn các sheet `keep` (một biểu + sheet phụ của nó), mở sẵn ở sheet `active`. Bỏ phần của sheet khác (bản vẽ, ghi chú, ảnh
+ * chỉ sheet đó dùng), tên vùng của sheet bị bỏ, chuỗi tính (calcChain), docProps/app.xml (danh sách sheet cũ); sheet giữ lại có công
+ * thức / danh sách chọn / liên kết trỏ sang sheet bị bỏ thì giữ giá trị đang hiện. Định dạng, vùng in, khổ giấy, ảnh của sheet giữ lại
+ * giữ nguyên. Không có sheet nào trong keep → trả nguyên tệp.
+ */
+export function onlySheets(X, bytes, keep, active) {
+  const z = openZip(X, bytes);
+  const list = bookSheets(z);
+  const want = new Set(keep || []);
+  const kept = list.filter((s) => want.has(s.name));
+  if (!kept.length) return bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const gone = list.filter((s) => !want.has(s.name));
+  const act = kept.some((s) => s.name === active) ? active : kept[0].name;
+  if (!gone.length) return openAtSheet(X, bytes, act);
+  const goneNames = gone.map((s) => s.name);
+
+  // workbook.xml: sheet, tên vùng (localSheetId đánh lại theo thứ tự mới), activeTab
+  let wb = z.get('xl/workbook.xml');
+  const newIdx = new Map(kept.map((s, i) => [list.indexOf(s), i]));
+  gone.forEach((s) => { wb = wb.replace(s.tag, ''); });
+  const sheetRef = refTester(goneNames, []);
+  const dropped = [];
+  wb = wb.replace(/<definedName\b([^>]*)>([\s\S]*?)<\/definedName>/g, (all, a, body) => {
+    const loc = attr(all, 'localSheetId');
+    if (loc !== null) {
+      if (!newIdx.has(Number(loc))) return '';
+      if (sheetRef(body)) return '';
+      return all.replace(/\slocalSheetId="\d+"/, ` localSheetId="${newIdx.get(Number(loc))}"`);
+    }
+    if (sheetRef(body)) { dropped.push(attr(all, 'name')); return ''; }
+    return all;
+  });
+  wb = wb.replace(/<definedNames>\s*<\/definedNames>/, '');
+  wb = wb.replace(/<workbookView\b[^>]*?\/?>/, (tag) => tag.replace(/\s(activeTab|firstSheet)="[^"]*"/g, ''));
+  z.put('xl/workbook.xml', wb);
+
+  // Phần cần giữ: đi từ gốc gói + workbook (trừ sheet bị bỏ, calcChain); phần chỉ sheet bị bỏ dùng → xóa
+  let wrels = z.get('xl/_rels/workbook.xml.rels') || '';
+  const goneRid = new Set(gone.map((s) => s.rid));
+  wrels = wrels.replace(/<Relationship\b[^>]*\/?>/g, (r) => (goneRid.has(attr(r, 'Id')) || /\/calcChain$/.test(attr(r, 'Type') || '') ? '' : r));
+  z.put('xl/_rels/workbook.xml.rels', wrels);
+  let root = z.get('_rels/.rels') || '';
+  root = root.replace(/<Relationship\b[^>]*\/?>/g, (r) => (/docProps\/app\.xml$/.test(attr(r, 'Target') || '') ? '' : r));
+  z.put('_rels/.rels', root);
+  const live = reach(z, ['xl/workbook.xml'].concat(relTargets(z, '')));
+  const dead = new Set(['xl/calcChain.xml', 'docProps/app.xml']);
+  reach(z, gone.map((s) => s.path)).forEach((p) => { if (!live.has(p)) dead.add(p); });
+  let ct = z.get('[Content_Types].xml') || '';
+  dead.forEach((p) => {
+    for (const q of [p, relsOf(p)]) {
+      if (X.CFB.find(z.zip, '/' + q)) X.CFB.utils.cfb_del(z.zip, '/' + q);
+      ct = ct.replace(new RegExp(`<Override\\b[^>]*PartName="/${reEsc(q)}"[^>]*/>`, 'g'), '');
+    }
+  });
+  z.put('[Content_Types].xml', ct);
+
+  // Sheet giữ lại: bỏ tham chiếu sang sheet bị bỏ
+  const broken = refTester(goneNames, dropped.filter(Boolean));
+  kept.forEach((s) => {
+    const x = s.path ? z.get(s.path) : null;
+    if (!x) return;
+    const linkRid = new Map();
+    for (const m of (z.get(relsOf(s.path)) || '').matchAll(/<Relationship\b[^>]*>/g)) {
+      const t = attr(m[0], 'Target') || '';
+      if (/\/hyperlink$/.test(attr(m[0], 'Type') || '') && t.startsWith('#')) linkRid.set(attr(m[0], 'Id'), t);
+    }
+    const y = cutRefs(x, broken, linkRid);
+    if (y !== x) z.put(s.path, y);
+  });
+  const out = z.CFB.write(z.zip, { fileType: 'zip', type: 'array', compression: true });
+  return openAtSheet(X, out, act);
+}
+
+/** Tên tệp của một biểu tách riêng: "BM-CĐ-04-03" → "BM-CD-04-03.xlsx" (bỏ ký tự không dùng được trong tên tệp) */
+export function sheetFileName(name) {
+  return String(name || 'bieu').replace(/[Đđ]/g, (c) => (c === 'Đ' ? 'D' : 'd')).replace(/[\\/:*?"<>|]+/g, '-').trim() + '.xlsx';
 }
 
 /** Sheet đang chọn khi mở tệp (để kiểm): tên sheet theo activeTab */

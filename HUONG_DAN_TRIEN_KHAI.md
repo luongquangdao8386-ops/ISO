@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.5 (màn Kiểm tra ISO; bản 4.4 thêm ISO 14001, ISO 45001, ISO 50001)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.6 (tải riêng từng biểu; 4.5 màn Kiểm tra ISO; 4.4 thêm ISO 14001, 45001, 50001)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -125,6 +125,33 @@ cách có. **Đã có** = biểu có tệp mẫu trong Kho tệp mẫu (nút **I
 "Một phần M&E / Checksheet", "Đề xuất Checksheet" chưa có tệp mẫu tính là thiếu; biểu ✕ Không áp dụng không tính. Nút **Tải danh sách
 Excel** (góc trên) ra bảng Mã · Tên · Nhóm · Có / Thiếu · Cách có · Tình trạng, có logo công ty ở đầu như báo cáo. Chỉ đổi app, máy chủ
 không đổi.
+
+Bản 4.6 (25/11/2026, anh: "biểu tải về vẫn còn các tab khác ở dưới… tải cái nào riêng cái đó thôi"): tải một biểu từ **Kiểm tra ISO →
+In**, **chi tiết biểu → Tải tệp mẫu**, **Kho tệp mẫu → Tải** (từng sheet) → tệp Excel **chỉ có biểu đó** (kèm trang phụ của chính nó nếu có,
+vd BM-CĐ-04-03 kèm 04-03-TH, 04-03-ML; 03-03 kèm 03-03a…i), tên tệp theo mã biểu (`BM-CD-02-04.xlsx`), mở ra Ctrl+P là in. Định dạng, vùng
+in, khổ giấy, ảnh, ghi chú của biểu giữ nguyên; ô công thức / danh sách chọn / liên kết trỏ sang tab đã bỏ (vd về Mục lục) giữ **giá trị đang
+hiện**, không báo lỗi. **Kho tệp mẫu → Tải cả tệp** vẫn tải cả bộ. Chỉ đổi app.
+
+## CẬP NHẬT LÊN BẢN 4.6 (1.0.0-d4.6, tải riêng từng biểu) — chỉ app
+
+**Anh phải làm:** đóng hẳn app rồi mở lại `/ISO/` → **Tài khoản → Thông tin** ghi `1.0.0-d4.6 · mã vỏ app 474e8e65765a` (máy chủ vẫn ghi
+bản cũ — đúng, không cần dán Code.gs). Máy chủ **chưa lên 4.4** thì làm 4 bước của mục "CẬP NHẬT LÊN BẢN 4.4" (Code.gs trên `main` nay là
+d4.6; Mô tả bản triển khai `d4.6 tai rieng tung bieu`).
+
+**Nên kiểm (1 phút, máy tính):** **Kiểm tra ISO** (hoặc Kho tệp mẫu → mở một bộ → **Tải** ở một sheet) → tải một biểu → mở bằng
+**Microsoft Excel**: chỉ còn tab của biểu đó, **không** hiện thông báo "We found a problem with some content / sửa tệp", logo / ảnh, khung,
+vùng in như cũ → Ctrl+P xem trước đúng một biểu. Nếu Excel báo sửa tệp: chụp gửi Claude, tạm dùng **Tải cả tệp** như trước.
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/server/tplsplit.test.mjs` (2 test): bộ có Mục lục (liên kết tới từng biểu), mỗi biểu
+có công thức lấy từ Mục lục (cả công thức dùng chung), tên vùng trỏ Mục lục, danh sách chọn (thường + kiểu Excel 2010), liên kết về Mục lục
+và sang trang phụ, ảnh dùng chung + ảnh riêng, calcChain → tải BM-CĐ-04-03: chỉ còn 04-03 + 04-03-TH, mở sẵn 04-03, gói hợp lệ (mọi liên
+kết nội bộ trỏ tới phần có thật, phần nào cũng có kiểu nội dung), vùng in đánh lại đúng tab, ô trỏ Mục lục thành giá trị, công thức trong
+biểu và sang trang phụ giữ, danh sách chọn tự ghi giữ, ảnh dùng chung giữ, ảnh riêng của tab bỏ bị xóa; Mục lục tải riêng; giữ cả tệp =
+như trước. `tests/ui/tpl.test.mjs`, `tests/ui/ready.test.mjs`: iPhone chi tiết biểu → Tải tệp mẫu → `BM-CD-04-03.xlsx` chỉ 3 tab; Kiểm tra
+ISO → In → như trên; máy tính Kho → Tải sheet 04-01 → `BM-CD-04-01.xlsx` một tab, **Tải cả tệp** → cả bộ 5 tab. Ngoài repo: tệp mẫu dựng
+bằng openpyxl, xlsxwriter (giống tệp Excel) và LibreOffice (có ảnh, ghi chú, vùng in, tiêu đề in lặp, danh sách chọn, công thức nhiều tab)
+→ tách từng biểu → mở lại bằng openpyxl không cảnh báo, LibreOffice in ra PDF đúng. Cả bộ: 117 test máy chủ + 54 test giao diện đạt.
+Không kiểm được: Microsoft Excel thật, tệp mẫu thật của anh (chưa có trong phiên này).
 
 ## CẬP NHẬT LÊN BẢN 4.5 (1.0.0-d4.5, màn Kiểm tra ISO) — chỉ app
 

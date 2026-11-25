@@ -1,12 +1,12 @@
 // Kho tệp mẫu · 模板库 (2e, người dùng yêu cầu 12/11/2026): bộ biểu Excel đã căn chỉnh in (mỗi sheet một mã biểu) và tệp Word / PDF mẫu.
-// Mọi cấp xem và tải; tệp Excel tải về mở sẵn đúng sheet của biểu (Ctrl+P → In sheet hiện tại). Thư ký ISO / cấp 4 tải lên nhiều tệp
+// Mọi cấp xem và tải; tải một biểu → tệp chỉ có sheet của biểu đó (+ sheet phụ), "Tải cả tệp" → cả bộ. Thư ký ISO / cấp 4 tải lên nhiều tệp
 // một lần (app đọc tên sheet + khổ giấy, ghép sheet ↔ biểu theo mã như máy chủ), tệp cùng bộ thay tệp cũ, bỏ tệp tải nhầm (PIN).
 // Chi tiết biểu có thẻ "Tệp mẫu" (itemTplCard). Tải về cần mạng (tệp nằm trên Drive riêng tư của máy chủ, qua doc.get).
 import { bi, biText, esc, fmtDate, nameText, uuid, blobToB64, session, resMsg } from '../core.js';
 import { ICON, toast, dialog, $, $$, setViewHtml, wireSearch } from '../ui.js';
 import { items, recs, isSecretary, roleLevel, can, tplActive, tplOn, scopeNames, scopeBi, allDepts, foldVi, users, userName, inScopeDept } from '../data.js';
 import { loadXlsx } from '../xlsx.js';
-import { readSheets, openAtSheet, itemIndex, matchSheet, setOf, normCode } from '../tplx.js';
+import { readSheets, openAtSheet, onlySheets, sheetFileName, itemIndex, matchSheet, setOf, normCode } from '../tplx.js';
 import { fetchDoc, openFile, fmtSize, mimeOf } from '../files.js';
 import { isTouchMobile } from '../media.js';
 import { writeOnline, writeWithPin, writeFail, busy } from '../form.js';
@@ -52,18 +52,40 @@ export async function tplMap() {
 
 const made = new Map(); // document_id|sheet → File
 
+/**
+ * Sheet thuộc cùng biểu với `sheet` trong tệp (biểu chính + sheet phụ -TD / -TH / -ML, a…i — ghép như Kho tệp mẫu); sheet không mang
+ * mã biểu (vd Mục lục) thì chỉ sheet đó. Trả {keep: [tên sheet], code: mã biểu | ''}
+ */
+async function formSheets(docId, sheet) {
+  const t = (await recs('TPL')).find((x) => x.document_id === docId);
+  const names = (t && Array.isArray(t.sheets_json) ? t.sheets_json : []).map((x) => x.n);
+  const idx = itemIndex(await items());
+  const m = matchSheet(idx, sheet);
+  if (!m) return { keep: [sheet], code: '' };
+  const keep = names.filter((n) => { const k = matchSheet(idx, n); return k && k.it.item_id === m.it.item_id; });
+  if (!keep.includes(sheet)) keep.push(sheet);
+  return { keep, code: m.it.code };
+}
+
 async function tplFile(docId, sheet) {
   const key = docId + '|' + (sheet || '');
   if (made.has(key)) return { ok: true, file: made.get(key) };
   const r = await fetchDoc(docId);
   if (!r.ok) return r;
   let file = r.file;
+  // Tải một biểu (25/11/2026, người dùng: "tải cái nào riêng cái đó thôi"): tệp chỉ còn sheet của biểu đó, mở sẵn đúng sheet;
+  // "Tải cả tệp" (không ghi sheet) vẫn là cả bộ. Lỗi khi tách → cả bộ mở sẵn sheet như trước.
   if (sheet && extOf(file.name) === 'xlsx') {
+    const type = file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    let X = null, raw = null;
     try {
-      const X = await loadXlsx();
-      const bytes = openAtSheet(X, new Uint8Array(await file.arrayBuffer()), sheet);
-      file = new File([bytes], file.name, { type: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    } catch (e) { /* tệp lạ: trả nguyên tệp */ }
+      X = await loadXlsx();
+      raw = new Uint8Array(await file.arrayBuffer());
+      const f = await formSheets(docId, sheet);
+      file = new File([onlySheets(X, raw, f.keep, sheet)], sheetFileName(f.code || sheet), { type });
+    } catch (e) {
+      try { if (X && raw) file = new File([openAtSheet(X, raw, sheet)], file.name, { type }); } catch (e2) { /* tệp lạ: trả nguyên tệp */ }
+    }
   }
   made.set(key, file);
   return { ok: true, file };
