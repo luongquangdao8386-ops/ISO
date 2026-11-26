@@ -111,7 +111,7 @@ export async function renderNcrs(view, { shell, query }) {
   const canNew = isSecretary() || (await depts()).some((d) => d.active !== false && canCreateNcr(d.dept_code));
   view.innerHTML = `<div class="row list-head ncr-head">${canNew ? `<a class="btn primary" href="#/ncr/new" id="ncr-new">${ICON.plus}<span>${bi('ncr.new')}</span></a>` : ''}
       ${await can('report.run') ? `<a class="btn" href="#/reports?kind=NCR" id="ncr-log">${ICON.reports}<span>${bi('ncr.log_report')}</span></a>` : ''}</div>
-    <div class="chips tabs">${TABS.filter((t) => t === 'all' || t === curTab || by[t].length).map((t) => `<button type="button" class="chip${t === curTab ? ' on' : ''}" data-tab="${t}">${bi('ncr.tab.' + t)} <b>${by[t].length}</b></button>`).join('')}</div>
+    ${((tabs) => (tabs.length > 1 ? `<div class="chips tabs">${tabs.map((t) => `<button type="button" class="chip${t === curTab ? ' on' : ''}" data-tab="${t}">${bi('ncr.tab.' + t)} <b>${by[t].length}</b></button>`).join('')}</div>` : ''))(TABS.filter((t) => t === 'all' || t === curTab || by[t].length))}
     ${shown.length ? `<ul class="cat-list">${shown.map((n) => ncrRow(n, um)).join('')}</ul>`
       : `<div class="card empty-state">${ICON.check}<p class="muted">${bi(all.length ? 'capa.none_tab' : 'ncr.none')}</p></div>`}
     <p class="muted small">${bi('ncr.how')}</p>`;

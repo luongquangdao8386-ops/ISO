@@ -54,35 +54,69 @@ test('iPhone: Trang chủ 9 ô → Tất cả chức năng: 3 nhóm, đủ ô; b
   } finally { await app.close(); }
 });
 
-test('web: menu trái 3 nhóm đóng sẵn → mở / đóng, nhớ sau khi tải lại; màn đang mở tự mở nhóm; tên ngắn; Tra cứu chỉ thấy nhóm được dùng', async () => {
+test('web: menu trái 3 nhóm — chỉ một nhóm mở: nhóm của màn đang xem; sang nhóm khác thì nhóm cũ gập; Trang chủ gập hết; bấm tên nhóm xem nhóm khác; tên ngắn; Tra cứu chỉ thấy nhóm được dùng', async () => {
   const env = realLike();
   let app = await openApp({ env, now: NOW, ...WEB });
   try {
     const { page } = app;
     await login(page);
+    const openGrps = () => page.locator('.side-grp.open').evaluateAll((els) => els.map((e) => e.dataset.grp));
     assert.deepEqual(await page.locator('.side-grp').evaluateAll((els) => els.map((e) => e.dataset.grp)), ['docs', 'rec', 'tools']);
     assert.deepEqual(await visibleSide(page), ['home', 'account'], 'mới vào: chỉ Trang chủ, tên 3 nhóm, Tài khoản');
     assert.equal(await page.locator('.side .side-item').count(), 18);
+    // Bấm tên nhóm Tài liệu → mở; vào Danh mục → vẫn chỉ Tài liệu mở
     await page.click('.side-grp[data-grp="docs"] .side-grp-h');
     assert.deepEqual(await visibleSide(page), ['home', 'catalog', 'templates', 'versions', 'requests', 'dist', 'labels', 'account']);
     assert.match(await page.innerText('.side-item[data-nav="dist"]'), /^Phân phối · 分发收回$/);
     assert.equal(await page.getAttribute('.side-grp[data-grp="docs"] .side-grp-h', 'aria-expanded'), 'true');
-    // Màn Khắc phục → nhóm Hồ sơ & đánh giá tự mở; Tài liệu vẫn mở (đã bấm)
     await page.click('.side-item[data-nav="catalog"]');
+    await page.waitForFunction(() => location.hash === '#/catalog');
+    assert.deepEqual(await openGrps(), ['docs']);
+    // Sang Kiểm tra ISO (nhóm Hồ sơ & đánh giá): Tài liệu tự gập — ảnh người dùng gửi 26/11/2026 là hai nhóm cùng mở
+    await page.click('.side-grp[data-grp="rec"] .side-grp-h');
+    assert.deepEqual(await openGrps(), ['rec'], 'bấm tên nhóm khác: nhóm đang mở gập lại');
+    await page.click('.side-item[data-nav="ready"]');
+    await page.waitForFunction(() => location.hash === '#/ready');
+    assert.deepEqual(await openGrps(), ['rec']);
+    // Vào thẳng màn của nhóm khác (link trong trang, nút quay lại…): nhóm đó mở, nhóm cũ gập
     await go(page, '#/capa');
-    await page.waitForFunction(() => document.querySelector('.side-grp[data-grp="rec"]').classList.contains('open'));
+    await page.waitForSelector('.side-item[data-nav="capa"].active');
+    assert.deepEqual(await openGrps(), ['rec']);
     assert.match(await page.innerText('.side-item[data-nav="ncr"]'), /^SP không phù hợp · 不合格品$/);
-    assert.equal(await page.locator('.side-item[data-nav="capa"].active').count(), 1);
-    // Đóng Tài liệu → tải lại: Tài liệu đóng, Công cụ (chưa mở) đóng
-    await page.click('.side-grp[data-grp="docs"] .side-grp-h');
+    await go(page, '#/templates');
+    await page.waitForSelector('.side-item[data-nav="templates"].active');
+    assert.deepEqual(await openGrps(), ['docs']);
+    // Chi tiết một biểu thuộc Danh mục → vẫn nhóm Tài liệu
+    await page.click('.side-item[data-nav="catalog"]');
+    await page.waitForSelector('.cat-tbl tr[data-href^="/item/"]');
+    await page.locator('.cat-tbl tr[data-href^="/item/"]').first().click();
+    await page.waitForFunction(() => /^#\/item\//.test(location.hash));
+    assert.deepEqual(await openGrps(), ['docs']);
+    // Đang ở một màn, bấm mở nhóm khác để xem: giữ nguyên tới khi chuyển màn (đồng bộ vẽ lại không gập)
     await page.click('.side-grp[data-grp="tools"] .side-grp-h');
+    assert.deepEqual(await openGrps(), ['tools']);
     assert.match(await page.innerText('.side-item[data-nav="links"]'), /^Kết nối · 连接$/);
+    // Bấm tên nhóm đang mở → gập
+    await page.click('.side-grp[data-grp="tools"] .side-grp-h');
+    assert.deepEqual(await openGrps(), []);
+    // Trang chủ: gập hết
+    await page.click('.side-item[data-nav="reports"]').catch(() => {});
+    await go(page, '#/reports');
+    await page.waitForSelector('.side-item[data-nav="reports"].active');
+    assert.deepEqual(await openGrps(), ['tools']);
+    await page.click('.side-item[data-nav="home"]');
+    await page.waitForSelector('.grid9');
+    assert.deepEqual(await openGrps(), []);
+    assert.deepEqual(await visibleSide(page), ['home', 'account']);
+    // Tải lại ở màn Khắc phục: chỉ nhóm của màn đó mở (không nhớ nhóm cũ)
+    await go(page, '#/capa');
+    await page.waitForSelector('.side-item[data-nav="capa"].active');
     await page.reload();
     await page.waitForSelector('.side-grp', { timeout: 20000 });
     const upin = await page.$('#upin');
     if (upin) { await page.fill('#upin', OWNER_PIN); await page.keyboard.press('Enter'); }
-    await page.waitForSelector('.side-grp[data-grp="tools"].open', { timeout: 20000 });
-    assert.equal(await page.locator('.side-grp[data-grp="docs"].open').count(), 0);
+    await page.waitForSelector('.side-grp[data-grp="rec"].open', { timeout: 20000 });
+    assert.deepEqual(await openGrps(), ['rec']);
     await page.screenshot({ path: path.join(SHOTS, 'menu-web.png') });
     // Tất cả chức năng trên máy tính: nhiều cột
     await go(page, '#/menu');

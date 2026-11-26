@@ -85,7 +85,7 @@ export async function renderRequests(view, { shell, query }) {
   const shown = by[curTab].slice().sort((a, b) => String(b.submitted_at).localeCompare(String(a.submitted_at)));
   view.innerHTML = `<div class="row list-head"><a class="btn primary" href="#/request/new">${ICON.plus}<span>${bi('dr.new')}</span></a>
       ${await can('report.run') ? `<a class="btn" href="#/reports?kind=DOCREQ">${ICON.reports}<span>${bi('dr.log_report')}</span></a>` : ''}</div>
-    <div class="chips tabs">${TABS.filter((t) => t === 'all' || t === curTab || by[t].length).map((t) => `<button type="button" class="chip${t === curTab ? ' on' : ''}" data-tab="${t}">${bi('dr.tab.' + t)} <b>${by[t].length}</b></button>`).join('')}</div>
+    ${((tabs) => (tabs.length > 1 ? `<div class="chips tabs">${tabs.map((t) => `<button type="button" class="chip${t === curTab ? ' on' : ''}" data-tab="${t}">${bi('dr.tab.' + t)} <b>${by[t].length}</b></button>`).join('')}</div>` : ''))(TABS.filter((t) => t === 'all' || t === curTab || by[t].length))}
     ${shown.length ? `<ul class="cat-list">${shown.map((r) => requestRow(r, itMap.get(r.item_id), um)).join('')}</ul>`
       : `<div class="card empty-state">${ICON.check}<p class="muted">${bi('dr.none')}</p></div>`}
     <p class="muted small">${bi('dr.how')}</p>`;

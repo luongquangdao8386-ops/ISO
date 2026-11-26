@@ -155,6 +155,9 @@ làm** → màn Nộp hồ sơ của biểu đó. **Nộp hồ sơ không bắt 
   tệp hỏng. Nay sheet của biểu luôn hiện ra (sheet phụ đang ẩn vẫn giữ ẩn).
 - **Kiểm tra ISO → "N lần"** của biểu in từ M&E / Checksheet: trước đếm số kỳ (một tháng 3 phiếu bảo trì ghi "1 lần"), nay đếm số lượt.
 - **Bản sao (fork) của người khác** không còn nối vào máy chủ THẬT của anh (config.js chỉ dùng link cố định trên trang của anh).
+- **Menu trái (máy tính)**: trước đi qua màn của nhóm nào là nhóm đó mở thêm, không tự gập → menu dài lại. Nay **chỉ một nhóm mở** — nhóm
+  của màn đang xem; sang màn ở nhóm khác thì nhóm cũ tự gập; Trang chủ, Tài khoản gập hết; bấm tên nhóm để xem nhóm khác. Không nhớ trên máy.
+- Khắc phục, Sản phẩm không phù hợp, Đề nghị tài liệu: chưa có phiếu thì không hiện hàng nút "Tất cả 0" thừa.
 
 ## CẬP NHẬT LÊN BẢN 4.8 (1.0.0-d4.8, Đã làm / Chưa làm, hồ sơ giấy) — dán Code.gs, không cần migrateSchema
 

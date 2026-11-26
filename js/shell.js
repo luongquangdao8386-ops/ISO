@@ -1,5 +1,5 @@
 // Khung app sau đăng nhập (không logo công ty): header, nav 5 nút iPhone, menu trái web
-import { bi, biText, esc, fmtDate, fmtDateTime, session, badge, L, ls } from './core.js';
+import { bi, biText, esc, fmtDate, fmtDateTime, session, badge, L } from './core.js';
 import { ICON, h, $, $$ } from './ui.js';
 import { isIosSafariTab } from './auth.js';
 
@@ -45,8 +45,8 @@ export const SIDE_GROUPS = [
 ];
 const SIDE_SHORT = { requests: 'side.short.requests', dist: 'side.short.dist', ncr: 'tile.ncr', links: 'tile.links' };
 export const groupOf = (key) => (SIDE_GROUPS.find((g) => g.items.includes(key)) || {}).key || '';
-/** Nhóm người dùng tự mở (nhớ trên máy); nhóm của màn đang mở luôn mở */
-function openGroups() { try { return new Set(JSON.parse(ls.get('side_open') || '[]')); } catch (e) { return new Set(); } }
+// Mở / đóng nhóm (26/11/2026, người dùng: "mỗi lần vào các tab đều mở ra như này"): chỉ một nhóm mở — nhóm của màn đang xem;
+// sang màn ở nhóm khác thì nhóm cũ tự gập; Trang chủ, Tài khoản: gập hết. Bấm tên nhóm để xem nhóm khác (nhóm đang mở gập lại). Không nhớ trên máy.
 
 export const isWide = () => window.matchMedia('(min-width: 900px)').matches;
 
@@ -55,12 +55,10 @@ function sideHtml(lvl, sec) {
   const shown = SIDE.filter((it) => lvl >= it.lvl || (['excel', 'versions', 'records', 'coverage', 'ready', 'requests', 'dist', 'labels', 'capa', 'ncr', 'audits', 'mreview'].includes(it.key) && sec) || (it.key === 'audits' && session.user && session.user.auditor));
   const item = (it) => `<a class="side-item${it.soon ? ' soon' : ''}" href="#${it.path}" data-nav="${it.key}">${ICON[it.icon]}<span class="side-label">${bi(SIDE_SHORT[it.key] || it.label)}${it.soon ? `<span class="tag soon">${bi('soon.tag')}</span>` : ''}</span></a>`;
   const byKey = new Map(shown.map((it) => [it.key, it]));
-  const open = openGroups();
   const groups = SIDE_GROUPS.map((g) => {
     const list = g.items.map((k) => byKey.get(k)).filter(Boolean);
     if (!list.length) return '';
-    const on = open.has(g.key);
-    return `<div class="side-grp${on ? ' open' : ''}" data-grp="${g.key}"><button type="button" class="side-grp-h" aria-expanded="${on}"><span class="side-grp-label">${bi(g.label)}</span><span class="side-grp-badge" hidden></span>${ICON.chevron}</button>
+    return `<div class="side-grp" data-grp="${g.key}"><button type="button" class="side-grp-h" aria-expanded="false"><span class="side-grp-label">${bi(g.label)}</span><span class="side-grp-badge" hidden></span>${ICON.chevron}</button>
       <div class="side-grp-items">${list.map(item).join('')}</div></div>`;
   }).join('');
   return `${byKey.has('home') ? item(byKey.get('home')) : ''}${groups}<hr>${byKey.has('account') ? item(byKey.get('account')) : ''}`;
@@ -112,16 +110,17 @@ export function mountShell(root, { env, onScan }) {
       import('./router.js').then((r) => r.navigate(nb.dataset.path));
     }
   });
-  // Nhóm menu trái: bấm tên nhóm mở / đóng, nhớ trên máy
+  // Nhóm menu trái: chỉ một nhóm mở (grp rỗng = gập hết)
+  const openOnly = (grp) => $$('.side-grp', el).forEach((g) => {
+    const on = g.dataset.grp === grp;
+    g.classList.toggle('open', on);
+    $('.side-grp-h', g).setAttribute('aria-expanded', String(on));
+  });
   $$('.side-grp-h', el).forEach((b) => b.addEventListener('click', () => {
     const g = b.closest('.side-grp');
-    const on = !g.classList.contains('open');
-    g.classList.toggle('open', on);
-    b.setAttribute('aria-expanded', String(on));
-    const set = openGroups();
-    if (on) set.add(g.dataset.grp); else set.delete(g.dataset.grp);
-    ls.set('side_open', JSON.stringify([...set]));
+    openOnly(g.classList.contains('open') ? '' : g.dataset.grp);
   }));
+  let activeKey = null;
   /** Số đỏ trên tên nhóm = tổng số đỏ của các mục trong nhóm (thấy cả khi nhóm đang đóng) */
   const groupBadges = () => $$('.side-grp', el).forEach((g) => {
     const n = $$('.side-item .nav-badge', g).reduce((a, x) => a + (parseInt(x.textContent, 10) || 0), 0);
@@ -172,10 +171,10 @@ export function mountShell(root, { env, onScan }) {
     },
     setActive(key) {
       $$('[data-nav]', el).forEach((x) => x.classList.toggle('active', x.dataset.nav === key));
-      // Nhóm của màn đang mở tự mở (không ghi nhớ)
-      const g = groupOf(key);
-      const box = g ? $(`.side-grp[data-grp="${g}"]`, el) : null;
-      if (box && !box.classList.contains('open')) { box.classList.add('open'); $('.side-grp-h', box).setAttribute('aria-expanded', 'true'); }
+      // Sang màn khác: chỉ mở nhóm của màn đó (vẽ lại cùng màn thì giữ nguyên nhóm người dùng vừa bấm mở)
+      if (key === activeKey) return;
+      activeKey = key;
+      openOnly(groupOf(key));
     },
     /** Trạng thái đồng bộ ở góc phải header (web) */
     setSync({ offline, maintenance = false, lastSync, queued = 0, problems = 0 }) {
