@@ -12,8 +12,11 @@
     '/ISO/': { base: 'https://luongquangdao8386-ops.github.io/ISO/', exec: THAT },
     '/ISO-thu/': { base: 'https://luongquangdao8386-ops.github.io/ISO-thu/', exec: THU }
   };
+  // Chỉ trang của chủ repo gốc dùng hai link trên. Bản sao (fork) ở tài khoản GitHub khác: không có link cố định — màn đăng nhập
+  // cho dán link /exec máy chủ của chính họ (lưu trên từng máy), địa chỉ app lấy theo trang đang mở. Không phải sửa tệp này.
+  var OWNER_HOST = 'luongquangdao8386-ops.github.io';
   var m = /^\/[^/]+\//.exec(location.pathname);
-  var site = (m && SITES[m[0]]) || { base: '', exec: '' };
+  var site = (location.hostname === OWNER_HOST && m && SITES[m[0]]) || { base: '', exec: '' };
   window.ISO_CONFIG = {
     APP_BASE_URL: site.base,
     EXEC_URL: site.exec,
