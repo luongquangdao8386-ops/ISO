@@ -170,7 +170,9 @@ test('nộp hồ sơ: kiểm quyền, biểu nhận hồ sơ, ngày, số trang,
   assert.equal(code(submit(sx, env, 'BM-SX-02-01', '2025-01-01', '2026-02-10').r), 'RANGE_TOO_LONG');
   assert.equal(code(submit(sx, env, 'BM-SX-02-01', '2027-01-01', '2027-01-01').r), 'DATE_OUT_OF_RANGE');
   assert.equal(code(submit(sx, env, 'BM-SX-02-01', '2026-11-31', '2026-11-31').r), 'INVALID_DATE');
-  assert.equal(code(submit(sx, env, 'BM-SX-02-01', '2026-11-10', '2026-11-10', { pages: 0 }).r), 'PAGES_INVALID');
+  // 0 trang = hồ sơ giấy (26/11/2026): phải ghi nơi lưu ở Ghi chú; số trang âm vẫn sai
+  assert.equal(code(submit(sx, env, 'BM-SX-02-01', '2026-11-10', '2026-11-10', { pages: 0 }).r), 'REQUIRED');
+  assert.equal(code(submit(sx, env, 'BM-SX-02-01', '2026-11-10', '2026-11-10', { pages: -1 }).r), 'PAGES_INVALID');
   assert.equal(code(submit(sx, env, 'BM-SX-02-01', '2026-11-10', '2026-11-10', { pages: 31 }).r), 'PAGES_INVALID');
   // Tệp: loại theo việc, chữ ký byte, quyền người nộp
   const { id } = submit(sx, env, 'BM-SX-02-01', '2026-11-10', '2026-11-10');

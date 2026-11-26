@@ -7,7 +7,7 @@
 import { bi, biText, esc, fmtDate, fmtNumber, session, nameText } from '../core.js';
 import { brandHtml, ICON } from '../ui.js';
 import { isWide } from '../shell.js';
-import { items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue, ncrOn, ncrOverdue, auditOn, canSeeAudits, auditLate, mreviewOn, mrDecisions } from '../data.js';
+import { recordsDoneMap, items, recs, roleLevel, isSecretary, today, weekday, catalogSummary, canSeeRecords, recordStatusMap, recordsOn, recordWeek, docControlOn, tplActive, scopeNames, scopeBi, capaOn, capaOverdue, ncrOn, ncrOverdue, auditOn, canSeeAudits, auditLate, mreviewOn, mrDecisions } from '../data.js';
 import { queueItems } from '../sync.js';
 import { pendingFor } from '../pending.js';
 import { missingMandatory, ISO_STDS } from '../coverage.js';
@@ -185,8 +185,8 @@ async function allTiles(list) {
   let readyTail = '';
   if (canSeeRecords()) {
     const { byItem } = await (await import('./tpl.js')).tplMap();
-    const rs = readySummary(readyRows(list, byItem).rows);
-    if (rs.total) readyTail = `<span class="${rs.missing ? 't-red-text' : 't-green-text'}">${bi('rd.tile', { H: rs.have, T: rs.total })}</span>`;
+    const rs = readySummary(readyRows(list, byItem, await recordsDoneMap()).rows);
+    if (rs.total) readyTail = `<span class="${rs.missing || rs.todo ? 't-red-text' : 't-green-text'}">${bi('rd.tile', { D: rs.done, H: rs.have, T: rs.total })}</span>`;
   }
   const cOn = await capaOn();
   let capaTail = '';

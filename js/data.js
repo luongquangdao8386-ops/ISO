@@ -291,6 +291,27 @@ export async function recordStatusMap(list) {
   for (const it of list) if (memo.__rs.has(it.item_id)) out.set(it.item_id, memo.__rs.get(it.item_id));
   return out;
 }
+/**
+ * Biểu đã làm (có hồ sơ, 26/11/2026 — Kiểm tra ISO): Map(item_id → {last: ngày gần nhất, n: số lần, src: REC | QUEUE | APP}) — hồ sơ đã nộp
+ * (không tính bị trả lại / hủy), hồ sơ đang chờ gửi trên máy, ngày có hồ sơ từ app M&E / Checksheet.
+ */
+export async function recordsDoneMap() {
+  const { byItem, queued, evByItem } = await recordInputs();
+  const out = new Map();
+  const add = (id, d, src) => {
+    const o = out.get(id) || { last: '', n: 0, src: '' };
+    o.n++;
+    if (String(d || '') >= o.last) { o.last = String(d || ''); o.src = src; }
+    out.set(id, o);
+  };
+  byItem.forEach((list, id) => list.forEach((r) => add(id, r.record_date || r.period_to, 'REC')));
+  // Hồ sơ chờ gửi chưa có ngày ghi: như máy chủ — cuối khoảng nếu đã qua, không thì hôm nay (đầu khoảng nếu khoảng ở tương lai)
+  const t = today();
+  const recDate = (r) => r.record_date || (r.period_to < t ? r.period_to : (r.period_from > t ? r.period_from : t));
+  queued.forEach((list, id) => list.forEach((r) => add(id, recDate(r), 'QUEUE')));
+  evByItem.forEach((list, id) => list.forEach((e) => add(id, e.last_date || e.period_to, 'APP')));
+  return out;
+}
 /** Xóa bộ nhớ tạm tình trạng hồ sơ (vừa lưu hồ sơ vào hàng chờ) */
 export function invalidateRecordStatus() { delete memo.__rs; delete memo.__ri; }
 

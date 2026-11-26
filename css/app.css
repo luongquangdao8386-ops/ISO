@@ -1846,3 +1846,23 @@ html.bg-home .home-hero, html.bg-home .cs-hero { background-image: var(--bg-home
 @media (min-width: 900px) {
   .menu-all .grid9 { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 }
+
+/* Kiểm tra ISO: Đã làm / Chưa làm (26/11/2026) */
+.rd-two { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 700px) { .rd-two { grid-template-columns: 1fr 1fr; gap: 24px; } }
+.rd-col { display: flex; flex-direction: column; gap: 6px; }
+.rd-k { font-size: 0.75rem; font-weight: 700; color: var(--graphite); text-transform: uppercase; letter-spacing: 0.02em; }
+.rd-bar-done { background: #F7E7C4; }
+.rd-bar-done i { background: #2E8B57; }
+.rd-tags { margin-left: auto; display: inline-flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.rd-tags .rd-tag { margin-left: 0; }
+.rd-done { margin-top: 2px; }
+.rd-todo-t { color: #9A6700; font-weight: 600; }
+.rd-row.d-TODO.s-HAVE { border-color: #F1D9A6; }
+.rd-act { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.rd-chip-todo:not(.on) { border-color: #F1D9A6; color: #9A6700; }
+@media (max-width: 699px) {
+  .rd-row { flex-wrap: wrap; }
+  .rd-act { flex-direction: row; width: 100%; }
+  .rd-act .btn { flex: 1 1 0; justify-content: center; }
+}

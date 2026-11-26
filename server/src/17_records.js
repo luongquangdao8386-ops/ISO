@@ -162,7 +162,8 @@ function graceDays_() {
 
 /**
  * record.submit {record_id, item_id, period_from, period_to, record_date?, pages, note?} — expected_version 0.
- * Mã HS-yymm-0001 do máy chủ cấp. pages = số ảnh / tệp sẽ gửi sau bằng doc.upload (1–30). Khoảng ngày tối đa 400 ngày.
+ * Mã HS-yymm-0001 do máy chủ cấp. pages = số ảnh / tệp sẽ gửi sau bằng doc.upload (1–30); pages 0 = hồ sơ giấy không đính kèm
+ * (khi cài đặt record_no_file bật, Ghi chú bắt buộc — nơi lưu). Khoảng ngày tối đa 400 ngày.
  */
 function recordSubmit_(ctx) {
   var p = ctx.req.payload || {};
@@ -176,8 +177,10 @@ function recordSubmit_(ctx) {
   var rdate = p.record_date === undefined || p.record_date === null ? '' : trimStr_(p.record_date);
   if (rdate && !isDateStr_(rdate)) errs.push(fieldError_('record_date', 'INVALID_DATE'));
   var pages = Number(p.pages);
-  if (!(pages >= 1 && pages <= RECORD_MAX_FILES_ && Math.floor(pages) === pages)) errs.push(fieldError_('pages', 'PAGES_INVALID'));
   var note = trimStr_(p.note);
+  var paper = (p.pages === 0 || p.pages === '0') && setting_('record_no_file') !== false;
+  if (!paper && !(pages >= 1 && pages <= RECORD_MAX_FILES_ && Math.floor(pages) === pages)) errs.push(fieldError_('pages', 'PAGES_INVALID'));
+  if (paper && !note) errs.push(fieldError_('note', 'REQUIRED'));
   if (note.length > 500) errs.push(fieldError_('note', 'TOO_LONG'));
   if (errs.length) throw validationError_(errs);
   var today = todayVN_();

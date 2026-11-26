@@ -64,9 +64,9 @@ test('iPhone: ô Trang chủ → Kiểm tra ISO: 3/4 đã có, thiếu BM-CĐ-08
   try {
     const { page } = app;
     await login(page);
-    // Ô Trang chủ: "3/4 đã có" (đỏ vì còn thiếu)
+    // Ô Trang chủ: "Đã làm 0/4 · có mẫu 3/4" (đỏ vì còn thiếu)
     const tile = page.locator('.grid9 .tile[href="#/ready"]');
-    assert.match(await tile.innerText(), /Kiểm tra ISO[\s\S]*3\/4 đã có/);
+    assert.match(await tile.innerText(), /Kiểm tra ISO[\s\S]*Đã làm 0\/4 · có mẫu 3\/4/);
     assert.equal(await tile.locator('.t-red-text').count(), 1);
     await tile.click();
     await page.waitForSelector('.rd-sum');
@@ -74,7 +74,8 @@ test('iPhone: ô Trang chủ → Kiểm tra ISO: 3/4 đã có, thiếu BM-CĐ-08
     assert.equal((await page.textContent('.rd-big .rd-n')).trim(), '3');
     assert.equal((await page.textContent('.rd-big .rd-of')).trim(), '/4');
     const sum = await page.innerText('.rd-sum');
-    assert.match(sum, /Thiếu 1 biểu — cần bổ sung/);
+    assert.match(sum, /Thiếu mẫu 1 biểu — cần bổ sung/);
+    assert.match(sum, /ĐÃ LÀM[\s\S]*0\s*\/4[\s\S]*Chưa làm 4 biểu/);
     assert.match(sum, /Tệp mẫu 1 · In từ app M&E 1 · In từ app Checksheet 1/);
     assert.match(sum, /Không áp dụng 1 biểu \(không tính\)/);
     assert.match(sum, /Phạm vi: Cơ điện/);
@@ -82,8 +83,12 @@ test('iPhone: ô Trang chủ → Kiểm tra ISO: 3/4 đã có, thiếu BM-CĐ-08
     assert.equal(await page.locator('.cov-group-h').count(), 4);
     const miss = page.locator('.rd-row.s-MISSING');
     assert.equal(await miss.count(), 1);
-    assert.match(await miss.innerText(), /BM-CĐ-08-01[\s\S]*Thiếu[\s\S]*Chưa có tệp mẫu · 尚无模板 · Một phần M&E/);
-    assert.match(await page.locator('.rd-row[data-code="BM-CĐ-04-03"]').innerText(), /Đã có[\s\S]*Tệp mẫu · 模板: BM-CĐ-04 · BM-CĐ-04-03 · A3 ngang[\s\S]*cũng in từ app M&E/);
+    assert.match(await miss.innerText(), /BM-CĐ-08-01[\s\S]*Thiếu mẫu[\s\S]*Chưa có tệp mẫu · 尚无模板 · Một phần M&E/);
+    assert.match(await page.locator('.rd-row[data-code="BM-CĐ-04-03"]').innerText(), /Có mẫu[\s\S]*Tệp mẫu · 模板: BM-CĐ-04 · BM-CĐ-04-03 · A3 ngang[\s\S]*cũng in từ app M&E/);
+    // Chưa làm: biểu in từ app (chưa nối) báo "Chưa có hồ sơ từ app", không có nút Ghi đã làm; biểu làm tay có nút
+    assert.match(await page.locator('.rd-row[data-code="BM-CĐ-04-03"]').innerText(), /Chưa làm[\s\S]*Chưa có hồ sơ từ app/);
+    assert.equal(await page.locator('.rd-row[data-code="BM-CĐ-04-03"] .rd-mark').count(), 0);
+    assert.equal(await page.locator('.rd-row[data-code="BM-CĐ-08-01"] .rd-mark').count(), 1);
     assert.match(await page.locator('.rd-row[data-code="BM-CĐ-02-05"]').innerText(), /In từ app Checksheet/);
     assert.equal(await page.locator('.rd-row[data-code="BM-CĐ-02-05"] button').count(), 0, 'biểu in từ app: không có nút In');
     assert.equal(await page.locator('.rd input').count(), 0, 'không có ô gõ → không bật bàn phím');
@@ -94,9 +99,10 @@ test('iPhone: ô Trang chủ → Kiểm tra ISO: 3/4 đã có, thiếu BM-CĐ-08
     await page.click('.rd-chips [data-f="MISSING"]');
     await page.waitForFunction(() => document.querySelectorAll('.rd-row').length === 1);
     assert.deepEqual(await codes(page), ['BM-CĐ-08-01']);
-    await page.click('.rd-chips [data-f="HAVE"]');
-    await page.waitForFunction(() => document.querySelectorAll('.rd-row').length === 3);
-    assert.equal(await page.locator('.rd-row.s-MISSING').count(), 0);
+    await page.click('.rd-chips [data-f="TODO"]');
+    await page.waitForFunction(() => document.querySelectorAll('.rd-row').length === 4);
+    await page.click('.rd-chips [data-f="DONE"]');
+    await page.waitForSelector('.rd .empty-state');
     await page.click('.rd-chips [data-f=""]');
     await page.waitForFunction(() => document.querySelectorAll('.rd-row').length === 4);
     // In: tải xong đổi thành "Mở / Lưu" → chạm lần nữa → tệp mở sẵn sheet BM-CĐ-04-03
@@ -116,7 +122,7 @@ test('iPhone: ô Trang chủ → Kiểm tra ISO: 3/4 đã có, thiếu BM-CĐ-08
     assert.equal(dx.suggestedFilename(), 'Kiem_tra_ISO_2026-11-25.xlsx');
     const buf = fs.readFileSync(await dx.path());
     const txt = sheetText(buf);
-    for (const s of ['DANH MỤC BIỂU MẪU KIỂM TRA ISO', 'ISO审核表单清单', 'BM-CĐ-08-01', '✗ Thiếu · 缺少', '✓ Đã có · 已有', '3/4', 'Tệp mẫu · 模板: BM-CĐ-04 · BM-CĐ-04-03',
+    for (const s of ['DANH MỤC BIỂU MẪU KIỂM TRA ISO', 'ISO审核表单清单', 'BM-CĐ-08-01', '✗ Thiếu mẫu · 缺模板', '✓ Có mẫu · 有模板', '3/4', '0/4', '○ Chưa làm · 未做', 'Tệp mẫu · 模板: BM-CĐ-04 · BM-CĐ-04-03',
       'In từ app Checksheet', 'Phạm vi · 范围: Cơ điện · 机电', 'Người lập', 'Chủ hệ thống']) assert.ok(txt.includes(s), s);
     const zip = X.CFB.read(new Uint8Array(buf), { type: 'array' });
     assert.ok(X.CFB.find(zip, '/xl/media/me_logo.png'), 'logo công ty trong Excel');
@@ -125,7 +131,7 @@ test('iPhone: ô Trang chủ → Kiểm tra ISO: 3/4 đã có, thiếu BM-CĐ-08
   } finally { await app.close(); }
 });
 
-test('web: menu Kiểm tra ISO; có tệp mẫu cho biểu còn thiếu → Đủ biểu; Excel tải luôn; Tra cứu cấp 1 không có ô / menu, mở thẳng báo không có quyền', async () => {
+test('web: menu Kiểm tra ISO; có tệp mẫu cho biểu còn thiếu → Biểu nào cũng có mẫu; Excel tải luôn; Tra cứu cấp 1 không có ô / menu, mở thẳng báo không có quyền', async () => {
   const { env, owner } = realLike();
   upload(owner, 'BM-CD-08_Dien-nuoc.xlsx', ['BM-CĐ-08-01']);
   env.g.dbReset_();
@@ -136,16 +142,16 @@ test('web: menu Kiểm tra ISO; có tệp mẫu cho biểu còn thiếu → Đ�
     await sideClick(page, 'ready');
     await page.waitForSelector('.rd-sum');
     assert.equal((await page.textContent('.rd-big .rd-n')).trim(), '4');
-    assert.match(await page.innerText('.rd-sum'), /Đủ biểu/);
+    assert.match(await page.innerText('.rd-sum'), /Biểu nào cũng có mẫu/);
     assert.equal(await page.locator('.rd-row.s-MISSING').count(), 0);
     await page.click('.rd-chips [data-f="MISSING"]');
     await page.waitForSelector('.rd .empty-state');
     assert.match(await page.innerText('.rd .empty-state'), /Không thiếu biểu nào/);
-    await page.click('.rd-chips [data-f="HAVE"]');
+    await page.click('.rd-chips [data-f="TODO"]');
     await page.waitForFunction(() => document.querySelectorAll('.rd-row').length === 4);
     // Máy tính: Excel tải xuống luôn, tên theo bộ lọc
     const [dx] = await Promise.all([page.waitForEvent('download'), page.click('#rd-xlsx')]);
-    assert.equal(dx.suggestedFilename(), 'Kiem_tra_ISO_2026-11-25_da_co.xlsx');
+    assert.equal(dx.suggestedFilename(), 'Kiem_tra_ISO_2026-11-25_chua_lam.xlsx');
     assert.ok(sheetText(fs.readFileSync(await dx.path())).includes('4/4'));
     assert.ok(await noOverflow(page));
     assert.deepEqual(await noRawKeys(page), []);
@@ -164,4 +170,71 @@ test('web: menu Kiểm tra ISO; có tệp mẫu cho biểu còn thiếu → Đ�
     assert.match(await page.innerText('.view'), /Kiểm tra ISO dành cho Nhân viên trở lên/);
     assert.deepEqual(app.consoleErrors, []);
   } finally { await app.close(); }
+});
+
+test('Ghi đã làm (26/11/2026): Chưa làm → Ghi đã làm → Nộp hồ sơ không kèm ảnh (hồ sơ giấy, phải ghi nơi lưu) → Đã làm, gần nhất hôm nay; Excel cột Đã làm; máy chủ tắt hồ sơ giấy thì vẫn bắt ảnh', async () => {
+  const { env } = realLike();
+  const app = await openApp({ env, now: NOW, ...IPHONE });
+  try {
+    const { page } = app;
+    await login(page);
+    await page.click('.grid9 .tile[href="#/ready"]');
+    await page.waitForSelector('.rd-sum');
+    await page.click('.rd-chips [data-f="TODO"]');
+    await page.waitForFunction(() => document.querySelectorAll('.rd-row').length === 4);
+    await page.click('.rd-row[data-code="BM-CĐ-08-01"] .rd-mark');
+    await page.waitForSelector('form.rec-form');
+    assert.match(await page.innerText('.rec-files'), /Không có ảnh \/ tệp \(hồ sơ giấy\)/);
+    assert.equal(await page.locator('.rec-files legend .req').count(), 0, 'ảnh / tệp không bắt buộc');
+    // Không ảnh, không ghi chú → nhắc ghi nơi lưu
+    await page.click('#rf-save');
+    await page.waitForFunction(() => /ghi nơi lưu hồ sơ giấy/.test((document.querySelector('[data-field="note"] .ferr') || {}).textContent || ''));
+    await page.fill('#f-note', 'Tủ hồ sơ cơ điện, ngăn 2');
+    await page.click('#rf-save');
+    await page.waitForFunction(() => /^#\/record\//.test(location.hash) && !/new/.test(location.hash), null, { timeout: 20000 });
+    await page.waitForFunction(() => /Hồ sơ giấy, không đính kèm/.test(document.body.innerText), null, { timeout: 20000 });
+    env.g.dbReset_();
+    const rec = env.rows('Records')[0];
+    assert.deepEqual([rec.pages, rec.note, rec.status], [0, 'Tủ hồ sơ cơ điện, ngăn 2', 'SUBMITTED']);
+    // Đã gửi xong (màn hồ sơ hiện mã HS do máy chủ cấp)
+    await page.waitForFunction((c) => document.body.innerText.includes(c), rec.code, { timeout: 20000 });
+    // Quay lại Kiểm tra ISO: 08-01 Đã làm, gần nhất hôm nay
+    // Quay lại (bộ lọc Chưa làm vẫn giữ → 08-01 đã rời danh sách Chưa làm: còn 3)
+    await go(page, '#/ready');
+    await page.waitForFunction(() => document.querySelectorAll('.rd-row').length === 3 && !document.querySelector('.rd-row[data-code="BM-CĐ-08-01"]'));
+    await page.click('.rd-chips [data-f=""]');
+    await page.waitForSelector('.rd-row[data-code="BM-CĐ-08-01"].d-DONE');
+    assert.match(await page.innerText('.rd-row[data-code="BM-CĐ-08-01"]'), /Đã làm · gần nhất 25\/11\/2026[\s\S]*1 lần/);
+    assert.match(await page.innerText('.rd-sum'), /1\s*\/4[\s\S]*Chưa làm 3 biểu/);
+    await page.click('.rd-chips [data-f="DONE"]');
+    await page.waitForFunction(() => document.querySelectorAll('.rd-row').length === 1);
+    await page.click('#rd-xlsx');
+    await page.waitForSelector('.modal #rd-open', { timeout: 20000 });
+    const [dx] = await Promise.all([page.waitForEvent('download'), page.click('.modal #rd-open')]);
+    assert.equal(dx.suggestedFilename(), 'Kiem_tra_ISO_2026-11-25_da_lam.xlsx');
+    const txt = sheetText(fs.readFileSync(await dx.path()));
+    assert.ok(txt.includes('✓ 25/11/2026 · 1 lần · 1次'), txt.slice(0, 400));
+    await page.locator('.modal .modal-actions .btn').click();
+    assert.ok(await noOverflow(page));
+    assert.deepEqual(await noRawKeys(page), []);
+    assert.deepEqual(app.consoleErrors, []);
+  } finally { await app.close(); }
+  // Quản trị tắt hồ sơ giấy (Cấu hình record_no_file = false): Nộp hồ sơ lại bắt ảnh / tệp
+  const env2 = realLike().env;
+  env2.g.withWriteLock_(() => env2.g.writeSetting_('record_no_file', false, 'TEST'));
+  env2.g.cache_().removeAll(['cfg:settings']);
+  const app2 = await openApp({ env: env2, now: NOW, ...IPHONE });
+  try {
+    const { page } = app2;
+    await login(page);
+    await page.click('.grid9 .tile[href="#/ready"]');
+    await page.waitForSelector('.rd-sum');
+    await page.click('.rd-row[data-code="BM-CĐ-08-01"] .rd-mark');
+    await page.waitForSelector('form.rec-form');
+    assert.equal(await page.locator('.rec-files legend .req').count(), 1);
+    await page.fill('#f-note', 'Tủ hồ sơ');
+    await page.click('#rf-save');
+    await page.waitForFunction(() => /Cần ít nhất 1 ảnh/.test((document.querySelector('[data-field="pages"] .ferr') || {}).textContent || ''));
+    assert.deepEqual(app2.consoleErrors, []);
+  } finally { await app2.close(); }
 });

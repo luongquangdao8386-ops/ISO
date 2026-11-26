@@ -5,7 +5,7 @@
  * ===================================================================== */
 
 var APP_ID = 'ISO';
-var SERVER_VERSION = '1.0.0-d4.7';
+var SERVER_VERSION = '1.0.0-d4.8';
 var API_CONTRACT_VERSION = '1.0';
 var SCHEMA_VERSION = '1.0.14';
 var TZ = 'Asia/Ho_Chi_Minh';
@@ -70,6 +70,8 @@ var SETTINGS_DEFAULTS = [
   ['record_grace_days', 'INT', 3, true, 1, 'Số ngày cho phép trễ khi xét hồ sơ', '记录允许延迟天数'],
   ['records_start_date', 'STRING', '', true, 1, 'Ngày bắt đầu tính hồ sơ cho biểu ● nhập từ Excel (trống = ngày nhập danh mục đầu tiên)', 'Excel导入的●表单开始计算记录的日期（空=首次导入目录日期）'],
   ['record_status_cache_seconds', 'INT', 300, false, 1, 'Bộ đệm tình trạng hồ sơ trên máy chủ (giây)', '服务器记录状态缓存（秒）'],
+  // 26/11/2026 (người dùng cần đánh dấu biểu đã làm): ghi hồ sơ không kèm ảnh / tệp — hồ sơ giấy, Ghi chú bắt buộc (nơi lưu)
+  ['record_no_file', 'BOOL', true, true, 1, 'Cho ghi hồ sơ không kèm ảnh / tệp (hồ sơ giấy: ghi nơi lưu ở Ghi chú)', '允许不附照片/文件登记记录（纸质记录：在备注写明存放处）'],
   // Đợt 2 (phiên 2a): app đã nối để lấy ngày có hồ sơ — chỉ đặt ở màn Kết nối (link.set), không sửa ở Cấu hình
   ['evidence_sources', 'STRING', '', true, 1, 'App đã nối để lấy ngày có hồ sơ (ME, CS) — đặt ở màn Kết nối', '已连接以获取记录日期的App（ME、CS）——在连接页面设置'],
   // Đợt 2 (phiên 2b): Gmail nhắc hạn — bật/tắt và giờ gửi đặt ở màn Gmail nhắc hạn (mail.settings.set), không sửa ở Cấu hình

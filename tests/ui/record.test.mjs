@@ -76,9 +76,10 @@ test('iPhone: quét tem → Nộp hồ sơ; mất mạng vẫn lưu khoảng ng�
     await page.fill('#f-to', '2026-11-05');
     await page.dispatchEvent('#f-to', 'change');
     await page.waitForFunction(() => /Phủ 12 kỳ/.test(document.querySelector('.rec-cover').textContent));
-    // Thiếu ảnh → báo lỗi
+    // Không ảnh, không ghi chú → báo ghi nơi lưu hồ sơ giấy (26/11/2026: ảnh không bắt buộc khi máy chủ cho hồ sơ giấy)
     await page.click('#rf-save');
-    await page.waitForSelector('.rec-files.bad, [data-field="pages"].bad');
+    await page.waitForSelector('[data-field="note"].bad');
+    assert.match(await page.textContent('[data-field="note"] .ferr'), /ghi nơi lưu hồ sơ giấy/);
     // Mất mạng rồi mới chụp/chọn ảnh và lưu
     await app.offline(true);
     await page.setInputFiles('#rf-pick', [

@@ -328,6 +328,8 @@ export async function renderRecordNew(view, ctx) {
   const qFrom = query && isDate(query.from) ? query.from : '', qTo = query && isDate(query.to) ? query.to : '';
   let mode = qFrom && qTo ? 'range' : rangeFirst ? 'range' : 'one';
   const pages = []; // {kind, file, name, url?, size}
+  // Hồ sơ giấy không kèm ảnh / tệp (26/11/2026): máy chủ cho phép (cài đặt record_no_file) thì ảnh không bắt buộc, ghi nơi lưu ở Ghi chú
+  const paperOk = (session.settings || {}).record_no_file === true;
   view.innerHTML = `<form class="card form rec-form" novalidate>
     <div class="rec-top"><a class="code big" href="#/item/${encodeURIComponent(it.item_id)}">${esc(it.code)}</a>${statusDot(it.status)}</div>
     <p class="item-name">${esc(it.name_vi || '')}${it.name_zh ? `<br><span class="zh muted">${esc(it.name_zh)}</span>` : ''}</p>
@@ -342,10 +344,10 @@ export async function renderRecordNew(view, ctx) {
           }).join('')}</select><div class="ferr"></div></div>`}</div>
         <div class="rec-range">${dateInput('from', 'rec.from', qFrom || sr.from)}${dateInput('to', 'rec.to', qTo || sr.to)}<div class="hint">${bi('rec.range_hint')}</div></div>
         <p class="rec-cover small" aria-live="polite"></p><div class="ferr"></div></fieldset>`}
-    <fieldset class="rec-files" data-field="pages"><legend>${bi('rec.pages')} <span class="req">*</span></legend>
+    <fieldset class="rec-files" data-field="pages"><legend>${bi('rec.pages')}${paperOk ? '' : ' <span class="req">*</span>'}</legend>
       <div class="row"><label class="btn primary file">${ICON.camera}<span>${bi('rec.take_photo')}</span><input type="file" id="rf-cam" accept="image/*" capture="environment" hidden></label>
         <label class="btn file">${ICON.upload}<span>${bi('rec.pick_files')}</span><input type="file" id="rf-pick" accept="${esc(KIND_ACCEPT.RECORD)}" multiple hidden></label></div>
-      <ol class="rec-pages"></ol><div class="hint">${bi('rec.pages_hint')}</div><div class="ferr" role="alert"></div></fieldset>
+      <ol class="rec-pages"></ol><div class="hint">${bi('rec.pages_hint')}</div>${paperOk ? `<div class="hint">${bi('rec.paper_hint')}</div>` : ''}<div class="ferr" role="alert"></div></fieldset>
     <div class="fld" data-field="note"><label for="f-note">${bi('rec.note')}</label><textarea class="inp" id="f-note" rows="2" maxlength="500"></textarea><div class="ferr"></div></div>
     <p class="form-err err"></p>
     <div class="row"><a class="btn" href="#/item/${encodeURIComponent(it.item_id)}">${bi('btn.cancel')}</a><button type="submit" class="btn primary" id="rf-save">${ICON.check}<span>${bi('rec.save')}</span></button></div>
@@ -442,13 +444,14 @@ export async function renderRecordNew(view, ctx) {
     else if (c.from > c.to) errs.push({ field: 'to', key: 'rec.range_invalid' });
     else if (daysBetween(c.from, c.to) >= 400) errs.push({ field: 'to', key: 'rec.range_long' });
     else if (c.from > addDays(t, 31)) errs.push({ field: mode === 'range' ? 'from' : 'day', key: 'rec.date_future' });
-    if (!pages.length) errs.push({ field: 'pages', key: 'rec.need_page' });
+    const note = $('#f-note', form).value.trim();
+    if (!pages.length && !paperOk) errs.push({ field: 'pages', key: 'rec.need_page' });
+    if (!pages.length && paperOk && !note) errs.push({ field: 'note', key: 'rec.need_paper_note' });
     if (errs.length) { showErrors(form, errs); return; }
     const save = $('#rf-save', form);
     busy(save, true);
     try {
       const id = uuid();
-      const note = $('#f-note', form).value.trim();
       await enqueue('record.submit', { record_id: id, item_id: it.item_id, period_from: c.from, period_to: c.to, record_date: type === 'EVENT' ? c.from : '', pages: pages.length, note },
         { entity_type: 'RECORD', entity_id: id, expected_version: 0 });
       let n = 0;
@@ -518,7 +521,7 @@ export async function renderRecord(view, ctx) {
       ${qUploads.length ? `<div class="rec-pages q">${qUploads.map((o) => `<button type="button" class="rec-thumb" data-q="${esc(o.operation_id)}">${/^image\//.test(o.payload.mime_type) ? `<img alt="" data-b64="${esc(o.operation_id)}">` : ICON.file}<span class="small">${bi('rec.page_n', { N: o.payload.page_no || '' })}</span></button>`).join('')}</div>
         <p class="muted small">${bi('rec.files_wait', { N: qUploads.length })}</p>` : ''}
       ${!r.queued && files.length < Number(r.pages || 0) && !qUploads.length ? `<p class="banner warn small">${bi('rec.files_missing', { N: files.length, T: r.pages })}</p>` : ''}
-      ${!files.length && !qUploads.length ? `<p class="muted small">${bi('rec.no_files')}</p>` : ''}
+      ${!files.length && !qUploads.length ? `<p class="muted small">${bi(Number(r.pages || 0) === 0 ? 'rec.paper_only' : 'rec.no_files')}</p>` : ''}
       ${canAdd ? `<div class="row"><label class="btn small file">${ICON.camera}<span>${bi('rec.add_files')}</span><input type="file" id="rd-add" accept="${esc(KIND_ACCEPT.RECORD)}" multiple hidden></label></div>` : ''}
     </section>
     <div class="row item-actions">

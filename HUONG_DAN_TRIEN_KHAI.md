@@ -1,4 +1,4 @@
-# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.7 (menu gọn; 4.6 tải riêng từng biểu; 4.5 Kiểm tra ISO; 4.4 thêm ISO 14001, 45001, 50001)
+# Hướng dẫn triển khai app ISO · 体系管理 — bản 1.0.0-d4.8 (Đã làm / Chưa làm; 4.7 menu gọn; 4.6 tải riêng từng biểu; 4.5 Kiểm tra ISO; 4.4 ISO 14001, 45001, 50001)
 
 App ISO là app thứ ba cùng nền với M&E và Checksheet: máy chủ riêng (dự án Apps Script riêng, bảng tính riêng), người dùng và PIN
 riêng. Ba app dùng **chung một tài khoản Google** (đã chốt 06/11/2026). Cách làm giống hệt M&E, Checksheet: dán `Code.gs` vào Apps Script, triển khai web app, mở trang app
@@ -140,6 +140,38 @@ hồi, In tem QR) · **Hồ sơ & đánh giá** (Kiểm tra ISO, Hồ sơ, Phủ
 Trang chủ · 3 tên nhóm · Tài khoản — bấm tên nhóm để mở / đóng (app nhớ trên máy), mở màn nào thì nhóm của màn đó tự mở, nhóm đang đóng mà
 có việc chờ thì hiện số đỏ trên tên nhóm; tên ngắn: Đề nghị, Phân phối, SP không phù hợp, Kết nối. Các mục hướng dẫn cũ ghi "Trang chủ → ô
 …" mà ô đó không còn ở Trang chủ: bấm ô **Tất cả chức năng** rồi bấm ô đó. Chỉ đổi app.
+
+Bản 4.8 (26/11/2026, anh: "những biểu nào tôi đã làm rồi thì tôi biết đã làm… nhiều biểu ra rồi mà chưa biết biểu nào đã làm biểu nào
+chưa"): màn **Kiểm tra ISO** thêm khối **Đã làm D/Y** (biểu đã có ít nhất một hồ sơ: nộp trong app hoặc ngày có hồ sơ từ app M&E /
+Checksheet) bên cạnh khối **Mẫu để in**; mỗi biểu ghi **✓ Đã làm · gần nhất dd/mm/yyyy · N lần** hoặc **○ Chưa làm** (biểu in từ app: "Chưa
+có hồ sơ từ app"; biểu ○ chưa soạn: "soạn biểu trước"), có kỳ quá hạn thì báo đỏ; lọc **Tất cả · Thiếu mẫu · Chưa làm · Đã làm**; nút **Ghi đã
+làm** → màn Nộp hồ sơ của biểu đó. **Nộp hồ sơ không bắt buộc ảnh / tệp nữa**: hồ sơ giấy thì để trống phần ảnh, ghi **nơi lưu** ở Ghi chú
+(vd "Tủ hồ sơ cơ điện, ngăn 2") — Quản trị muốn bắt buộc ảnh như trước: Cấu hình → `record_no_file` = false. Ô Trang chủ Kiểm tra ISO ghi
+"Đã làm D/Y · có mẫu H/Y". Excel danh sách thêm cột **Đã làm (gần nhất)**. Cần dán Code.gs (máy chủ nhận hồ sơ không kèm ảnh).
+
+## CẬP NHẬT LÊN BẢN 4.8 (1.0.0-d4.8, Đã làm / Chưa làm, hồ sơ giấy) — dán Code.gs, không cần migrateSchema
+
+**Anh phải làm:**
+1. <https://script.google.com> → `ISO_MayChu_THAT` → `Code.gs` → Ctrl+A → xóa → mở
+   `https://raw.githubusercontent.com/luongquangdao8386-ops/ISO/main/apps-script/Code.gs` → Ctrl+A → Ctrl+C → dán → **Lưu**.
+   (Máy chủ chưa lên 4.4 thì chạy thêm **`migrateSchema`** như mục 4.4 — nhật ký ghi nạp điều khoản ISO 14001 / 45001 / 50001.)
+2. **Triển khai → Quản lý các bản triển khai** → bút chì → **Phiên bản mới** → Mô tả `d4.8 da lam chua lam` → **Triển khai**.
+3. Đóng hẳn app rồi mở lại → **Tài khoản → Thông tin**: `1.0.0-d4.8 · mã vỏ app a5fc0519fa2f`, máy chủ `1.0.0-d4.8`.
+   Chưa dán Code.gs thì app vẫn chạy, chỉ là Nộp hồ sơ còn bắt ảnh như cũ.
+
+**Nên kiểm (2 phút, iPhone thật):** Trang chủ → ô **Kiểm tra ISO** → bấm **Chưa làm** → chọn một biểu anh đã ghi trên giấy → **Ghi đã làm** →
+chọn kỳ / ngày → không chụp ảnh, ghi nơi lưu ở Ghi chú → **Lưu** → quay lại Kiểm tra ISO (bấm Tất cả): biểu đó **✓ Đã làm · gần nhất hôm nay**.
+Nếu chỉ thử: vào hồ sơ đó (HS-…) → **Trả lại** (PIN, lý do "thử") để biểu về Chưa làm.
+
+**Đã thử trên giả lập — anh không cần làm:** `tests/ui/ready.test.mjs` (3 test): iPhone — ô Trang chủ "Đã làm 0/4 · có mẫu 3/4"; Kiểm tra
+ISO hai khối (Mẫu để in 3/4 thiếu 1 · Đã làm 0/4 chưa làm 4); biểu in từ app (chưa nối) "Chưa có hồ sơ từ app", không có nút Ghi đã làm; lọc
+Chưa làm 4 / Đã làm 0; **Ghi đã làm** BM-CĐ-08-01 → Nộp hồ sơ: phần ảnh không có dấu bắt buộc, bấm Lưu khi chưa ghi gì → nhắc "ghi nơi lưu
+hồ sơ giấy" → ghi "Tủ hồ sơ cơ điện, ngăn 2" → Lưu → màn hồ sơ "Hồ sơ giấy, không đính kèm", mã HS-… → máy chủ có hồ sơ 0 trang → quay lại
+(lọc Chưa làm còn 3) → Tất cả: 08-01 "✓ Đã làm · gần nhất 25/11/2026 · 1 lần", Đã làm 1/4 → lọc Đã làm → Excel `…_da_lam.xlsx` cột Đã làm; máy
+chủ tắt `record_no_file` → Nộp hồ sơ lại bắt ảnh ("Cần ít nhất 1 ảnh"). `tests/server/ready.test.mjs`: hồ sơ 0 trang thiếu Ghi chú → báo, có
+Ghi chú → lưu; tắt cài đặt → báo số trang; Trạng thái hệ thống không tính hồ sơ giấy là thiếu tệp; cách đếm Đã làm / Chưa làm, lọc.
+`tests/ui/record.test.mjs`: Nộp hồ sơ không ảnh không ghi chú → nhắc nơi lưu, mất mạng vẫn lưu ảnh như trước. Cả bộ: 118 test máy chủ +
+57 test giao diện đạt.
 
 ## CẬP NHẬT LÊN BẢN 4.7 (1.0.0-d4.7, menu gọn) — chỉ app
 
