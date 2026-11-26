@@ -238,3 +238,23 @@ test('Ghi đã làm (26/11/2026): Chưa làm → Ghi đã làm → Nộp hồ s�
     assert.deepEqual(app2.consoleErrors, []);
   } finally { await app2.close(); }
 });
+
+test('Đã làm từ M&E / Checksheet: số lần = số lượt trong các kỳ (không phải số kỳ), gần nhất = ngày mới nhất, ghi "từ app"', async () => {
+  const { env } = realLike();
+  const it = env.rows('Items').find((x) => x.code === 'BM-CĐ-03-03');
+  env.g.dbReset_();
+  env.g.withWriteLock_(() => env.g.insertRows_('Evidence', [
+    { evidence_id: uuid(), source: 'ME', item_id: it.item_id, form_code: it.code, period_type: 'MONTH', period_key: '2026-10', period_from: '2026-10-01', period_to: '2026-10-31', count: 3, last_date: '2026-10-28', src_codes: it.code, synced_at: NOW },
+    { evidence_id: uuid(), source: 'ME', item_id: it.item_id, form_code: it.code, period_type: 'MONTH', period_key: '2026-11', period_from: '2026-11-01', period_to: '2026-11-30', count: 2, last_date: '2026-11-20', src_codes: it.code, synced_at: NOW }
+  ]));
+  env.g.dbReset_();
+  const app = await openApp({ env, now: NOW, ...IPHONE });
+  try {
+    const { page } = app;
+    await login(page);
+    await go(page, '#/ready');
+    await page.waitForSelector('.rd-row[data-code="BM-CĐ-03-03"].d-DONE');
+    assert.match(await page.innerText('.rd-row[data-code="BM-CĐ-03-03"]'), /Đã làm · gần nhất 20\/11\/2026[\s\S]*5 lần[\s\S]*từ app M&E \/ Checksheet/);
+    assert.deepEqual(app.consoleErrors, []);
+  } finally { await app.close(); }
+});

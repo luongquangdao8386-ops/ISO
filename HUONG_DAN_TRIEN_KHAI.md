@@ -149,6 +149,13 @@ làm** → màn Nộp hồ sơ của biểu đó. **Nộp hồ sơ không bắt 
 (vd "Tủ hồ sơ cơ điện, ngăn 2") — Quản trị muốn bắt buộc ảnh như trước: Cấu hình → `record_no_file` = false. Ô Trang chủ Kiểm tra ISO ghi
 "Đã làm D/Y · có mẫu H/Y". Excel danh sách thêm cột **Đã làm (gần nhất)**. Cần dán Code.gs (máy chủ nhận hồ sơ không kèm ảnh).
 
+## SỬA LỖI 26/11/2026 (sau rà soát) — chỉ app, không phải làm gì
+
+- **Kho tệp mẫu → tải riêng một biểu**: biểu nằm ở sheet đang **ẩn** trong tệp Excel gốc thì tệp tải về chỉ còn một sheet ẩn → Excel báo
+  tệp hỏng. Nay sheet của biểu luôn hiện ra (sheet phụ đang ẩn vẫn giữ ẩn).
+- **Kiểm tra ISO → "N lần"** của biểu in từ M&E / Checksheet: trước đếm số kỳ (một tháng 3 phiếu bảo trì ghi "1 lần"), nay đếm số lượt.
+- **Bản sao (fork) của người khác** không còn nối vào máy chủ THẬT của anh (config.js chỉ dùng link cố định trên trang của anh).
+
 ## CẬP NHẬT LÊN BẢN 4.8 (1.0.0-d4.8, Đã làm / Chưa làm, hồ sơ giấy) — dán Code.gs, không cần migrateSchema
 
 **Anh phải làm:**

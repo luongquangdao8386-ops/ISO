@@ -157,3 +157,17 @@ test('sheet không mang mã biểu (Mục lục) chỉ chính nó; giữ cả t�
   assert.equal(sheetFileName('BM-CĐ-04-03'), 'BM-CD-04-03.xlsx');
   assert.equal(sheetFileName('Mục lục / 目录'), 'Mục lục - 目录.xlsx');
 });
+
+test('sheet của biểu đang ẩn trong tệp gốc: tệp tải riêng hiện sheet đó (không còn sheet nào hiện → Excel báo hỏng); sheet phụ ẩn giữ ẩn', () => {
+  const wb = X.utils.book_new();
+  ['Mục lục', 'BM-CĐ-04-01', 'BM-CĐ-04-02', 'BM-CĐ-04-02-TH'].forEach((n) => X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([[n]]), n));
+  wb.Workbook = { Sheets: [{ Hidden: 0 }, { Hidden: 1 }, { Hidden: 0 }, { Hidden: 2 }] };
+  const src = new Uint8Array(X.write(wb, { type: 'array', bookType: 'xlsx' }));
+  const sheets = (bytes) => get(zipOf(bytes), 'xl/workbook.xml').match(/<sheet\b[^>]*>/g).map((t) => [/name="([^"]*)"/.exec(t)[1], (/state="([^"]*)"/.exec(t) || [])[1] || 'visible']);
+  assert.deepEqual(sheets(onlySheets(X, src, ['BM-CĐ-04-01'], 'BM-CĐ-04-01')), [['BM-CĐ-04-01', 'visible']]);
+  assert.deepEqual(sheets(onlySheets(X, src, ['BM-CĐ-04-02', 'BM-CĐ-04-02-TH'], 'BM-CĐ-04-02')), [['BM-CĐ-04-02', 'visible'], ['BM-CĐ-04-02-TH', 'veryHidden']]);
+  const back = X.read(onlySheets(X, src, ['BM-CĐ-04-01'], 'BM-CĐ-04-01'), { type: 'array' });
+  assert.deepEqual([...back.SheetNames], ['BM-CĐ-04-01']);
+  // Cả tệp, mở sẵn ở sheet ẩn: sheet đó hiện, sheet khác giữ nguyên
+  assert.deepEqual(sheets(openAtSheet(X, src, 'BM-CĐ-04-01')), [['Mục lục', 'visible'], ['BM-CĐ-04-01', 'visible'], ['BM-CĐ-04-02', 'visible'], ['BM-CĐ-04-02-TH', 'veryHidden']]);
+});

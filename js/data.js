@@ -298,9 +298,10 @@ export async function recordStatusMap(list) {
 export async function recordsDoneMap() {
   const { byItem, queued, evByItem } = await recordInputs();
   const out = new Map();
-  const add = (id, d, src) => {
+  // n = số lần làm: mỗi hồ sơ một lần; dòng ngày có hồ sơ từ M&E / Checksheet là một kỳ, mang số lượt trong kỳ (count)
+  const add = (id, d, src, k = 1) => {
     const o = out.get(id) || { last: '', n: 0, src: '' };
-    o.n++;
+    o.n += k;
     if (String(d || '') >= o.last) { o.last = String(d || ''); o.src = src; }
     out.set(id, o);
   };
@@ -309,7 +310,7 @@ export async function recordsDoneMap() {
   const t = today();
   const recDate = (r) => r.record_date || (r.period_to < t ? r.period_to : (r.period_from > t ? r.period_from : t));
   queued.forEach((list, id) => list.forEach((r) => add(id, recDate(r), 'QUEUE')));
-  evByItem.forEach((list, id) => list.forEach((e) => add(id, e.last_date || e.period_to, 'APP')));
+  evByItem.forEach((list, id) => list.forEach((e) => add(id, e.last_date || e.period_to, 'APP', Math.max(1, Math.round(Number(e.count) || 1)))));
   return out;
 }
 /** Xóa bộ nhớ tạm tình trạng hồ sơ (vừa lưu hồ sơ vào hàng chờ) */

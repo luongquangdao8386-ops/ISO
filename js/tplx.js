@@ -143,6 +143,8 @@ export function openAtSheet(X, bytes, name) {
   } else {
     wb = wb.replace(/<sheets>/, `<bookViews><workbookView activeTab="${i}"/></bookViews><sheets>`);
   }
+  // Sheet của biểu đang ẩn trong tệp gốc: hiện ra (sheet đang chọn mà ẩn — hoặc tệp chỉ còn sheet ẩn — Excel báo tệp hỏng)
+  if (list[i].state !== 'visible') wb = wb.replace(list[i].tag, list[i].tag.replace(/\sstate="[^"]*"/, ''));
   z.put('xl/workbook.xml', wb);
   list.forEach((s, j) => {
     if (!s.path) return;
